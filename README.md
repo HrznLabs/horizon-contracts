@@ -3,10 +3,19 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-blue)](https://docs.soliditylang.org/)
 [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-orange)](https://book.getfoundry.sh/)
+[![Base](https://img.shields.io/badge/Deployed%20on-Base-0052FF)](https://base.org)
 
-**Decentralized mission coordination protocol built on Base.**
+**Decentralized mission coordination protocol built on Base (Optimism L2).**
 
 Horizon Protocol enables trustless, escrow-backed task coordination with USDC payments, reputation attestations, dispute resolution, and community governance through DAOs.
+
+## 🎯 Why Horizon?
+
+- **Non-custodial** - Funds in escrow, protocol never controls user assets
+- **Trust-minimized** - On-chain reputation and dispute resolution
+- **Community-driven** - Guild DAOs curate and govern local markets
+- **Gas-efficient** - EIP-1167 minimal proxies for 90%+ gas savings
+- **Privacy-preserving** - Location precision controls, opt-in tracking only
 
 ## 🌐 Deployed Contracts (Base Sepolia)
 
@@ -29,7 +38,7 @@ Horizon Protocol is a decentralized platform for coordinating real-world tasks (
 - **Minimal Proxy Deployment** - Gas-efficient EIP-1167 clones
 - **Multi-party Fee Distribution** - Protocol, Labs, Resolver, Guild, and Performer splits
 - **Dispute Resolution** - DDR (Dynamic Dispute Reserve) and LPP (Loser-Pays Penalty)
-- **Reputation System** - On-chain ratings and attestations
+- **Reputation System** - On-chain ratings and attestations via EAS
 - **Guild Governance** - Community-driven mission curation
 - **Achievement NFTs** - Soulbound and tradable achievements
 
@@ -95,6 +104,7 @@ function submitProof(bytes32 proofHash) external;  // Submit completion proof
 function approveCompletion() external;       // Poster approves
 function cancelMission() external;           // Cancel if not accepted
 function raiseDispute(bytes32 disputeHash) external;  // Raise dispute
+function claimExpired() external;            // Claim expired mission funds
 ```
 
 #### `PaymentRouter.sol`
@@ -104,7 +114,7 @@ Routes payments with configurable fee splits.
 - Protocol: 4% (fixed)
 - Labs: 4% (fixed)
 - Resolver: 2% (fixed)
-- Guild: 0-15% (variable)
+- Guild: 0-15% (variable, set by guild)
 - Performer: 90% - guildFee
 
 #### `DisputeResolver.sol`
@@ -141,6 +151,8 @@ function submitRating(
     uint8 score,        // 1-5
     bytes32 commentHash
 ) external;
+
+function getAverageRating(address user) external view returns (uint256 average, uint256 count);
 ```
 
 #### `HorizonAchievements.sol`
@@ -153,6 +165,12 @@ ERC-721 achievements with soulbound support.
 - Seasonal/limited-time
 - Special events
 
+```solidity
+function mintAchievement(address to, uint256 typeId, bytes32 proofHash) external returns (uint256 tokenId);
+function createAchievementType(...) external returns (uint256 typeId);
+function hasAchievement(address user, uint256 typeId) external view returns (bool);
+```
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -164,7 +182,7 @@ ERC-721 achievements with soulbound support.
 
 ```bash
 # Clone the repository
-git clone https://github.com/horizon-labs/horizon-contracts.git
+git clone https://github.com/HrznLabs/horizon-contracts.git
 cd horizon-contracts
 
 # Install dependencies
@@ -185,6 +203,9 @@ forge test -vvv
 
 # Run specific test
 forge test --match-test testCreateMission
+
+# Gas report
+forge test --gas-report
 ```
 
 ### Deployment
@@ -209,23 +230,37 @@ All contracts implement well-defined interfaces for integration:
 
 ## 🔒 Security
 
-### Audit Status
-
-⚠️ **These contracts have not been formally audited.** Use at your own risk.
-
 ### Security Features
 
 - **ReentrancyGuard** on all external calls
 - **SafeERC20** for token transfers
-- **Access Control** with role-based permissions
+- **Access Control** with role-based permissions (OpenZeppelin)
 - **Immutable parameters** for critical configuration
-- **Minimal proxy pattern** for predictable deployments
+- **CEI pattern** (Checks-Effects-Interactions) throughout
+- **Custom errors** for gas efficiency
+- **Events** for all state changes
 
-### Known Considerations
+### Audit Status
 
-1. DDR deposits must be made before dispute resolution
-2. Appeal period must pass before dispute finalization
-3. Guild fees are set per-guild and can be overridden per-mission
+⚠️ **These contracts have not been formally audited.** Use at your own risk on testnet.
+
+### Security Invariants
+
+1. `rewardAmount` immutable after mission creation
+2. `performer` immutable after mission acceptance
+3. Escrow funds can only exit via: settlement, expiry, or dispute resolution
+4. DDR deposits required before dispute resolution
+5. Appeal period must pass before dispute finalization
+
+## 🛠️ SDK
+
+For TypeScript integration, use our SDK:
+
+```bash
+yarn add @horizon-protocol/sdk viem
+```
+
+See [horizon-sdk](https://github.com/HrznLabs/horizon-sdk) for documentation.
 
 ## 📄 License
 
@@ -233,12 +268,10 @@ MIT License - see [LICENSE](./LICENSE)
 
 ## 🔗 Links
 
-- [Horizon Protocol Documentation](https://docs.horizon.xyz) (coming soon)
+- [SDK Repository](https://github.com/HrznLabs/horizon-sdk)
 - [Base Sepolia Explorer](https://sepolia.basescan.org)
-- [Discord](https://discord.gg/horizon) (coming soon)
-- [Twitter](https://twitter.com/HorizonProtocol) (coming soon)
+- [Verified Contracts](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c)
 
 ---
 
-Built with ❤️ by the Horizon Labs team
-
+Built with ❤️ by Horizon Labs | Powered by Base (Optimism L2)
