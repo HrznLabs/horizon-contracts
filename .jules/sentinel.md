@@ -1,4 +1,4 @@
-## 2024-05-23 - Critical Access Control Vulnerability in Escrow
-**Vulnerability:** Found `settleDispute` function in `MissionEscrow.sol` was `external` and lacked any access control, allowing anyone to settle disputes and potentially steal funds.
-**Learning:** Comments indicating "TODO: Add access control" are major red flags. Clone patterns make passing dependencies (like `DisputeResolver`) tricky if not planned for in the factory/initializer.
-**Prevention:** Always implement access control immediately, even if using placeholders. Use `restricted` or specific role modifiers on all state-changing external functions. Review initialization logic for clones carefully to ensure all trusted parties are known.
+## 2024-05-23 - Unprotected Critical Function in Proxy Implementation
+**Vulnerability:** Found `settleDispute` in `MissionEscrow` (implementation contract) was completely unprotected, allowing any user to refund themselves or steal funds.
+**Learning:** The error definition `NotDisputeResolver` existed in the interface but was not used in the implementation, suggesting the access control was intended but forgotten. Always verify that defined errors are actually used in logic.
+**Prevention:** Use a checklist for "sensitive functions" (functions that move funds or change critical state) to ensure they have appropriate access control modifiers or checks. Verify against the interface definitions to ensure all intended restrictions are implemented.

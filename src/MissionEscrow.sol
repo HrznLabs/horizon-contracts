@@ -59,11 +59,6 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         _;
     }
 
-    modifier onlyDisputeResolver() {
-        if (msg.sender != _disputeResolver) revert NotDisputeResolver();
-        _;
-    }
-
     // =============================================================================
     // INITIALIZATION
     // =============================================================================
@@ -86,8 +81,8 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         bytes32 metadataHash,
         bytes32 locationHash,
         address paymentRouter,
-        address disputeResolver,
-        address usdc
+        address usdc,
+        address disputeResolver
     ) external initializer {
         _missionId = missionId;
         
@@ -259,7 +254,10 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      * @param outcome 0=None, 1=PosterWins, 2=PerformerWins, 3=Split, 4=Cancelled
      * @param splitPercentage For Split outcome, performer's share in basis points (0-10000)
      */
-    function settleDispute(uint8 outcome, uint256 splitPercentage) external onlyDisputeResolver {
+    function settleDispute(uint8 outcome, uint256 splitPercentage) external {
+        // Only dispute resolver can settle
+        if (msg.sender != _disputeResolver) revert NotDisputeResolver();
+
         // Must be in Disputed state
         if (_runtime.state != MissionState.Disputed) revert InvalidState();
         
