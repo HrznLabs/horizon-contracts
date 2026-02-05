@@ -24,12 +24,33 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     using SafeERC20 for IERC20;
 
     // =============================================================================
+    // PACKED STRUCTS
+    // =============================================================================
+
+    struct MissionParamsPacked {
+        address poster;         // 20
+        uint64 createdAt;       // 8
+        address guild;          // 20
+        uint64 expiresAt;       // 8
+        uint256 rewardAmount;   // 32
+        bytes32 metadataHash;   // 32
+        bytes32 locationHash;   // 32
+    }
+
+    struct MissionRuntimePacked {
+        address performer;    // 20
+        MissionState state;   // 1
+        bool disputeRaised;   // 1
+        bytes32 proofHash;    // 32
+    }
+
+    // =============================================================================
     // STATE VARIABLES
     // =============================================================================
 
     uint256 private _missionId;
-    MissionParams private _params;
-    MissionRuntime private _runtime;
+    MissionParamsPacked private _params;
+    MissionRuntimePacked private _runtime;
 
     IPaymentRouter private _paymentRouter;
     IERC20 private _usdc;
@@ -84,17 +105,19 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     ) external initializer {
         _missionId = missionId;
         
-        _params = MissionParams({
+        if (expiresAt > type(uint64).max) revert MissionExpired();
+
+        _params = MissionParamsPacked({
             poster: poster,
             rewardAmount: rewardAmount,
-            createdAt: block.timestamp,
-            expiresAt: expiresAt,
+            createdAt: uint64(block.timestamp),
+            expiresAt: uint64(expiresAt),
             guild: guild,
             metadataHash: metadataHash,
             locationHash: locationHash
         });
 
-        _runtime = MissionRuntime({
+        _runtime = MissionRuntimePacked({
             performer: address(0),
             state: MissionState.Open,
             proofHash: bytes32(0),
@@ -226,11 +249,24 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     // =============================================================================
 
     function getParams() external view returns (MissionParams memory) {
-        return _params;
+        return MissionParams({
+            poster: _params.poster,
+            rewardAmount: _params.rewardAmount,
+            createdAt: uint256(_params.createdAt),
+            expiresAt: uint256(_params.expiresAt),
+            guild: _params.guild,
+            metadataHash: _params.metadataHash,
+            locationHash: _params.locationHash
+        });
     }
 
     function getRuntime() external view returns (MissionRuntime memory) {
-        return _runtime;
+        return MissionRuntime({
+            performer: _runtime.performer,
+            state: _runtime.state,
+            proofHash: _runtime.proofHash,
+            disputeRaised: _runtime.disputeRaised
+        });
     }
 
     function getMissionId() external view returns (uint256) {
@@ -290,5 +326,3 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         emit DisputeSettled(_missionId, outcome, posterAmount, performerAmount);
     }
 }
-
-
