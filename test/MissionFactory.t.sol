@@ -39,7 +39,7 @@ contract MissionFactoryTest is Test {
         );
 
         // Deploy MissionFactory
-        factory = new MissionFactory(address(usdc), address(router));
+        factory = new MissionFactory(address(usdc), address(router), owner);
 
         vm.stopPrank();
 

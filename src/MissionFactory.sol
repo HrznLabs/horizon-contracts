@@ -34,6 +34,9 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     /// @notice PaymentRouter contract address
     address public paymentRouter;
 
+    /// @notice DisputeResolver contract address
+    address public disputeResolver;
+
     /// @notice Current mission counter
     uint256 public missionCount;
 
@@ -68,6 +71,7 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     );
 
     event PaymentRouterUpdated(address indexed newRouter);
+    event DisputeResolverUpdated(address indexed newResolver);
 
     // =============================================================================
     // ERRORS
@@ -76,6 +80,7 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     error InvalidRewardAmount();
     error InvalidDuration();
     error InvalidPaymentRouter();
+    error InvalidDisputeResolver();
     error TransferFailed();
     error MissionNotFound();
 
@@ -87,13 +92,16 @@ contract MissionFactory is Ownable, ReentrancyGuard {
      * @notice Deploy the MissionFactory
      * @param _usdc USDC token address
      * @param _paymentRouter PaymentRouter contract address
+     * @param _disputeResolver DisputeResolver contract address
      */
     constructor(
         address _usdc,
-        address _paymentRouter
+        address _paymentRouter,
+        address _disputeResolver
     ) Ownable(msg.sender) {
         usdc = IERC20(_usdc);
         paymentRouter = _paymentRouter;
+        disputeResolver = _disputeResolver;
 
         // Deploy the implementation contract
         escrowImplementation = address(new MissionEscrow());
@@ -146,6 +154,7 @@ contract MissionFactory is Ownable, ReentrancyGuard {
             metadataHash,
             locationHash,
             paymentRouter,
+            disputeResolver,
             address(usdc)
         );
 
@@ -223,6 +232,16 @@ contract MissionFactory is Ownable, ReentrancyGuard {
         if (_paymentRouter == address(0)) revert InvalidPaymentRouter();
         paymentRouter = _paymentRouter;
         emit PaymentRouterUpdated(_paymentRouter);
+    }
+
+    /**
+     * @notice Update the dispute resolver address
+     * @param _disputeResolver New dispute resolver address
+     */
+    function setDisputeResolver(address _disputeResolver) external onlyOwner {
+        if (_disputeResolver == address(0)) revert InvalidDisputeResolver();
+        disputeResolver = _disputeResolver;
+        emit DisputeResolverUpdated(_disputeResolver);
     }
 }
 
