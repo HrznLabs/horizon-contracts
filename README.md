@@ -1,277 +1,91 @@
 # Horizon Protocol Smart Contracts
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Solidity](https://img.shields.io/badge/Solidity-0.8.24-blue)](https://docs.soliditylang.org/)
-[![Foundry](https://img.shields.io/badge/Built%20with-Foundry-orange)](https://book.getfoundry.sh/)
-[![Base](https://img.shields.io/badge/Deployed%20on-Base-0052FF)](https://base.org)
+Smart contracts for Horizon Protocol, built with Foundry and deployed on Base.
 
-**Decentralized mission coordination protocol built on Base (Optimism L2).**
+## Overview
 
-Horizon Protocol enables trustless, escrow-backed task coordination with USDC payments, reputation attestations, dispute resolution, and community governance through DAOs.
+Horizon enables trustless, escrow-backed mission coordination:
 
-## 🎯 Why Horizon?
+- Missions are funded in USDC and escrowed on-chain
+- Performers accept, submit proof, and receive payment on completion
+- Disputes are handled with DDR/LPP economics
+- Guilds curate missions and earn fees
 
-- **Non-custodial** - Funds in escrow, protocol never controls user assets
-- **Trust-minimized** - On-chain reputation and dispute resolution
-- **Community-driven** - Guild DAOs curate and govern local markets
-- **Gas-efficient** - EIP-1167 minimal proxies for 90%+ gas savings
-- **Privacy-preserving** - Location precision controls, opt-in tracking only
+## Contract Suite
 
-## 🌐 Deployed Contracts (Base Sepolia)
+- `MissionFactory` - deploys `MissionEscrow` clones (EIP-1167)
+- `MissionEscrow` - mission lifecycle and escrow
+- `PaymentRouter` - fee routing to treasuries
+- `GuildFactory` / `GuildDAO` - guild governance
+- `DisputeResolver` - DDR/LPP dispute flow
+- `ReputationAttestations` - on-chain ratings
+- `HorizonAchievements` - achievements (soulbound + tradable)
 
-| Contract | Address | Verified |
-|----------|---------|----------|
-| PaymentRouter | `0x94fb7908257ec36f701d2605b51eefed4326ddf5` | ✅ |
-| MissionFactory | `0xee9234954b134c39c17a75482da78e46b16f466c` | ✅ |
-| GuildFactory | `0xfeae3538a4a1801e47b6d16104aa8586edb55f00` | ✅ |
-| ReputationAttestations | `0xedae9682a0fb6fb3c18d6865461f67db7d748002` | ✅ |
-| DisputeResolver | `0xb00ac4278129928aecc72541b0bcd69d94c1691e` | ✅ |
-| HorizonAchievements | `0x568e0e3102bfa1f4045d3f62559c0f9823b469bc` | ✅ |
+## Fee Structure (basis points)
 
-**Base Sepolia USDC:** `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
+- Protocol: 400
+- Labs: 400
+- Resolver: 200
+- Guild: 0-1500 (router cap), `GuildDAO` enforces 1000 max at init
+- Performer: 9000 minus guild fee
 
-## 📋 Overview
+## Deployments
 
-Horizon Protocol is a decentralized platform for coordinating real-world tasks (missions) with:
+See `DEPLOYED_ADDRESSES.md` for the canonical list. Current Base Sepolia v2.2 addresses:
 
-- **USDC Escrow** - Funds locked until mission completion
-- **Minimal Proxy Deployment** - Gas-efficient EIP-1167 clones
-- **Multi-party Fee Distribution** - Protocol, Labs, Resolver, Guild, and Performer splits
-- **Dispute Resolution** - DDR (Dynamic Dispute Reserve) and LPP (Loser-Pays Penalty)
-- **Reputation System** - On-chain ratings and attestations via EAS
-- **Guild Governance** - Community-driven mission curation
-- **Achievement NFTs** - Soulbound and tradable achievements
+| Contract | Address |
+| --- | --- |
+| PaymentRouter | `0x94fb7908257ec36f701d2605b51eefed4326ddf5` |
+| MissionFactory | `0xee9234954b134c39c17a75482da78e46b16f466c` |
+| GuildFactory | `0xfeae3538a4a1801e47b6d16104aa8586edb55f00` |
+| ReputationAttestations | `0xedae9682a0fb6fb3c18d6865461f67db7d748002` |
+| DisputeResolver | `0xb00ac4278129928aecc72541b0bcd69d94c1691e` |
+| HorizonAchievements | `0x568e0e3102bfa1f4045d3f62559c0f9823b469bc` |
 
-## 🏗️ Architecture
+USDC (Base Sepolia): `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Mission Flow                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Poster                    MissionFactory                        │
-│    │                            │                                │
-│    ├── createMission() ────────>│                                │
-│    │   (USDC + params)          │                                │
-│    │                            ├── Deploy MissionEscrow Clone   │
-│    │                            │   (EIP-1167 minimal proxy)     │
-│    │                            │                                │
-│    │                     MissionEscrow                           │
-│    │                            │                                │
-│  Performer                      │                                │
-│    ├── acceptMission() ────────>│                                │
-│    ├── submitProof() ──────────>│                                │
-│    │                            │                                │
-│  Poster                         │                                │
-│    ├── approveCompletion() ────>│                                │
-│    │                            │                                │
-│    │                     PaymentRouter                           │
-│    │                            │                                │
-│    │                            ├── 4% → Protocol Treasury       │
-│    │                            ├── 4% → Labs Treasury           │
-│    │                            ├── 2% → Resolver Treasury       │
-│    │                            ├── 0-15% → Guild Treasury       │
-│    │                            └── 75-90% → Performer           │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+## Prerequisites
 
-## 📦 Contract Suite
+- Foundry
+- Node.js (for scripts)
 
-### Core Contracts
-
-#### `MissionFactory.sol`
-Factory for deploying `MissionEscrow` clones using EIP-1167 minimal proxies.
-
-```solidity
-function createMission(
-    uint256 rewardAmount,    // USDC amount (6 decimals)
-    uint256 expiresAt,       // Expiration timestamp
-    address guild,           // Optional guild address
-    bytes32 metadataHash,    // IPFS hash of mission metadata
-    bytes32 locationHash     // IPFS hash of location data
-) external returns (uint256 missionId);
-```
-
-#### `MissionEscrow.sol`
-Individual escrow contract for each mission with full lifecycle management.
-
-**States:** `Open` → `Accepted` → `Submitted` → `Completed`/`Cancelled`/`Disputed`
-
-```solidity
-function acceptMission() external;           // Performer accepts
-function submitProof(bytes32 proofHash) external;  // Submit completion proof
-function approveCompletion() external;       // Poster approves
-function cancelMission() external;           // Cancel if not accepted
-function raiseDispute(bytes32 disputeHash) external;  // Raise dispute
-function claimExpired() external;            // Claim expired mission funds
-```
-
-#### `PaymentRouter.sol`
-Routes payments with configurable fee splits.
-
-**Fee Structure:**
-- Protocol: 4% (fixed)
-- Labs: 4% (fixed)
-- Resolver: 2% (fixed)
-- Guild: 0-15% (variable, set by guild)
-- Performer: 90% - guildFee
-
-#### `DisputeResolver.sol`
-Handles mission disputes with economic incentives.
-
-**Mechanisms:**
-- **DDR (Dynamic Dispute Reserve):** 5% deposit from each party
-- **LPP (Loser-Pays Penalty):** 2% penalty redistributed
-- **Appeal Period:** 48 hours before finalization
-- **DAO Override:** Protocol DAO can override resolutions
-
-### Governance Contracts
-
-#### `GuildDAO.sol`
-Guild governance with role-based access control.
-
-**Roles:**
-- `ADMIN_ROLE` - Full guild control
-- `OFFICER_ROLE` - Member management
-- `CURATOR_ROLE` - Mission board curation
-
-#### `GuildFactory.sol`
-Factory for deploying `GuildDAO` clones.
-
-### Supporting Contracts
-
-#### `ReputationAttestations.sol`
-On-chain reputation and rating storage.
-
-```solidity
-function submitRating(
-    uint256 missionId,
-    address ratee,
-    uint8 score,        // 1-5
-    bytes32 commentHash
-) external;
-
-function getAverageRating(address user) external view returns (uint256 average, uint256 count);
-```
-
-#### `HorizonAchievements.sol`
-ERC-721 achievements with soulbound support.
-
-**Categories:**
-- Milestone (first mission, 100 missions, etc.)
-- Performance (speed runner, perfect rating)
-- Guild-related achievements
-- Seasonal/limited-time
-- Special events
-
-```solidity
-function mintAchievement(address to, uint256 typeId, bytes32 proofHash) external returns (uint256 tokenId);
-function createAchievementType(...) external returns (uint256 typeId);
-function hasAchievement(address user, uint256 typeId) external view returns (bool);
-```
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- [Foundry](https://book.getfoundry.sh/getting-started/installation)
-- [Node.js](https://nodejs.org/) (for scripts)
-
-### Installation
+## Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/HrznLabs/horizon-contracts.git
 cd horizon-contracts
-
-# Install dependencies
 forge install
+```
 
-# Build
+## Build & Test
+
+```bash
 forge build
-```
-
-### Testing
-
-```bash
-# Run all tests
-forge test
-
-# Run with verbosity
 forge test -vvv
-
-# Run specific test
-forge test --match-test testCreateMission
-
-# Gas report
-forge test --gas-report
+forge coverage
 ```
 
-### Deployment
+## Deploy
 
 ```bash
-# Set environment variables
-export DEPLOYER_PRIVATE_KEY=your_private_key
-export BASE_RPC_URL=https://sepolia.base.org
-export BASESCAN_API_KEY=your_api_key
+# Base Sepolia
+forge script script/Deploy.s.sol:DeployScript --rpc-url base_sepolia --broadcast --verify
 
-# Deploy to Base Sepolia
-forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --verify
+# Base Mainnet
+forge script script/Deploy.s.sol:DeployScript --rpc-url base_mainnet --broadcast --verify
 ```
 
-## 📖 Interfaces
-
-All contracts implement well-defined interfaces for integration:
-
-- `IMissionEscrow.sol` - Mission lifecycle interface
-- `IPaymentRouter.sol` - Payment routing interface
-- `IDisputeResolver.sol` - Dispute resolution interface
-
-## 🔒 Security
-
-### Security Features
-
-- **ReentrancyGuard** on all external calls
-- **SafeERC20** for token transfers
-- **Access Control** with role-based permissions (OpenZeppelin)
-- **Immutable parameters** for critical configuration
-- **CEI pattern** (Checks-Effects-Interactions) throughout
-- **Custom errors** for gas efficiency
-- **Events** for all state changes
-
-### Audit Status
-
-⚠️ **These contracts have not been formally audited.** Use at your own risk on testnet.
-
-### Security Invariants
-
-1. `rewardAmount` immutable after mission creation
-2. `performer` immutable after mission acceptance
-3. Escrow funds can only exit via: settlement, expiry, or dispute resolution
-4. DDR deposits required before dispute resolution
-5. Appeal period must pass before dispute finalization
-
-## 🛠️ SDK
-
-For TypeScript integration, use our SDK:
+## ABIs
 
 ```bash
-yarn add @horizon-protocol/sdk viem
+node scripts/export-abis.js
 ```
 
-See [horizon-sdk](https://github.com/HrznLabs/horizon-sdk) for documentation.
+## Security Notes
 
-## 📄 License
+- `PaymentRouter.onlyAuthorized` is currently permissive for testing. Harden it before production deployments.
+- Dispute resolution uses DDR (5%) and LPP (2%) as enforced in `DisputeResolver`.
 
-MIT License - see [LICENSE](./LICENSE)
+## License
 
-## 🔗 Links
-
-- [SDK Repository](https://github.com/HrznLabs/horizon-sdk)
-- [Base Sepolia Explorer](https://sepolia.basescan.org)
-- [Verified Contracts](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c)
-
----
-
-Built with ❤️ by Horizon Labs | Powered by Base (Optimism L2)
+MIT
