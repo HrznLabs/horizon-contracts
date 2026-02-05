@@ -54,6 +54,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
     IPaymentRouter private _paymentRouter;
     IERC20 private _usdc;
+    address private _disputeResolver;
 
     // =============================================================================
     // MODIFIERS
@@ -101,7 +102,8 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         bytes32 metadataHash,
         bytes32 locationHash,
         address paymentRouter,
-        address usdc
+        address usdc,
+        address disputeResolver
     ) external initializer {
         _missionId = missionId;
         
@@ -126,6 +128,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
         _paymentRouter = IPaymentRouter(paymentRouter);
         _usdc = IERC20(usdc);
+        _disputeResolver = disputeResolver;
     }
 
     // =============================================================================
@@ -273,6 +276,10 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         return _missionId;
     }
 
+    function getDisputeResolver() external view returns (address) {
+        return _disputeResolver;
+    }
+
     // =============================================================================
     // DISPUTE SETTLEMENT
     // =============================================================================
@@ -284,11 +291,11 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      * @param splitPercentage For Split outcome, performer's share in basis points (0-10000)
      */
     function settleDispute(uint8 outcome, uint256 splitPercentage) external {
+        // Only dispute resolver can settle
+        if (msg.sender != _disputeResolver) revert NotDisputeResolver();
+
         // Must be in Disputed state
         if (_runtime.state != MissionState.Disputed) revert InvalidState();
-        
-        // Note: In production, add DisputeResolver access control here
-        // For now, allow any caller (will be restricted in DisputeResolver integration)
         
         uint256 posterAmount = 0;
         uint256 performerAmount = 0;
@@ -326,3 +333,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         emit DisputeSettled(_missionId, outcome, posterAmount, performerAmount);
     }
 }
+<<<<<<< bolt/optimize-mission-escrow-storage-11154790348603479756
+=======
+
+>>>>>>> main

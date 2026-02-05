@@ -40,6 +40,7 @@ contract MissionFactoryTest is Test {
 
         // Deploy MissionFactory
         factory = new MissionFactory(address(usdc), address(router));
+        factory.setDisputeResolver(address(999)); // Dummy resolver
 
         vm.stopPrank();
 
@@ -234,5 +235,4 @@ contract MissionFactoryTest is Test {
         assertEq(usdc.balanceOf(poster), posterBalanceBefore + REWARD_AMOUNT);
     }
 }
-
 
