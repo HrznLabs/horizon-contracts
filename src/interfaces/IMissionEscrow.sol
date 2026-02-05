@@ -78,6 +78,7 @@ interface IMissionEscrow {
         bytes32 metadataHash,
         bytes32 locationHash,
         address paymentRouter,
+        address disputeResolver,
         address usdc
     ) external;
 

@@ -54,26 +54,8 @@ contract DeployScript is Script {
         console.log("   PaymentRouter:", address(paymentRouter));
         console.log("   Fee structure: Protocol 4%, Labs 4%, Resolver 2%, Guild variable");
 
-        // 2. Deploy MissionFactory
-        console.log("2. Deploying MissionFactory...");
-        MissionFactory missionFactory = new MissionFactory(
-            USDC_BASE_SEPOLIA,
-            address(paymentRouter)
-        );
-        console.log("   MissionFactory:", address(missionFactory));
-
-        // 3. Deploy GuildFactory
-        console.log("3. Deploying GuildFactory...");
-        GuildFactory guildFactory = new GuildFactory();
-        console.log("   GuildFactory:", address(guildFactory));
-
-        // 4. Deploy ReputationAttestations
-        console.log("4. Deploying ReputationAttestations...");
-        ReputationAttestations reputationAttestations = new ReputationAttestations();
-        console.log("   ReputationAttestations:", address(reputationAttestations));
-
-        // 5. Deploy DisputeResolver with jollyv.eth as owner
-        console.log("5. Deploying DisputeResolver...");
+        // 2. Deploy DisputeResolver with jollyv.eth as owner
+        console.log("2. Deploying DisputeResolver...");
         DisputeResolver disputeResolver = new DisputeResolver(
             USDC_BASE_SEPOLIA,
             JOLLYV_ETH, // ResolversDAO
@@ -83,6 +65,25 @@ contract DeployScript is Script {
         );
         console.log("   DisputeResolver:", address(disputeResolver));
         console.log("   DDR Rate: 5%, LPP Rate: 2%");
+
+        // 3. Deploy MissionFactory
+        console.log("3. Deploying MissionFactory...");
+        MissionFactory missionFactory = new MissionFactory(
+            USDC_BASE_SEPOLIA,
+            address(paymentRouter),
+            address(disputeResolver)
+        );
+        console.log("   MissionFactory:", address(missionFactory));
+
+        // 4. Deploy GuildFactory
+        console.log("4. Deploying GuildFactory...");
+        GuildFactory guildFactory = new GuildFactory();
+        console.log("   GuildFactory:", address(guildFactory));
+
+        // 5. Deploy ReputationAttestations
+        console.log("5. Deploying ReputationAttestations...");
+        ReputationAttestations reputationAttestations = new ReputationAttestations();
+        console.log("   ReputationAttestations:", address(reputationAttestations));
 
         // 6. Deploy HorizonAchievements (NFT contract)
         console.log("6. Deploying HorizonAchievements...");

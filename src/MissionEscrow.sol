@@ -33,6 +33,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
     IPaymentRouter private _paymentRouter;
     IERC20 private _usdc;
+    address private _disputeResolver;
 
     // =============================================================================
     // MODIFIERS
@@ -58,6 +59,11 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         _;
     }
 
+    modifier onlyDisputeResolver() {
+        if (msg.sender != _disputeResolver) revert NotDisputeResolver();
+        _;
+    }
+
     // =============================================================================
     // INITIALIZATION
     // =============================================================================
@@ -80,6 +86,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         bytes32 metadataHash,
         bytes32 locationHash,
         address paymentRouter,
+        address disputeResolver,
         address usdc
     ) external initializer {
         _missionId = missionId;
@@ -103,6 +110,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
         _paymentRouter = IPaymentRouter(paymentRouter);
         _usdc = IERC20(usdc);
+        _disputeResolver = disputeResolver;
     }
 
     // =============================================================================
@@ -237,6 +245,10 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         return _missionId;
     }
 
+    function getDisputeResolver() external view returns (address) {
+        return _disputeResolver;
+    }
+
     // =============================================================================
     // DISPUTE SETTLEMENT
     // =============================================================================
@@ -247,12 +259,9 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      * @param outcome 0=None, 1=PosterWins, 2=PerformerWins, 3=Split, 4=Cancelled
      * @param splitPercentage For Split outcome, performer's share in basis points (0-10000)
      */
-    function settleDispute(uint8 outcome, uint256 splitPercentage) external {
+    function settleDispute(uint8 outcome, uint256 splitPercentage) external onlyDisputeResolver {
         // Must be in Disputed state
         if (_runtime.state != MissionState.Disputed) revert InvalidState();
-        
-        // Note: In production, add DisputeResolver access control here
-        // For now, allow any caller (will be restricted in DisputeResolver integration)
         
         uint256 posterAmount = 0;
         uint256 performerAmount = 0;
