@@ -138,6 +138,9 @@ contract MissionFactory is Ownable, ReentrancyGuard {
             revert InvalidDuration();
         }
 
+        // Validate dispute resolver
+        if (disputeResolver == address(0)) revert InvalidDisputeResolver();
+
         // Increment mission counter
         missionId = ++missionCount;
 
@@ -244,5 +247,4 @@ contract MissionFactory is Ownable, ReentrancyGuard {
         emit DisputeResolverUpdated(_disputeResolver);
     }
 }
-
 

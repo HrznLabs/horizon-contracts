@@ -300,4 +300,3 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     }
 }
 
-

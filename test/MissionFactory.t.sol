@@ -235,4 +235,3 @@ contract MissionFactoryTest is Test {
     }
 }
 
-
