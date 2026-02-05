@@ -67,11 +67,11 @@ Horizon Protocol is a decentralized platform for coordinating real-world tasks (
 │    │                            │                                │
 │    │                     PaymentRouter                           │
 │    │                            │                                │
-│    │                            ├── 4% → Protocol Treasury       │
-│    │                            ├── 4% → Labs Treasury           │
+│    │                            ├── 2.5% → Protocol Treasury     │
+│    │                            ├── 2.5% → Labs Treasury         │
 │    │                            ├── 2% → Resolver Treasury       │
 │    │                            ├── 0-15% → Guild Treasury       │
-│    │                            └── 75-90% → Performer           │
+│    │                            └── 78-93% → Performer           │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -111,11 +111,11 @@ function claimExpired() external;            // Claim expired mission funds
 Routes payments with configurable fee splits.
 
 **Fee Structure:**
-- Protocol: 4% (fixed)
-- Labs: 4% (fixed)
-- Resolver: 2% (fixed)
+- Protocol: 2.5% (250 bp, fixed)
+- Labs: 2.5% (250 bp, fixed)
+- Resolver: 2% (200 bp, fixed)
 - Guild: 0-15% (variable, set by guild)
-- Performer: 90% - guildFee
+- Performer: Remainder (~88% with 5% guild fee)
 
 #### `DisputeResolver.sol`
 Handles mission disputes with economic incentives.
