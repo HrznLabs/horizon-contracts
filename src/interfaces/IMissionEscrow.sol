@@ -78,8 +78,8 @@ interface IMissionEscrow {
         bytes32 metadataHash,
         bytes32 locationHash,
         address paymentRouter,
-        address disputeResolver,
-        address usdc
+        address usdc,
+        address disputeResolver
     ) external;
 
     function acceptMission() external;
@@ -97,6 +97,6 @@ interface IMissionEscrow {
     function getParams() external view returns (MissionParams memory);
     function getRuntime() external view returns (MissionRuntime memory);
     function getMissionId() external view returns (uint256);
+    function getDisputeResolver() external view returns (address);
 }
-
 
