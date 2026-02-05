@@ -71,7 +71,7 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     );
 
     event PaymentRouterUpdated(address indexed newRouter);
-    event DisputeResolverUpdated(address indexed newResolver);
+    event DisputeResolverUpdated(address indexed resolver);
 
     // =============================================================================
     // ERRORS
@@ -92,16 +92,13 @@ contract MissionFactory is Ownable, ReentrancyGuard {
      * @notice Deploy the MissionFactory
      * @param _usdc USDC token address
      * @param _paymentRouter PaymentRouter contract address
-     * @param _disputeResolver DisputeResolver contract address
      */
     constructor(
         address _usdc,
-        address _paymentRouter,
-        address _disputeResolver
+        address _paymentRouter
     ) Ownable(msg.sender) {
         usdc = IERC20(_usdc);
         paymentRouter = _paymentRouter;
-        disputeResolver = _disputeResolver;
 
         // Deploy the implementation contract
         escrowImplementation = address(new MissionEscrow());
@@ -157,8 +154,8 @@ contract MissionFactory is Ownable, ReentrancyGuard {
             metadataHash,
             locationHash,
             paymentRouter,
-            disputeResolver,
-            address(usdc)
+            address(usdc),
+            disputeResolver
         );
 
         // Store mission mapping
