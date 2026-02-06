@@ -218,7 +218,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         }
         
         if (msg.sender != _params.poster && msg.sender != _runtime.performer) {
-            revert InvalidState();
+            revert NotParty();
         }
 
         if (_runtime.disputeRaised) revert DisputeAlreadyRaised();
@@ -333,7 +333,3 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         emit DisputeSettled(_missionId, outcome, posterAmount, performerAmount);
     }
 }
-<<<<<<< bolt/optimize-mission-escrow-storage-11154790348603479756
-=======
-
->>>>>>> main
