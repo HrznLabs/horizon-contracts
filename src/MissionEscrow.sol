@@ -24,15 +24,43 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     using SafeERC20 for IERC20;
 
     // =============================================================================
+    // PACKED STRUCTS
+    // =============================================================================
+
+    struct MissionParamsPacked {
+        address poster;         // 20
+        uint48 createdAt;       // 6
+        uint48 expiresAt;       // 6
+        address guild;          // 20
+        uint96 rewardAmount;    // 12
+        bytes32 metadataHash;   // 32
+        bytes32 locationHash;   // 32
+    }
+
+    struct MissionRuntimePacked {
+        address performer;    // 20
+        MissionState state;   // 1
+        bool disputeRaised;   // 1
+        bytes32 proofHash;    // 32
+    }
+
+    // =============================================================================
     // STATE VARIABLES
     // =============================================================================
 
     uint256 private _missionId;
-    MissionParams private _params;
-    MissionRuntime private _runtime;
+    MissionParamsPacked private _params;
+    MissionRuntimePacked private _runtime;
 
     IPaymentRouter private _paymentRouter;
     IERC20 private _usdc;
+    address private _disputeResolver;
+
+    // =============================================================================
+    // ERRORS
+    // =============================================================================
+
+    error InvalidRewardAmount();
 
     // =============================================================================
     // MODIFIERS
@@ -80,21 +108,25 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         bytes32 metadataHash,
         bytes32 locationHash,
         address paymentRouter,
-        address usdc
+        address usdc,
+        address disputeResolver
     ) external initializer {
         _missionId = missionId;
         
-        _params = MissionParams({
+        if (expiresAt > type(uint48).max) revert MissionExpired();
+        if (rewardAmount > type(uint96).max) revert InvalidRewardAmount();
+
+        _params = MissionParamsPacked({
             poster: poster,
-            rewardAmount: rewardAmount,
-            createdAt: block.timestamp,
-            expiresAt: expiresAt,
+            rewardAmount: uint96(rewardAmount),
+            createdAt: uint48(block.timestamp),
+            expiresAt: uint48(expiresAt),
             guild: guild,
             metadataHash: metadataHash,
             locationHash: locationHash
         });
 
-        _runtime = MissionRuntime({
+        _runtime = MissionRuntimePacked({
             performer: address(0),
             state: MissionState.Open,
             proofHash: bytes32(0),
@@ -103,6 +135,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
         _paymentRouter = IPaymentRouter(paymentRouter);
         _usdc = IERC20(usdc);
+        _disputeResolver = disputeResolver;
     }
 
     // =============================================================================
@@ -156,7 +189,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         _paymentRouter.settlePayment(
             _missionId,
             _runtime.performer,
-            _params.rewardAmount,
+            uint256(_params.rewardAmount),
             _params.guild
         );
 
@@ -226,15 +259,32 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     // =============================================================================
 
     function getParams() external view returns (MissionParams memory) {
-        return _params;
+        return MissionParams({
+            poster: _params.poster,
+            rewardAmount: uint256(_params.rewardAmount),
+            createdAt: uint256(_params.createdAt),
+            expiresAt: uint256(_params.expiresAt),
+            guild: _params.guild,
+            metadataHash: _params.metadataHash,
+            locationHash: _params.locationHash
+        });
     }
 
     function getRuntime() external view returns (MissionRuntime memory) {
-        return _runtime;
+        return MissionRuntime({
+            performer: _runtime.performer,
+            state: _runtime.state,
+            proofHash: _runtime.proofHash,
+            disputeRaised: _runtime.disputeRaised
+        });
     }
 
     function getMissionId() external view returns (uint256) {
         return _missionId;
+    }
+
+    function getDisputeResolver() external view returns (address) {
+        return _disputeResolver;
     }
 
     // =============================================================================
@@ -248,11 +298,11 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      * @param splitPercentage For Split outcome, performer's share in basis points (0-10000)
      */
     function settleDispute(uint8 outcome, uint256 splitPercentage) external {
+        // Only dispute resolver can settle
+        if (msg.sender != _disputeResolver) revert NotDisputeResolver();
+
         // Must be in Disputed state
         if (_runtime.state != MissionState.Disputed) revert InvalidState();
-        
-        // Note: In production, add DisputeResolver access control here
-        // For now, allow any caller (will be restricted in DisputeResolver integration)
         
         uint256 posterAmount = 0;
         uint256 performerAmount = 0;
@@ -265,8 +315,8 @@ contract MissionEscrow is Initializable, IMissionEscrow {
             performerAmount = _params.rewardAmount;
         } else if (outcome == 3) {
             // Split: Distribute based on splitPercentage
-            performerAmount = (_params.rewardAmount * splitPercentage) / 10000;
-            posterAmount = _params.rewardAmount - performerAmount;
+            performerAmount = (uint256(_params.rewardAmount) * splitPercentage) / 10000;
+            posterAmount = uint256(_params.rewardAmount) - performerAmount;
         } else if (outcome == 4) {
             // Cancelled: Poster gets refund
             posterAmount = _params.rewardAmount;
@@ -290,5 +340,3 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         emit DisputeSettled(_missionId, outcome, posterAmount, performerAmount);
     }
 }
-
-
