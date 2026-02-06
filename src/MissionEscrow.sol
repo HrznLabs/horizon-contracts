@@ -29,10 +29,10 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
     struct MissionParamsPacked {
         address poster;         // 20
-        uint64 createdAt;       // 8
+        uint48 createdAt;       // 6
+        uint48 expiresAt;       // 6
         address guild;          // 20
-        uint64 expiresAt;       // 8
-        uint256 rewardAmount;   // 32
+        uint96 rewardAmount;    // 12
         bytes32 metadataHash;   // 32
         bytes32 locationHash;   // 32
     }
@@ -55,6 +55,12 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     IPaymentRouter private _paymentRouter;
     IERC20 private _usdc;
     address private _disputeResolver;
+
+    // =============================================================================
+    // ERRORS
+    // =============================================================================
+
+    error InvalidRewardAmount();
 
     // =============================================================================
     // MODIFIERS
@@ -107,13 +113,14 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     ) external initializer {
         _missionId = missionId;
         
-        if (expiresAt > type(uint64).max) revert MissionExpired();
+        if (expiresAt > type(uint48).max) revert MissionExpired();
+        if (rewardAmount > type(uint96).max) revert InvalidRewardAmount();
 
         _params = MissionParamsPacked({
             poster: poster,
-            rewardAmount: rewardAmount,
-            createdAt: uint64(block.timestamp),
-            expiresAt: uint64(expiresAt),
+            rewardAmount: uint96(rewardAmount),
+            createdAt: uint48(block.timestamp),
+            expiresAt: uint48(expiresAt),
             guild: guild,
             metadataHash: metadataHash,
             locationHash: locationHash
@@ -182,7 +189,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         _paymentRouter.settlePayment(
             _missionId,
             _runtime.performer,
-            _params.rewardAmount,
+            uint256(_params.rewardAmount),
             _params.guild
         );
 
@@ -254,7 +261,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     function getParams() external view returns (MissionParams memory) {
         return MissionParams({
             poster: _params.poster,
-            rewardAmount: _params.rewardAmount,
+            rewardAmount: uint256(_params.rewardAmount),
             createdAt: uint256(_params.createdAt),
             expiresAt: uint256(_params.expiresAt),
             guild: _params.guild,
@@ -308,8 +315,8 @@ contract MissionEscrow is Initializable, IMissionEscrow {
             performerAmount = _params.rewardAmount;
         } else if (outcome == 3) {
             // Split: Distribute based on splitPercentage
-            performerAmount = (_params.rewardAmount * splitPercentage) / 10000;
-            posterAmount = _params.rewardAmount - performerAmount;
+            performerAmount = (uint256(_params.rewardAmount) * splitPercentage) / 10000;
+            posterAmount = uint256(_params.rewardAmount) - performerAmount;
         } else if (outcome == 4) {
             // Cancelled: Poster gets refund
             posterAmount = _params.rewardAmount;
@@ -333,7 +340,3 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         emit DisputeSettled(_missionId, outcome, posterAmount, performerAmount);
     }
 }
-<<<<<<< bolt/optimize-mission-escrow-storage-11154790348603479756
-=======
-
->>>>>>> main
