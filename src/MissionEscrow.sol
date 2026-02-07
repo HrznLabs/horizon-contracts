@@ -248,7 +248,8 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         if (block.timestamp <= _expiresAt) revert MissionNotExpired();
         
         if (_state == MissionState.Completed ||
-            _state == MissionState.Cancelled) {
+            _state == MissionState.Cancelled ||
+            _state == MissionState.Disputed) {
             revert InvalidState();
         }
 
