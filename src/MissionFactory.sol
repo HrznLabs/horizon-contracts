@@ -77,8 +77,8 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     // ERRORS
     // =============================================================================
 
-    error InvalidRewardAmount();
-    error InvalidDuration();
+    error InvalidRewardAmount(uint256 amount, uint256 min, uint256 max);
+    error InvalidDuration(uint256 duration, uint256 min, uint256 max);
     error InvalidPaymentRouter();
     error InvalidDisputeResolver();
     error TransferFailed();
@@ -126,13 +126,13 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     ) external nonReentrant returns (uint256 missionId) {
         // Validate reward amount
         if (rewardAmount < MIN_REWARD || rewardAmount > MAX_REWARD) {
-            revert InvalidRewardAmount();
+            revert InvalidRewardAmount(rewardAmount, MIN_REWARD, MAX_REWARD);
         }
 
         // Validate duration
         uint256 duration = expiresAt - block.timestamp;
         if (duration < MIN_DURATION || duration > MAX_DURATION) {
-            revert InvalidDuration();
+            revert InvalidDuration(duration, MIN_DURATION, MAX_DURATION);
         }
 
         // Validate dispute resolver
