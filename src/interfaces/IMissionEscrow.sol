@@ -60,6 +60,7 @@ interface IMissionEscrow {
     error NotPoster();
     error NotPerformer();
     error NotDisputeResolver();
+    error NotParty();
     error MissionExpired();
     error MissionNotExpired();
     error AlreadyAccepted();
