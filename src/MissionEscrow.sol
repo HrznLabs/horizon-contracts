@@ -333,7 +333,3 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         emit DisputeSettled(_missionId, outcome, posterAmount, performerAmount);
     }
 }
-<<<<<<< bolt/optimize-mission-escrow-storage-11154790348603479756
-=======
-
->>>>>>> main
