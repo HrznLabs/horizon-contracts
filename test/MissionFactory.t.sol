@@ -94,7 +94,14 @@ contract MissionFactoryTest is Test {
         vm.startPrank(poster);
         usdc.approve(address(factory), 0.5e6);
 
-        vm.expectRevert(MissionFactory.InvalidRewardAmount.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                MissionFactory.InvalidRewardAmount.selector,
+                0.5e6,
+                1e6,
+                100_000e6
+            )
+        );
         factory.createMission(
             0.5e6, // Below minimum
             block.timestamp + 1 days,
@@ -110,7 +117,14 @@ contract MissionFactoryTest is Test {
         vm.startPrank(poster);
         usdc.approve(address(factory), REWARD_AMOUNT);
 
-        vm.expectRevert(MissionFactory.InvalidDuration.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                MissionFactory.InvalidDuration.selector,
+                1800,
+                3600,
+                30 days
+            )
+        );
         factory.createMission(
             REWARD_AMOUNT,
             block.timestamp + 30 minutes, // Below minimum
