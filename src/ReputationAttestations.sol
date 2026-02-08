@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title ReputationAttestations
@@ -74,7 +74,7 @@ contract ReputationAttestations is Ownable {
     // CONSTRUCTOR
     // =============================================================================
 
-    constructor() Ownable(msg.sender) {}
+    constructor() Ownable(msg.sender) { }
 
     // =============================================================================
     // RATING FUNCTIONS
@@ -87,26 +87,20 @@ contract ReputationAttestations is Ownable {
      * @param score Rating score (1-5)
      * @param commentHash IPFS hash of rating comment
      */
-    function submitRating(
-        uint256 missionId,
-        address ratee,
-        uint8 score,
-        bytes32 commentHash
-    ) external {
+    function submitRating(uint256 missionId, address ratee, uint8 score, bytes32 commentHash)
+        external
+    {
         if (score < 1 || score > 5) revert InvalidScore();
         if (msg.sender == ratee) revert SelfRating();
-        
+
         // Check if already rated
         if (ratings[missionId][msg.sender][ratee].score != 0) {
             revert AlreadyRated();
         }
 
         // Store rating
-        ratings[missionId][msg.sender][ratee] = Rating({
-            score: score,
-            commentHash: commentHash,
-            timestamp: block.timestamp
-        });
+        ratings[missionId][msg.sender][ratee] =
+            Rating({ score: score, commentHash: commentHash, timestamp: block.timestamp });
 
         // Update ratee's statistics
         ratingCounts[ratee]++;
@@ -131,13 +125,7 @@ contract ReputationAttestations is Ownable {
         uint256 rewardAmount
     ) external {
         // In production, verify caller is authorized MissionEscrow
-        emit MissionOutcomeRecorded(
-            missionId,
-            poster,
-            performer,
-            completed,
-            rewardAmount
-        );
+        emit MissionOutcomeRecorded(missionId, poster, performer, completed, rewardAmount);
     }
 
     // =============================================================================
@@ -147,11 +135,11 @@ contract ReputationAttestations is Ownable {
     /**
      * @notice Get rating for a specific mission/rater/ratee combination
      */
-    function getRating(
-        uint256 missionId,
-        address rater,
-        address ratee
-    ) external view returns (Rating memory) {
+    function getRating(uint256 missionId, address rater, address ratee)
+        external
+        view
+        returns (Rating memory)
+    {
         return ratings[missionId][rater][ratee];
     }
 
@@ -161,14 +149,10 @@ contract ReputationAttestations is Ownable {
      * @return average Average rating (multiplied by 100 for precision)
      * @return count Number of ratings
      */
-    function getAverageRating(address user) 
-        external 
-        view 
-        returns (uint256 average, uint256 count) 
-    {
+    function getAverageRating(address user) external view returns (uint256 average, uint256 count) {
         count = ratingCounts[user];
         if (count == 0) return (0, 0);
-        
+
         average = (ratingSums[user] * 100) / count;
     }
 
@@ -197,5 +181,4 @@ contract ReputationAttestations is Ownable {
         authorizedContracts[_contract] = false;
     }
 }
-
 
