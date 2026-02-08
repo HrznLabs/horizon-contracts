@@ -50,7 +50,9 @@ interface IMissionEscrow {
     event MissionCompleted(uint256 indexed id);
     event MissionCancelled(uint256 indexed id);
     event MissionDisputed(uint256 indexed id, address indexed by, bytes32 disputeHash);
-    event DisputeSettled(uint256 indexed id, uint8 outcome, uint256 posterAmount, uint256 performerAmount);
+    event DisputeSettled(
+        uint256 indexed id, uint8 outcome, uint256 posterAmount, uint256 performerAmount
+    );
 
     // =============================================================================
     // ERRORS
@@ -78,7 +80,6 @@ interface IMissionEscrow {
         bytes32 metadataHash,
         bytes32 locationHash,
         address paymentRouter,
-        address usdc,
         address disputeResolver
     ) external;
 
@@ -88,7 +89,7 @@ interface IMissionEscrow {
     function cancelMission() external;
     function raiseDispute(bytes32 disputeHash) external;
     function claimExpired() external;
-    
+
     /// @notice Settle escrow based on dispute outcome (called by DisputeResolver)
     /// @param outcome 0=None, 1=PosterWins, 2=PerformerWins, 3=Split, 4=Cancelled
     /// @param splitPercentage For Split outcome, performer's share in basis points (0-10000)
@@ -99,4 +100,3 @@ interface IMissionEscrow {
     function getMissionId() external view returns (uint256);
     function getDisputeResolver() external view returns (address);
 }
-
