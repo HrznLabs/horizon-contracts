@@ -38,8 +38,7 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     address public disputeResolver;
 
     /// @notice Current mission counter
-    /// @dev Packed with disputeResolver (20 bytes) to save 1 storage slot and 1 SLOAD in createMission
-    uint96 public missionCount;
+    uint256 public missionCount;
 
     /// @notice Mapping from mission ID to escrow address
     mapping(uint256 => address) public missions;
@@ -99,7 +98,7 @@ contract MissionFactory is Ownable, ReentrancyGuard {
         paymentRouter = _paymentRouter;
 
         // Deploy the implementation contract
-        escrowImplementation = address(new MissionEscrow(_usdc));
+        escrowImplementation = address(new MissionEscrow());
     }
 
     // =============================================================================
@@ -153,6 +152,7 @@ contract MissionFactory is Ownable, ReentrancyGuard {
                 metadataHash,
                 locationHash,
                 paymentRouter,
+                address(usdc),
                 disputeResolver
             );
 
@@ -242,3 +242,4 @@ contract MissionFactory is Ownable, ReentrancyGuard {
         emit DisputeResolverUpdated(_disputeResolver);
     }
 }
+

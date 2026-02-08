@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {GuildDAO} from "./GuildDAO.sol";
+import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { GuildDAO } from "./GuildDAO.sol";
 
 /**
  * @title GuildFactory
@@ -34,10 +34,7 @@ contract GuildFactory is Ownable {
     // =============================================================================
 
     event GuildCreated(
-        uint256 indexed id,
-        address indexed guild,
-        address indexed admin,
-        string name
+        uint256 indexed id, address indexed guild, address indexed admin, string name
     );
 
     // =============================================================================
@@ -68,11 +65,10 @@ contract GuildFactory is Ownable {
      * @return guildId The ID of the created guild
      * @return guild The address of the created guild
      */
-    function createGuild(
-        string calldata name,
-        address treasury,
-        uint16 guildFeeBps
-    ) external returns (uint256 guildId, address guild) {
+    function createGuild(string calldata name, address treasury, uint16 guildFeeBps)
+        external
+        returns (uint256 guildId, address guild)
+    {
         if (bytes(name).length == 0 || bytes(name).length > 100) {
             revert InvalidName();
         }
@@ -84,12 +80,13 @@ contract GuildFactory is Ownable {
         guild = guildImplementation.clone();
 
         // Initialize guild
-        GuildDAO(guild).initialize(
-            name,
-            msg.sender, // Creator becomes admin
-            treasury,
-            guildFeeBps
-        );
+        GuildDAO(guild)
+            .initialize(
+                name,
+                msg.sender, // Creator becomes admin
+                treasury,
+                guildFeeBps
+            );
 
         // Store mappings
         guilds[guildId] = guild;
@@ -121,5 +118,4 @@ contract GuildFactory is Ownable {
         return isGuild[guild];
     }
 }
-
 
