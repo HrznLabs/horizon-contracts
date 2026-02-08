@@ -41,31 +41,31 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     address private _paymentRouter; // 20
     // 12 bytes gap
 
-    // Slot 3: USDC (Immutable - shared across all clones)
-    // Note: Using immutable saves 1 storage slot and reduces gas costs.
-    IERC20 private immutable _usdc;
+    // Slot 3: USDC
+    address private _usdc; // 20
+    // 12 bytes gap
 
-    // Slot 3: DisputeResolver
+    // Slot 4: DisputeResolver
     address private _disputeResolver; // 20
     // 12 bytes gap
 
-    // Slot 4: Performer
+    // Slot 5: Performer
     address private _performer; // 20
     // 12 bytes gap
 
-    // Slot 5: RewardAmount + CreatedAt + ExpiresAt
+    // Slot 6: RewardAmount + CreatedAt + ExpiresAt
     uint128 private _rewardAmount; // 16
     uint64 private _createdAt; // 8
     uint64 private _expiresAt; // 8
     // Total 32 bytes (Packed perfectly)
 
-    // Slot 6: MetadataHash
+    // Slot 7: MetadataHash
     bytes32 private _metadataHash; // 32
 
-    // Slot 7: LocationHash
+    // Slot 8: LocationHash
     bytes32 private _locationHash; // 32
 
-    // Slot 8: ProofHash
+    // Slot 9: ProofHash
     bytes32 private _proofHash; // 32
 
     // =============================================================================
@@ -97,8 +97,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     // =============================================================================
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(address usdc) {
-        _usdc = IERC20(usdc);
+    constructor() {
         _disableInitializers();
     }
 
@@ -115,6 +114,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         bytes32 metadataHash,
         bytes32 locationHash,
         address paymentRouter,
+        address usdc,
         address disputeResolver
     ) external initializer {
         if (expiresAt > type(uint64).max) revert MissionExpired();
@@ -129,6 +129,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         _disputeRaised = false;
 
         _paymentRouter = paymentRouter;
+        _usdc = usdc;
         _disputeResolver = disputeResolver;
         // _performer is 0
 
@@ -178,7 +179,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         _state = MissionState.Completed;
 
         // Transfer USDC to PaymentRouter for distribution
-        _usdc.safeTransfer(_paymentRouter, _rewardAmount);
+        IERC20(_usdc).safeTransfer(_paymentRouter, _rewardAmount);
 
         // Settle payment through router
         IPaymentRouter(_paymentRouter).settlePayment(_missionId, _performer, _rewardAmount, _guild);
@@ -194,7 +195,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         _state = MissionState.Cancelled;
 
         // Refund poster
-        _usdc.safeTransfer(_poster, _rewardAmount);
+        IERC20(_usdc).safeTransfer(_poster, _rewardAmount);
 
         emit MissionCancelled(_missionId);
     }
@@ -210,7 +211,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         }
 
         if (msg.sender != _poster && msg.sender != _performer) {
-            revert NotParty();
+            revert InvalidState();
         }
 
         if (_disputeRaised) revert DisputeAlreadyRaised();
@@ -230,13 +231,13 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
         if (
             _state == MissionState.Completed || _state == MissionState.Cancelled
-                || _state == MissionState.Disputed
+                || _state == MissionState.Disputed || _state == MissionState.Submitted
         ) {
             revert InvalidState();
         }
 
         _state = MissionState.Cancelled;
-        _usdc.safeTransfer(_poster, _rewardAmount);
+        IERC20(_usdc).safeTransfer(_poster, _rewardAmount);
 
         emit MissionCancelled(_missionId);
     }
@@ -316,12 +317,12 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
         // Transfer funds
         if (posterAmount > 0) {
-            _usdc.safeTransfer(_poster, posterAmount);
+            IERC20(_usdc).safeTransfer(_poster, posterAmount);
         }
         if (performerAmount > 0) {
             // Transfer to performer directly (simple version)
             // In production, could use PaymentRouter for fee distribution
-            _usdc.safeTransfer(_performer, performerAmount);
+            IERC20(_usdc).safeTransfer(_performer, performerAmount);
         }
 
         emit DisputeSettled(_missionId, outcome, posterAmount, performerAmount);
