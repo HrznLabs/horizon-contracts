@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IMissionEscrow} from "./interfaces/IMissionEscrow.sol";
-import {MissionEscrow} from "./MissionEscrow.sol";
+import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IMissionEscrow } from "./interfaces/IMissionEscrow.sol";
+import { MissionEscrow } from "./MissionEscrow.sol";
 
 /**
  * @title MissionFactory
@@ -93,10 +93,7 @@ contract MissionFactory is Ownable, ReentrancyGuard {
      * @param _usdc USDC token address
      * @param _paymentRouter PaymentRouter contract address
      */
-    constructor(
-        address _usdc,
-        address _paymentRouter
-    ) Ownable(msg.sender) {
+    constructor(address _usdc, address _paymentRouter) Ownable(msg.sender) {
         usdc = IERC20(_usdc);
         paymentRouter = _paymentRouter;
 
@@ -145,18 +142,19 @@ contract MissionFactory is Ownable, ReentrancyGuard {
         address escrow = escrowImplementation.clone();
 
         // Initialize escrow
-        IMissionEscrow(escrow).initialize(
-            missionId,
-            msg.sender,
-            rewardAmount,
-            expiresAt,
-            guild,
-            metadataHash,
-            locationHash,
-            paymentRouter,
-            address(usdc),
-            disputeResolver
-        );
+        IMissionEscrow(escrow)
+            .initialize(
+                missionId,
+                msg.sender,
+                rewardAmount,
+                expiresAt,
+                guild,
+                metadataHash,
+                locationHash,
+                paymentRouter,
+                address(usdc),
+                disputeResolver
+            );
 
         // Store mission mapping
         missions[missionId] = escrow;
@@ -195,10 +193,10 @@ contract MissionFactory is Ownable, ReentrancyGuard {
      * @param missionId The mission ID
      * @return params The mission parameters
      */
-    function getMissionParams(uint256 missionId) 
-        external 
-        view 
-        returns (IMissionEscrow.MissionParams memory params) 
+    function getMissionParams(uint256 missionId)
+        external
+        view
+        returns (IMissionEscrow.MissionParams memory params)
     {
         address escrow = missions[missionId];
         if (escrow == address(0)) revert MissionNotFound();
@@ -210,10 +208,10 @@ contract MissionFactory is Ownable, ReentrancyGuard {
      * @param missionId The mission ID
      * @return runtime The mission runtime state
      */
-    function getMissionRuntime(uint256 missionId) 
-        external 
-        view 
-        returns (IMissionEscrow.MissionRuntime memory runtime) 
+    function getMissionRuntime(uint256 missionId)
+        external
+        view
+        returns (IMissionEscrow.MissionRuntime memory runtime)
     {
         address escrow = missions[missionId];
         if (escrow == address(0)) revert MissionNotFound();
