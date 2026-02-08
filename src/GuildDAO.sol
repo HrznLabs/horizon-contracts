@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {
+    AccessControlUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 /**
  * @title GuildDAO
@@ -66,7 +68,9 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     event GuildMemberRemoved(address indexed guild, address indexed member);
     event GuildRoleGranted(address indexed guild, address indexed member, string role);
     event GuildConfigUpdated(address indexed guild);
-    event GuildBoardEntryAdded(address indexed guild, uint256 indexed missionId, address indexed curator);
+    event GuildBoardEntryAdded(
+        address indexed guild, uint256 indexed missionId, address indexed curator
+    );
 
     // =============================================================================
     // ERRORS
@@ -92,22 +96,16 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @param treasury Guild treasury address
      * @param guildFeeBps Guild fee in basis points
      */
-    function initialize(
-        string calldata name,
-        address admin,
-        address treasury,
-        uint16 guildFeeBps
-    ) external initializer {
+    function initialize(string calldata name, address admin, address treasury, uint16 guildFeeBps)
+        external
+        initializer
+    {
         __AccessControl_init();
 
         if (guildFeeBps > 1000) revert InvalidFee(); // Max 10%
 
-        config = GuildConfig({
-            name: name,
-            admin: admin,
-            treasury: treasury,
-            guildFeeBps: guildFeeBps
-        });
+        config =
+            GuildConfig({ name: name, admin: admin, treasury: treasury, guildFeeBps: guildFeeBps });
 
         // Set up roles
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -134,11 +132,7 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     function _addMember(address member) internal {
         if (members[member].isMember) revert AlreadyMember();
 
-        members[member] = GuildMember({
-            isMember: true,
-            joinedAt: block.timestamp,
-            leftAt: 0
-        });
+        members[member] = GuildMember({ isMember: true, joinedAt: block.timestamp, leftAt: 0 });
 
         memberCount++;
         emit GuildMemberAdded(address(this), member);
@@ -201,11 +195,10 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @param treasury New treasury address
      * @param guildFeeBps New fee in basis points
      */
-    function updateConfig(
-        string calldata name,
-        address treasury,
-        uint16 guildFeeBps
-    ) external onlyRole(ADMIN_ROLE) {
+    function updateConfig(string calldata name, address treasury, uint16 guildFeeBps)
+        external
+        onlyRole(ADMIN_ROLE)
+    {
         if (guildFeeBps > 1000) revert InvalidFee();
 
         config.name = name;
@@ -266,5 +259,4 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
         return defaultEligibility;
     }
 }
-
 
