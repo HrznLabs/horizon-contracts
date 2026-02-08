@@ -210,7 +210,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         }
 
         if (msg.sender != _poster && msg.sender != _performer) {
-            revert InvalidState();
+            revert NotParty();
         }
 
         if (_disputeRaised) revert DisputeAlreadyRaised();
