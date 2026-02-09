@@ -1,3 +1,3 @@
-## 2024-05-23 - Immutable Variables in Minimal Proxies
-**Learning:** EIP-1167 Minimal Proxies (Clones) delegate calls to an implementation contract. Immutable variables in the implementation contract are embedded in its bytecode and are accessible to clones without storage reads. This is highly efficient for values constant across all clones (like the factory-scoped USDC address).
-**Action:** When optimizing factory-spawned contracts, check if any storage variables are constant for a given factory deployment and move them to immutable variables in the implementation contract.
+## 2026-02-09 - [MissionFactory Storage Packing]
+**Learning:** `MissionFactory` uses `uint96` for `missionCount` to pack with `address disputeResolver` in a single storage slot. This saves ~20k gas on deployment and ~2.1k gas on every mission creation (due to warm slot access).
+**Action:** When adding state variables to factories or frequently used contracts, always check if they can be packed with existing variables by adjusting types (e.g., `uint256` -> `uint96`).
