@@ -42,6 +42,9 @@ contract MissionFactoryTest is Test {
         factory = new MissionFactory(address(usdc), address(router));
         factory.setDisputeResolver(address(999)); // Dummy resolver
 
+        // Set MissionFactory in PaymentRouter
+        router.setMissionFactory(address(factory));
+
         vm.stopPrank();
 
         // Mint USDC to poster

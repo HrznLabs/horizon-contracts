@@ -6,6 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
+import {IMissionFactory} from "./interfaces/IMissionFactory.sol";
 
 /**
  * @title PaymentRouter
@@ -89,9 +90,15 @@ contract PaymentRouter is Ownable, ReentrancyGuard, IPaymentRouter {
     // MODIFIERS
     // =============================================================================
 
-    modifier onlyAuthorized() {
-        // In production, verify caller is a valid MissionEscrow
-        // For now, allow any caller for testing
+    modifier onlyAuthorized(uint256 missionId) {
+        // Verify caller is a valid MissionEscrow for the given missionId
+        if (missionFactory == address(0)) {
+            revert OnlyMissionEscrow();
+        }
+        address expectedEscrow = IMissionFactory(missionFactory).getMission(missionId);
+        if (msg.sender != expectedEscrow) {
+            revert OnlyMissionEscrow();
+        }
         _;
     }
 
@@ -111,7 +118,7 @@ contract PaymentRouter is Ownable, ReentrancyGuard, IPaymentRouter {
         address performer,
         uint256 rewardAmount,
         address guild
-    ) external nonReentrant onlyAuthorized {
+    ) external nonReentrant onlyAuthorized(missionId) {
         // Get guild fee (0 if no guild)
         uint16 guildFeeBps = 0;
         if (guild != address(0)) {
@@ -174,7 +181,7 @@ contract PaymentRouter is Ownable, ReentrancyGuard, IPaymentRouter {
         uint256 rewardAmount,
         address guild,
         uint16 guildFeeBps
-    ) external nonReentrant onlyAuthorized {
+    ) external nonReentrant onlyAuthorized(missionId) {
         if (guildFeeBps > MAX_GUILD_FEE_BPS) {
             revert InvalidFeeConfig();
         }
