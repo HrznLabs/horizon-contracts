@@ -38,7 +38,8 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     address public disputeResolver;
 
     /// @notice Current mission counter
-    uint256 public missionCount;
+    /// @dev Packed with disputeResolver (20 bytes) to save 1 storage slot and 1 SLOAD in createMission
+    uint96 public missionCount;
 
     /// @notice Mapping from mission ID to escrow address
     mapping(uint256 => address) public missions;
