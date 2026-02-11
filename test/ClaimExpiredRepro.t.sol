@@ -29,6 +29,7 @@ contract ClaimExpiredRepro is Test {
         paymentRouter = new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury);
         factory = new MissionFactory(address(usdc), address(paymentRouter));
         factory.setDisputeResolver(disputeResolver);
+        paymentRouter.setMissionFactory(address(factory));
         vm.stopPrank();
 
         usdc.mint(poster, 1000e6);

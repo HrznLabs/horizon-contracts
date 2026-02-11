@@ -7,6 +7,10 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
 
+interface IMissionFactory {
+    function missions(uint256 missionId) external view returns (address);
+}
+
 /**
  * @title PaymentRouter
  * @author Horizon Protocol
@@ -89,9 +93,13 @@ contract PaymentRouter is Ownable, ReentrancyGuard, IPaymentRouter {
     // MODIFIERS
     // =============================================================================
 
-    modifier onlyAuthorized() {
-        // In production, verify caller is a valid MissionEscrow
-        // For now, allow any caller for testing
+    modifier onlyAuthorized(uint256 missionId) {
+        if (missionFactory == address(0)) {
+            revert OnlyMissionEscrow();
+        }
+        if (msg.sender != IMissionFactory(missionFactory).missions(missionId)) {
+            revert OnlyMissionEscrow();
+        }
         _;
     }
 
@@ -111,7 +119,7 @@ contract PaymentRouter is Ownable, ReentrancyGuard, IPaymentRouter {
         address performer,
         uint256 rewardAmount,
         address guild
-    ) external nonReentrant onlyAuthorized {
+    ) external nonReentrant onlyAuthorized(missionId) {
         // Get guild fee (0 if no guild)
         uint16 guildFeeBps = 0;
         if (guild != address(0)) {
@@ -174,7 +182,7 @@ contract PaymentRouter is Ownable, ReentrancyGuard, IPaymentRouter {
         uint256 rewardAmount,
         address guild,
         uint16 guildFeeBps
-    ) external nonReentrant onlyAuthorized {
+    ) external nonReentrant onlyAuthorized(missionId) {
         if (guildFeeBps > MAX_GUILD_FEE_BPS) {
             revert InvalidFeeConfig();
         }

@@ -7,3 +7,8 @@
 **Vulnerability:** The `claimExpired` function in `MissionEscrow` allowed a poster to reclaim funds even if the mission was in `Disputed` state, as long as the expiration time had passed. This effectively allowed a poster to bypass the dispute resolution process.
 **Learning:** State machines with time-based transitions (like expiration) must explicitly check against *all* conflicting states (like `Disputed` or `Submitted`), not just the obvious terminal states (`Completed`, `Cancelled`).
 **Prevention:** When implementing time-based overrides (like "expire" or "timeout"), visualize the state machine and verify that the override does not invalidate active states that require human intervention.
+
+## 2024-05-25 - Empty Access Control Modifier
+**Vulnerability:** The `onlyAuthorized` modifier in `PaymentRouter` was empty, containing only a comment `// For now, allow any caller for testing`, allowing any user to drain funds via `settlePayment`.
+**Learning:** Placeholder code from development/testing phases can easily slip into production if not explicitly tracked or if tests don't cover negative cases (unauthorized access).
+**Prevention:** Never commit empty modifiers or "allow all" logic to the main branch. Use environment variables or build flags if testing logic differs, or better yet, mock the authorization in tests instead of weakening the production code.
