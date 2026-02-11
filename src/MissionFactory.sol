@@ -38,8 +38,7 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     address public disputeResolver;
 
     /// @notice Current mission counter
-    /// @dev Packed with disputeResolver (20 bytes + 12 bytes = 32 bytes) to save 1 storage slot
-    /// and ~2.1k gas per mission creation by warming the slot during disputeResolver read.
+    /// @dev Packed with disputeResolver (20 bytes + 12 bytes = 32 bytes)
     uint96 public missionCount;
 
     /// @notice Mapping from mission ID to escrow address
