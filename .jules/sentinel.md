@@ -8,7 +8,7 @@
 **Learning:** State machines with time-based transitions (like expiration) must explicitly check against *all* conflicting states (like `Disputed` or `Submitted`), not just the obvious terminal states (`Completed`, `Cancelled`).
 **Prevention:** When implementing time-based overrides (like "expire" or "timeout"), visualize the state machine and verify that the override does not invalidate active states that require human intervention.
 
-## 2024-05-25 - Front-running Submission via Expiration
-**Vulnerability:** The `claimExpired` function in `MissionEscrow` did not check for `Submitted` state, allowing a poster to claim funds after the performer had submitted work but the mission had expired (either by waiting or due to late submission).
-**Learning:** Escrow logic must protect the performer once they have committed work (submitted proof). Expiration should only apply if no work has been submitted.
-**Prevention:** In state machines involving two parties, ensure that unilateral actions (like claiming expiry) are blocked once the counterparty has performed their part of the contract (like submitting work).
+## 2024-05-25 - Empty Access Control Modifier
+**Vulnerability:** The `onlyAuthorized` modifier in `PaymentRouter` was empty, containing only a comment `// For now, allow any caller for testing`, allowing any user to drain funds via `settlePayment`.
+**Learning:** Placeholder code from development/testing phases can easily slip into production if not explicitly tracked or if tests don't cover negative cases (unauthorized access).
+**Prevention:** Never commit empty modifiers or "allow all" logic to the main branch. Use environment variables or build flags if testing logic differs, or better yet, mock the authorization in tests instead of weakening the production code.
