@@ -229,10 +229,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     function claimExpired() external onlyPoster {
         if (block.timestamp <= _expiresAt) revert MissionNotExpired();
 
-        if (
-            _state == MissionState.Completed || _state == MissionState.Cancelled
-                || _state == MissionState.Disputed || _state == MissionState.Submitted
-        ) {
+        if (_state != MissionState.Open && _state != MissionState.Accepted) {
             revert InvalidState();
         }
 
