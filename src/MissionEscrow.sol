@@ -164,7 +164,12 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      * @param proofHash IPFS hash of proof data
      * @dev Transitions from Accepted to Submitted
      */
-    function submitProof(bytes32 proofHash) external onlyPerformer inState(MissionState.Accepted) {
+    function submitProof(bytes32 proofHash)
+        external
+        onlyPerformer
+        inState(MissionState.Accepted)
+        notExpired
+    {
         _proofHash = proofHash;
         _state = MissionState.Submitted;
 
@@ -211,7 +216,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         }
 
         if (msg.sender != _poster && msg.sender != _performer) {
-            revert InvalidState();
+            revert NotParty();
         }
 
         if (_disputeRaised) revert DisputeAlreadyRaised();
