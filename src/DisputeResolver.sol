@@ -365,7 +365,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             if (block.timestamp < dispute.appealDeadline) {
                 revert AppealPeriodActive();
             }
-        } else if (dispute.state != DisputeState.Appealed) {
+        } else {
             // Appealed disputes are finalized by DAO override
             revert InvalidDisputeState();
         }
