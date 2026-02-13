@@ -5,3 +5,7 @@
 ## 2025-02-08 - Documentation as Interface
 **Learning:** For backend projects, the README is the UI. Static contract addresses force context switching (copy-paste), while clickable links keep developers in flow.
 **Action:** Always hyperlink contract addresses to block explorers in documentation.
+
+## 2025-02-09 - Environment Configuration Standards
+**Learning:** Manual environment variable setup via `export` commands creates friction and is error-prone. Standardizing on `.env.example` significantly improves the onboarding experience (DX) and reduces setup errors.
+**Action:** Always include a documented `.env.example` file for backend projects to streamline local development setup.
