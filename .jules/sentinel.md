@@ -12,3 +12,8 @@
 **Vulnerability:** The `onlyAuthorized` modifier in `PaymentRouter` was empty, containing only a comment `// For now, allow any caller for testing`, allowing any user to drain funds via `settlePayment`.
 **Learning:** Placeholder code from development/testing phases can easily slip into production if not explicitly tracked or if tests don't cover negative cases (unauthorized access).
 **Prevention:** Never commit empty modifiers or "allow all" logic to the main branch. Use environment variables or build flags if testing logic differs, or better yet, mock the authorization in tests instead of weakening the production code.
+
+## 2025-05-26 - Bypass of Appeal Process in DisputeResolver
+**Vulnerability:** `finalizeDispute` function explicitly allowed `Appealed` state to bypass the appeal process and finalize with the original outcome, ignoring the DAO override mechanism.
+**Learning:** Complex conditional logic (`else if (!appealed)`) can accidentally invert the intended security check. The comment `// Appealed disputes are finalized by DAO override` indicated the intent, but the code did the opposite.
+**Prevention:** Use positive checks (`if (state == Resolved)`) rather than negative checks (`if (state != Appealed)`), and always test state transitions explicitly, especially for "stuck" or "waiting" states like appeals.
