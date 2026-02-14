@@ -208,6 +208,19 @@ forge test --match-test testCreateMission
 forge test --gas-report
 ```
 
+### Developer Commands (Makefile)
+
+A `Makefile` is included to simplify common tasks:
+
+```bash
+make all            # Clean, install, and build
+make test           # Run tests
+make test-v         # Run tests with verbosity
+make gas            # Run gas report
+make deploy-sepolia # Deploy to Base Sepolia
+make verify         # Verify contract
+```
+
 ### Deployment
 
 ```bash

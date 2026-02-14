@@ -149,9 +149,9 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
      * @param name Name of the achievement
      * @param description Description of how to earn it
      * @param category Achievement category
-     * @param isSoulbound Whether the achievement is non-transferable
+     * @param _isSoulbound Whether the achievement is non-transferable
      * @param maxSupply Maximum number that can be minted (0 = unlimited)
-     * @param tokenURI Base URI for this achievement type
+     * @param _tokenURI Base URI for this achievement type
      * @param xpReward XP awarded when achievement is earned
      * @return typeId The ID of the created achievement type
      */
@@ -159,9 +159,9 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
         string calldata name,
         string calldata description,
         AchievementCategory category,
-        bool isSoulbound,
+        bool _isSoulbound,
         uint256 maxSupply,
-        string calldata tokenURI,
+        string calldata _tokenURI,
         uint256 xpReward
     ) external onlyRole(ADMIN_ROLE) returns (uint256 typeId) {
         _typeIdCounter++;
@@ -172,15 +172,15 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
             name: name,
             description: description,
             category: category,
-            isSoulbound: isSoulbound,
+            isSoulbound: _isSoulbound,
             isActive: true,
             maxSupply: maxSupply,
             currentSupply: 0,
-            baseTokenURI: tokenURI,
+            baseTokenURI: _tokenURI,
             xpReward: xpReward
         });
 
-        emit AchievementTypeCreated(typeId, name, category, isSoulbound, maxSupply);
+        emit AchievementTypeCreated(typeId, name, category, _isSoulbound, maxSupply);
     }
 
     /**
