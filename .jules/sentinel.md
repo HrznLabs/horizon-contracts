@@ -12,3 +12,8 @@
 **Vulnerability:** The `onlyAuthorized` modifier in `PaymentRouter` was empty, containing only a comment `// For now, allow any caller for testing`, allowing any user to drain funds via `settlePayment`.
 **Learning:** Placeholder code from development/testing phases can easily slip into production if not explicitly tracked or if tests don't cover negative cases (unauthorized access).
 **Prevention:** Never commit empty modifiers or "allow all" logic to the main branch. Use environment variables or build flags if testing logic differs, or better yet, mock the authorization in tests instead of weakening the production code.
+
+## 2024-05-26 - Dispute Resolution Deadlock
+**Vulnerability:** Found `DisputeResolver` required DDR deposits from BOTH parties before allowing `resolveDispute`. If one party refused to participate, the dispute was deadlocked.
+**Learning:** "Skin in the game" mechanisms must handle non-participation gracefully. Never let a refusal to participate block the resolution process.
+**Prevention:** Design state machines where every state has a path forward (e.g., default judgment) even if some actors go silent.
