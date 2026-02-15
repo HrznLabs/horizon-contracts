@@ -22,3 +22,8 @@
 **Vulnerability:** `finalizeDispute` function explicitly allowed `Appealed` state to bypass the appeal process and finalize with the original outcome, ignoring the DAO override mechanism.
 **Learning:** Complex conditional logic (`else if (!appealed)`) can accidentally invert the intended security check. The comment `// Appealed disputes are finalized by DAO override` indicated the intent, but the code did the opposite.
 **Prevention:** Use positive checks (`if (state == Resolved)`) rather than negative checks (`if (state != Appealed)`), and always test state transitions explicitly, especially for "stuck" or "waiting" states like appeals.
+
+## 2024-05-26 - Dispute Resolution Deadlock
+**Vulnerability:** Found `DisputeResolver` required DDR deposits from BOTH parties before allowing `resolveDispute`. If one party refused to participate, the dispute was deadlocked.
+**Learning:** "Skin in the game" mechanisms must handle non-participation gracefully. Never let a refusal to participate block the resolution process.
+**Prevention:** Design state machines where every state has a path forward (e.g., default judgment) even if some actors go silent.
