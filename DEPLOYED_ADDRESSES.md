@@ -8,6 +8,7 @@
 |----------|---------|----------|
 | PaymentRouter | [`0x94fb7908257ec36f701d2605b51eefed4326ddf5`](https://sepolia.basescan.org/address/0x94fb7908257ec36f701d2605b51eefed4326ddf5) | [View](https://sepolia.basescan.org/address/0x94fb7908257ec36f701d2605b51eefed4326ddf5) |
 | MissionFactory | [`0xee9234954b134c39c17a75482da78e46b16f466c`](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c) | [View](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c) |
+| MissionEscrow (Implementation) | [`0x873Ea710B6b289b0e9D6867B1630066e9721B5c9`](https://sepolia.basescan.org/address/0x873Ea710B6b289b0e9D6867B1630066e9721B5c9) | [View](https://sepolia.basescan.org/address/0x873Ea710B6b289b0e9D6867B1630066e9721B5c9) |
 | GuildFactory | [`0xfeae3538a4a1801e47b6d16104aa8586edb55f00`](https://sepolia.basescan.org/address/0xfeae3538a4a1801e47b6d16104aa8586edb55f00) | [View](https://sepolia.basescan.org/address/0xfeae3538a4a1801e47b6d16104aa8586edb55f00) |
 | ReputationAttestations | [`0xedae9682a0fb6fb3c18d6865461f67db7d748002`](https://sepolia.basescan.org/address/0xedae9682a0fb6fb3c18d6865461f67db7d748002) | [View](https://sepolia.basescan.org/address/0xedae9682a0fb6fb3c18d6865461f67db7d748002) |
 | DisputeResolver | [`0xb00ac4278129928aecc72541b0bcd69d94c1691e`](https://sepolia.basescan.org/address/0xb00ac4278129928aecc72541b0bcd69d94c1691e) | [View](https://sepolia.basescan.org/address/0xb00ac4278129928aecc72541b0bcd69d94c1691e) |
@@ -23,7 +24,7 @@
 
 | Identity | Address |
 |----------|---------|
-| jollyv.eth / jollyv.base.eth | [`0x2b30efBA367D669c9cd7723587346a79b67A42DB`](https://sepolia.basescan.org/address/0x2b30efBA367D669c9cd7723587346a79b67A42DB) |
+| [jollyv.eth](https://app.ens.domains/jollyv.eth) / [jollyv.base.eth](https://basenames.xyz/name/jollyv.base.eth) | [`0x2b30efBA367D669c9cd7723587346a79b67A42DB`](https://sepolia.basescan.org/address/0x2b30efBA367D669c9cd7723587346a79b67A42DB) |
 
 ---
 
