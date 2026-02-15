@@ -12,3 +12,13 @@
 **Vulnerability:** The `onlyAuthorized` modifier in `PaymentRouter` was empty, containing only a comment `// For now, allow any caller for testing`, allowing any user to drain funds via `settlePayment`.
 **Learning:** Placeholder code from development/testing phases can easily slip into production if not explicitly tracked or if tests don't cover negative cases (unauthorized access).
 **Prevention:** Never commit empty modifiers or "allow all" logic to the main branch. Use environment variables or build flags if testing logic differs, or better yet, mock the authorization in tests instead of weakening the production code.
+
+## 2024-05-26 - Late Submission Blocking Refund
+**Vulnerability:** The `submitProof` function in `MissionEscrow` allowed submissions after `expiresAt`, transitioning the state to `Submitted`. This prevented the poster from calling `claimExpired` (which reverts if `Submitted`), effectively allowing a performer to block a refund indefinitely or force a dispute even after missing the deadline.
+**Learning:** Time-based deadlines must be enforced on *all* relevant state transitions. If one party can act after the deadline to change the state to a "protected" one, they can hold the other party hostage.
+**Prevention:** Ensure that actions that transition state from "Open/Accepted" to "Submitted/Completed" have an explicit `notExpired` check if an expiration mechanism exists.
+
+## 2025-05-26 - Bypass of Appeal Process in DisputeResolver
+**Vulnerability:** `finalizeDispute` function explicitly allowed `Appealed` state to bypass the appeal process and finalize with the original outcome, ignoring the DAO override mechanism.
+**Learning:** Complex conditional logic (`else if (!appealed)`) can accidentally invert the intended security check. The comment `// Appealed disputes are finalized by DAO override` indicated the intent, but the code did the opposite.
+**Prevention:** Use positive checks (`if (state == Resolved)`) rather than negative checks (`if (state != Appealed)`), and always test state transitions explicitly, especially for "stuck" or "waiting" states like appeals.
