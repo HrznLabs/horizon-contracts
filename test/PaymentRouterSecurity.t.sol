@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {PaymentRouter} from "../src/PaymentRouter.sol";
-import {MockERC20} from "./mocks/MockERC20.sol";
-import {IMissionFactory} from "../src/interfaces/IMissionFactory.sol";
-import {IPaymentRouter} from "../src/interfaces/IPaymentRouter.sol";
+import { Test } from "forge-std/Test.sol";
+import { PaymentRouter } from "../src/PaymentRouter.sol";
+import { MockERC20 } from "./mocks/MockERC20.sol";
+import { IMissionFactory } from "../src/interfaces/IMissionFactory.sol";
+import { IPaymentRouter } from "../src/interfaces/IPaymentRouter.sol";
 
 contract MockMissionFactory is IMissionFactory {
     mapping(uint256 => address) public missions;
@@ -32,12 +32,7 @@ contract PaymentRouterSecurityTest is Test {
 
     function setUp() public {
         usdc = new MockERC20("USDC", "USDC", 6);
-        router = new PaymentRouter(
-            address(usdc),
-            protocolTreasury,
-            resolverTreasury,
-            labsTreasury
-        );
+        router = new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury);
         factory = new MockMissionFactory();
         router.setMissionFactory(address(factory));
 
@@ -80,18 +75,16 @@ contract PaymentRouterSecurityTest is Test {
 
         vm.stopPrank();
 
-        uint256 expectedPerformerAmount = (rewardAmount * 9000) / 10000;
-        assertEq(usdc.balanceOf(attacker), expectedPerformerAmount, "Performer should receive funds");
+        uint256 expectedPerformerAmount = (rewardAmount * 9000) / 10_000;
+        assertEq(
+            usdc.balanceOf(attacker), expectedPerformerAmount, "Performer should receive funds"
+        );
     }
 
     function test_RevertWhen_MissionFactoryNotSet() public {
         // Create new router without factory
-        PaymentRouter unsafeRouter = new PaymentRouter(
-            address(usdc),
-            protocolTreasury,
-            resolverTreasury,
-            labsTreasury
-        );
+        PaymentRouter unsafeRouter =
+            new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury);
 
         usdc.mint(address(unsafeRouter), 100e6);
 

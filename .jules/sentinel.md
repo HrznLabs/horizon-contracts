@@ -27,3 +27,8 @@
 **Vulnerability:** Found `DisputeResolver` required DDR deposits from BOTH parties before allowing `resolveDispute`. If one party refused to participate, the dispute was deadlocked.
 **Learning:** "Skin in the game" mechanisms must handle non-participation gracefully. Never let a refusal to participate block the resolution process.
 **Prevention:** Design state machines where every state has a path forward (e.g., default judgment) even if some actors go silent.
+
+## 2024-05-26 - Fee Bypass in Dispute Settlement
+**Vulnerability:** The `settleDispute` function in `MissionEscrow` directly transferred 100% of the reward to the performer if they won, bypassing the `PaymentRouter` fees (10%). This created a perverse incentive for performers to dispute every mission.
+**Learning:** Replicating logic ("simple version") instead of reusing existing secure components (`PaymentRouter`) often leads to inconsistent behavior and security gaps.
+**Prevention:** Always reuse established payment routing logic for fund distribution. Avoid "short-circuiting" logic for special cases if it means bypassing standard fees or checks.

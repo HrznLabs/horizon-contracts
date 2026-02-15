@@ -322,9 +322,10 @@ contract MissionEscrow is Initializable, IMissionEscrow {
             IERC20(_usdc).safeTransfer(_poster, posterAmount);
         }
         if (performerAmount > 0) {
-            // Transfer to performer directly (simple version)
-            // In production, could use PaymentRouter for fee distribution
-            IERC20(_usdc).safeTransfer(_performer, performerAmount);
+            // Transfer to PaymentRouter for fee distribution
+            IERC20(_usdc).safeTransfer(_paymentRouter, performerAmount);
+            IPaymentRouter(_paymentRouter)
+                .settlePayment(_missionId, _performer, performerAmount, _guild);
         }
 
         emit DisputeSettled(_missionId, outcome, posterAmount, performerAmount);
