@@ -21,7 +21,7 @@ contract GuildFactory is Ownable {
     address public immutable guildImplementation;
 
     /// @notice Current guild counter
-    uint256 public guildCount;
+    uint96 public guildCount;
 
     /// @notice Mapping from guild ID to guild address
     mapping(uint256 => address) public guilds;

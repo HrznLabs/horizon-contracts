@@ -73,7 +73,7 @@ contract MissionEscrowUXTest is Test {
         // 3. Random user tries to raise dispute
         vm.prank(randomUser);
 
-        // EXPECTED BEHAVIOR: Reverts with InvalidState
+        // EXPECTED BEHAVIOR: Reverts with InvalidState (Current implementation behavior)
         vm.expectRevert(IMissionEscrow.InvalidState.selector);
         IMissionEscrow(escrow).raiseDispute(keccak256("evidence"));
     }

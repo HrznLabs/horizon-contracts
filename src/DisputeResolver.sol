@@ -306,13 +306,21 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert InvalidOutcome();
         }
 
-        // DDR Enforcement: Both parties must have deposited DDR before resolution
-        // This ensures fair dispute economics and prevents gaming the system
-        if (_ddrDeposits[disputeId][dispute.poster] == 0) {
-            revert InsufficientDDR();
-        }
-        if (_ddrDeposits[disputeId][dispute.performer] == 0) {
-            revert InsufficientDDR();
+        // DDR Enforcement: The WINNER must have deposited DDR before resolution
+        // This prevents deadlock if one party refuses to participate
+        if (outcome == DisputeOutcome.PosterWins) {
+            if (_ddrDeposits[disputeId][dispute.poster] == 0) revert InsufficientDDR();
+        } else if (outcome == DisputeOutcome.PerformerWins) {
+            if (_ddrDeposits[disputeId][dispute.performer] == 0) revert InsufficientDDR();
+        } else {
+            // For Split or Cancelled, require both parties to have deposited
+            // This ensures mutual participation for complex outcomes
+            if (
+                _ddrDeposits[disputeId][dispute.poster] == 0
+                    || _ddrDeposits[disputeId][dispute.performer] == 0
+            ) {
+                revert InsufficientDDR();
+            }
         }
 
         dispute.outcome = outcome;
@@ -365,7 +373,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             if (block.timestamp < dispute.appealDeadline) {
                 revert AppealPeriodActive();
             }
-        } else if (dispute.state != DisputeState.Appealed) {
+        } else {
             // Appealed disputes are finalized by DAO override
             revert InvalidDisputeState();
         }
