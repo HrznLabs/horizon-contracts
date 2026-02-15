@@ -200,10 +200,13 @@ forge test --gas-report
 ### Deployment
 
 ```bash
-# Set environment variables
-export DEPLOYER_PRIVATE_KEY=your_private_key
-export BASE_RPC_URL=https://sepolia.base.org
-export BASESCAN_API_KEY=your_api_key
+# Configure environment
+cp .env.example .env
+
+# Edit .env with your private key and API keys
+# DEPLOYER_PRIVATE_KEY=0x...
+# BASE_RPC_URL=https://sepolia.base.org
+# BASESCAN_API_KEY=...
 
 # Deploy to Base Sepolia
 forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --verify
