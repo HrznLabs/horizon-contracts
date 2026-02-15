@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, console} from "forge-std/Test.sol";
-import {MissionFactory} from "../src/MissionFactory.sol";
-import {MissionEscrow} from "../src/MissionEscrow.sol";
-import {PaymentRouter} from "../src/PaymentRouter.sol";
-import {IMissionEscrow} from "../src/interfaces/IMissionEscrow.sol";
-import {MockERC20} from "./mocks/MockERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Test, console } from "forge-std/Test.sol";
+import { MissionFactory } from "../src/MissionFactory.sol";
+import { MissionEscrow } from "../src/MissionEscrow.sol";
+import { PaymentRouter } from "../src/PaymentRouter.sol";
+import { IMissionEscrow } from "../src/interfaces/IMissionEscrow.sol";
+import { MockERC20 } from "./mocks/MockERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract SentinelClaimExpiredTest is Test {
     MissionFactory public factory;
@@ -39,13 +39,8 @@ contract SentinelClaimExpiredTest is Test {
     function test_PosterCannotClaimExpiredWhileSubmitted() public {
         vm.startPrank(poster);
         uint256 expiresAt = block.timestamp + 1 days;
-        uint256 missionId = factory.createMission(
-            REWARD_AMOUNT,
-            expiresAt,
-            address(0),
-            bytes32(0),
-            bytes32(0)
-        );
+        uint256 missionId =
+            factory.createMission(REWARD_AMOUNT, expiresAt, address(0), bytes32(0), bytes32(0));
         vm.stopPrank();
 
         address escrowAddress = factory.missions(missionId);
@@ -59,7 +54,7 @@ contract SentinelClaimExpiredTest is Test {
 
         // Confirm state is Submitted
         IMissionEscrow.MissionRuntime memory runtime = escrow.getRuntime();
-        assertEq(uint(runtime.state), uint(IMissionEscrow.MissionState.Submitted));
+        assertEq(uint256(runtime.state), uint256(IMissionEscrow.MissionState.Submitted));
 
         // Fast forward past expiration
         vm.warp(expiresAt + 1);
@@ -72,7 +67,7 @@ contract SentinelClaimExpiredTest is Test {
         // Assertions
         runtime = escrow.getRuntime();
         // State should still be Submitted
-        assertEq(uint(runtime.state), uint(IMissionEscrow.MissionState.Submitted));
+        assertEq(uint256(runtime.state), uint256(IMissionEscrow.MissionState.Submitted));
 
         // Poster did NOT get refund
         assertEq(usdc.balanceOf(poster), 900e6); // 1000 - 100
