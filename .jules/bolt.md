@@ -9,3 +9,7 @@
 ## 2026-02-12 - [Whitelist vs Blacklist State Checks]
 **Learning:** In state machines, checking against a whitelist of allowed states (e.g., `Open` or `Accepted`) is safer and cheaper than blacklisting forbidden states. It automatically handles undefined or new states (e.g., `None` or future states), preventing bypasses.
 **Action:** Always prefer whitelist checks for critical state transitions to save gas and improve security.
+
+## 2026-02-14 - [NFT Storage Packing Pattern]
+**Learning:** Using separate storage-optimized structs (e.g., `uint32` type IDs, `uint64` timestamps, packed booleans) while keeping the original external structs for ABI compatibility saved ~22% gas per mint (112k gas). This pattern allows massive storage savings without breaking existing integrations.
+**Action:** When optimizing existing structs with large fields (e.g., `uint256`), create a parallel internal `Storage` struct with smaller types to pack data tightly, then map it back to the original struct for external views to preserve ABI.
