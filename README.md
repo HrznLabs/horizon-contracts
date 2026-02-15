@@ -44,36 +44,25 @@ Horizon Protocol is a decentralized platform for coordinating real-world tasks (
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Mission Flow                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Poster                    MissionFactory                        │
-│    │                            │                                │
-│    ├── createMission() ────────>│                                │
-│    │   (USDC + params)          │                                │
-│    │                            ├── Deploy MissionEscrow Clone   │
-│    │                            │   (EIP-1167 minimal proxy)     │
-│    │                            │                                │
-│    │                     MissionEscrow                           │
-│    │                            │                                │
-│  Performer                      │                                │
-│    ├── acceptMission() ────────>│                                │
-│    ├── submitProof() ──────────>│                                │
-│    │                            │                                │
-│  Poster                         │                                │
-│    ├── approveCompletion() ────>│                                │
-│    │                            │                                │
-│    │                     PaymentRouter                           │
-│    │                            │                                │
-│    │                            ├── 4% → Protocol Treasury       │
-│    │                            ├── 4% → Labs Treasury           │
-│    │                            ├── 2% → Resolver Treasury       │
-│    │                            ├── 0-15% → Guild Treasury       │
-│    │                            └── 75-90% → Performer           │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    actor Poster
+    actor Performer
+    participant MF as MissionFactory
+    participant ME as MissionEscrow
+    participant PR as PaymentRouter
+
+    Poster->>MF: createMission(USDC + params)
+    MF-->>ME: Deploy MissionEscrow Clone<br/>(EIP-1167 minimal proxy)
+
+    Performer->>ME: acceptMission()
+    Performer->>ME: submitProof()
+
+    Poster->>ME: approveCompletion()
+
+    ME->>PR: Settle Payment
+
+    Note right of PR: 4% → Protocol Treasury<br/>4% → Labs Treasury<br/>2% → Resolver Treasury<br/>0-15% → Guild Treasury<br/>75-90% → Performer
 ```
 
 ## 📦 Contract Suite
@@ -211,10 +200,13 @@ forge test --gas-report
 ### Deployment
 
 ```bash
-# Set environment variables
-export DEPLOYER_PRIVATE_KEY=your_private_key
-export BASE_RPC_URL=https://sepolia.base.org
-export BASESCAN_API_KEY=your_api_key
+# Configure environment
+cp .env.example .env
+
+# Edit .env with your private key and API keys
+# DEPLOYER_PRIVATE_KEY=0x...
+# BASE_RPC_URL=https://sepolia.base.org
+# BASESCAN_API_KEY=...
 
 # Deploy to Base Sepolia
 forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --verify
