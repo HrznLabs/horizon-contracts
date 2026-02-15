@@ -31,15 +31,17 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     address private _poster; // 20
     uint96 private _missionId; // 12 (Packed perfectly: 20 + 12 = 32)
 
-    // Slot 1: Guild + State + DisputeRaised
+    // Slot 1: Guild + State + DisputeRaised + ExpiresAt
     address private _guild; // 20
     MissionState private _state; // 1
     bool private _disputeRaised; // 1
-    // 10 bytes gap
+    uint64 private _expiresAt; // 8
+    // 2 bytes gap
 
-    // Slot 2: PaymentRouter
+    // Slot 2: PaymentRouter + RewardAmount
     address private _paymentRouter; // 20
-    // 12 bytes gap
+    uint96 private _rewardAmount; // 12
+    // Packed perfectly (20 + 12 = 32)
 
     // Slot 3: USDC
     address private _usdc; // 20
@@ -49,15 +51,12 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     address private _disputeResolver; // 20
     // 12 bytes gap
 
-    // Slot 5: Performer
+    // Slot 5: Performer + CreatedAt
     address private _performer; // 20
-    // 12 bytes gap
-
-    // Slot 6: RewardAmount + CreatedAt + ExpiresAt
-    uint128 private _rewardAmount; // 16
     uint64 private _createdAt; // 8
-    uint64 private _expiresAt; // 8
-    // Total 32 bytes (Packed perfectly)
+    // 4 bytes gap
+
+    // Slot 6 Removed
 
     // Slot 7: MetadataHash
     bytes32 private _metadataHash; // 32
@@ -119,7 +118,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     ) external initializer {
         if (expiresAt > type(uint64).max) revert MissionExpired();
         if (missionId > type(uint96).max) revert InvalidState();
-        if (rewardAmount > type(uint128).max) revert InvalidState();
+        if (rewardAmount > type(uint96).max) revert InvalidState();
 
         _missionId = uint96(missionId);
         _poster = poster;
@@ -127,15 +126,16 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         _guild = guild;
         _state = MissionState.Open;
         _disputeRaised = false;
+        _expiresAt = uint64(expiresAt);
 
         _paymentRouter = paymentRouter;
+        _rewardAmount = uint96(rewardAmount);
+
         _usdc = usdc;
         _disputeResolver = disputeResolver;
         // _performer is 0
 
-        _rewardAmount = uint128(rewardAmount);
         _createdAt = uint64(block.timestamp);
-        _expiresAt = uint64(expiresAt);
 
         _metadataHash = metadataHash;
         _locationHash = locationHash;
@@ -164,7 +164,12 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      * @param proofHash IPFS hash of proof data
      * @dev Transitions from Accepted to Submitted
      */
-    function submitProof(bytes32 proofHash) external onlyPerformer inState(MissionState.Accepted) {
+    function submitProof(bytes32 proofHash)
+        external
+        onlyPerformer
+        inState(MissionState.Accepted)
+        notExpired
+    {
         _proofHash = proofHash;
         _state = MissionState.Submitted;
 
@@ -211,7 +216,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         }
 
         if (msg.sender != _poster && msg.sender != _performer) {
-            revert InvalidState();
+            revert NotParty();
         }
 
         if (_disputeRaised) revert DisputeAlreadyRaised();
@@ -229,10 +234,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     function claimExpired() external onlyPoster {
         if (block.timestamp <= _expiresAt) revert MissionNotExpired();
 
-        if (
-            _state == MissionState.Completed || _state == MissionState.Cancelled
-                || _state == MissionState.Disputed || _state == MissionState.Submitted
-        ) {
+        if (_state != MissionState.Open && _state != MissionState.Accepted) {
             revert InvalidState();
         }
 
