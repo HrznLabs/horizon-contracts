@@ -29,11 +29,13 @@ contract ReputationAttestations is Ownable {
     /// @notice Mapping: missionId => rater => ratee => Rating
     mapping(uint256 => mapping(address => mapping(address => Rating))) public ratings;
 
-    /// @notice Mapping: user => total ratings received
-    mapping(address => uint256) public ratingCounts;
+    struct RatingStats {
+        uint128 count;
+        uint128 sum;
+    }
 
-    /// @notice Mapping: user => sum of all ratings (for average calculation)
-    mapping(address => uint256) public ratingSums;
+    /// @notice Mapping: user => packed rating stats (count + sum)
+    mapping(address => RatingStats) private _stats;
 
     /// @notice Authorized mission escrow contracts
     mapping(address => bool) public authorizedContracts;
@@ -103,8 +105,10 @@ contract ReputationAttestations is Ownable {
             Rating({ score: score, commentHash: commentHash, timestamp: block.timestamp });
 
         // Update ratee's statistics
-        ratingCounts[ratee]++;
-        ratingSums[ratee] += score;
+        RatingStats memory stats = _stats[ratee];
+        stats.count++;
+        stats.sum += score;
+        _stats[ratee] = stats;
 
         emit RatingSubmitted(missionId, msg.sender, ratee, score, commentHash);
     }
@@ -150,10 +154,25 @@ contract ReputationAttestations is Ownable {
      * @return count Number of ratings
      */
     function getAverageRating(address user) external view returns (uint256 average, uint256 count) {
-        count = ratingCounts[user];
+        RatingStats memory stats = _stats[user];
+        count = uint256(stats.count);
         if (count == 0) return (0, 0);
 
-        average = (ratingSums[user] * 100) / count;
+        average = (uint256(stats.sum) * 100) / count;
+    }
+
+    /**
+     * @notice Get total ratings received by a user
+     */
+    function ratingCounts(address user) external view returns (uint256) {
+        return _stats[user].count;
+    }
+
+    /**
+     * @notice Get sum of all ratings for a user
+     */
+    function ratingSums(address user) external view returns (uint256) {
+        return _stats[user].sum;
     }
 
     // =============================================================================

@@ -13,3 +13,7 @@
 ## 2026-02-14 - [NFT Storage Packing Pattern]
 **Learning:** Using separate storage-optimized structs (e.g., `uint32` type IDs, `uint64` timestamps, packed booleans) while keeping the original external structs for ABI compatibility saved ~22% gas per mint (112k gas). This pattern allows massive storage savings without breaking existing integrations.
 **Action:** When optimizing existing structs with large fields (e.g., `uint256`), create a parallel internal `Storage` struct with smaller types to pack data tightly, then map it back to the original struct for external views to preserve ABI.
+
+## 2025-02-16 - ReputationAttestations Storage Packing
+**Learning:** Replacing separate public mappings for related counters (count/sum) with a single private mapping to a packed struct (uint128/uint128) saves ~20k gas per write (1 SSTORE instead of 2). However, to preserve ABI compatibility, manual getter functions matching the original mapping signature must be added.
+**Action:** Look for related counters in other contracts (e.g., totalRewards/totalMissions) and pack them if they fit in 256 bits, ensuring getters are preserved.
