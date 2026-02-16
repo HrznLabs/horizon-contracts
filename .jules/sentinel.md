@@ -32,3 +32,8 @@
 **Vulnerability:** The `settleDispute` function in `MissionEscrow` directly transferred 100% of the reward to the performer if they won, bypassing the `PaymentRouter` fees (10%). This created a perverse incentive for performers to dispute every mission.
 **Learning:** Replicating logic ("simple version") instead of reusing existing secure components (`PaymentRouter`) often leads to inconsistent behavior and security gaps.
 **Prevention:** Always reuse established payment routing logic for fund distribution. Avoid "short-circuiting" logic for special cases if it means bypassing standard fees or checks.
+
+## 2025-05-26 - Unrestricted Reputation Writing
+**Vulnerability:** The `ReputationAttestations` contract allowed any user to submit a rating for any mission/user without verification of participation or mission completion.
+**Learning:** Contracts often assume they will be called by trusted entities (like `MissionEscrow`) or have implicit context, but public `external` functions must always validate authorization explicitly. Reputation systems without strict access control become weaponized spam vectors.
+**Prevention:** Implement strict access control checks (`onlyAuthorized`, verify participation via factory/registry) on all public write functions, especially those affecting social signals like reputation.
