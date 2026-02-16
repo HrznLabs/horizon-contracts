@@ -41,11 +41,7 @@ contract DisputeResolverSecurity is Test {
 
         // Deploy DisputeResolver
         disputeResolverContract = new DisputeResolver(
-            address(usdc),
-            resolversDAO,
-            protocolDAO,
-            protocolTreasury,
-            resolverTreasury
+            address(usdc), resolversDAO, protocolDAO, protocolTreasury, resolverTreasury
         );
 
         // Deploy MissionFactory
@@ -92,7 +88,8 @@ contract DisputeResolverSecurity is Test {
 
         // Then create dispute on Resolver
         vm.prank(poster);
-        uint256 disputeId = disputeResolverContract.createDispute(escrowAddress, missionId, keccak256("evidence"));
+        uint256 disputeId =
+            disputeResolverContract.createDispute(escrowAddress, missionId, keccak256("evidence"));
 
         // 5. Assign resolver
         vm.prank(resolversDAO);
@@ -104,7 +101,9 @@ contract DisputeResolverSecurity is Test {
 
         // 7. Resolver resolves dispute (PosterWins)
         vm.prank(resolver);
-        disputeResolverContract.resolveDispute(disputeId, IDisputeResolver.DisputeOutcome.PosterWins, keccak256("resolution"), 0);
+        disputeResolverContract.resolveDispute(
+            disputeId, IDisputeResolver.DisputeOutcome.PosterWins, keccak256("resolution"), 0
+        );
 
         // Verify state is Resolved
         IDisputeResolver.Dispute memory dispute = disputeResolverContract.getDispute(disputeId);
