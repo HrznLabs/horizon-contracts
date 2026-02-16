@@ -21,13 +21,13 @@ Horizon Protocol enables trustless, escrow-backed task coordination with USDC pa
 
 | Contract | Address | Verified |
 |----------|---------|----------|
-| PaymentRouter | [`0x94fb7908257ec36f701d2605b51eefed4326ddf5`](https://sepolia.basescan.org/address/0x94fb7908257ec36f701d2605b51eefed4326ddf5) | ✅ |
-| MissionFactory | [`0xee9234954b134c39c17a75482da78e46b16f466c`](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c) | ✅ |
-| MissionEscrow (Implementation) | [`0x873Ea710B6b289b0e9D6867B1630066e9721B5c9`](https://sepolia.basescan.org/address/0x873Ea710B6b289b0e9D6867B1630066e9721B5c9) | ✅ |
-| GuildFactory | [`0xfeae3538a4a1801e47b6d16104aa8586edb55f00`](https://sepolia.basescan.org/address/0xfeae3538a4a1801e47b6d16104aa8586edb55f00) | ✅ |
-| ReputationAttestations | [`0xedae9682a0fb6fb3c18d6865461f67db7d748002`](https://sepolia.basescan.org/address/0xedae9682a0fb6fb3c18d6865461f67db7d748002) | ✅ |
-| DisputeResolver | [`0xb00ac4278129928aecc72541b0bcd69d94c1691e`](https://sepolia.basescan.org/address/0xb00ac4278129928aecc72541b0bcd69d94c1691e) | ✅ |
-| HorizonAchievements | [`0x568e0e3102bfa1f4045d3f62559c0f9823b469bc`](https://sepolia.basescan.org/address/0x568e0e3102bfa1f4045d3f62559c0f9823b469bc) | ✅ |
+| PaymentRouter | [`0x94fb7908257ec36f701d2605b51eefed4326ddf5`](https://sepolia.basescan.org/address/0x94fb7908257ec36f701d2605b51eefed4326ddf5) | [✅](https://sepolia.basescan.org/address/0x94fb7908257ec36f701d2605b51eefed4326ddf5#code) |
+| MissionFactory | [`0xee9234954b134c39c17a75482da78e46b16f466c`](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c) | [✅](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c#code) |
+| MissionEscrow (Implementation) | [`0x873Ea710B6b289b0e9D6867B1630066e9721B5c9`](https://sepolia.basescan.org/address/0x873Ea710B6b289b0e9D6867B1630066e9721B5c9) | [✅](https://sepolia.basescan.org/address/0x873Ea710B6b289b0e9D6867B1630066e9721B5c9#code) |
+| GuildFactory | [`0xfeae3538a4a1801e47b6d16104aa8586edb55f00`](https://sepolia.basescan.org/address/0xfeae3538a4a1801e47b6d16104aa8586edb55f00) | [✅](https://sepolia.basescan.org/address/0xfeae3538a4a1801e47b6d16104aa8586edb55f00#code) |
+| ReputationAttestations | [`0xedae9682a0fb6fb3c18d6865461f67db7d748002`](https://sepolia.basescan.org/address/0xedae9682a0fb6fb3c18d6865461f67db7d748002) | [✅](https://sepolia.basescan.org/address/0xedae9682a0fb6fb3c18d6865461f67db7d748002#code) |
+| DisputeResolver | [`0xb00ac4278129928aecc72541b0bcd69d94c1691e`](https://sepolia.basescan.org/address/0xb00ac4278129928aecc72541b0bcd69d94c1691e) | [✅](https://sepolia.basescan.org/address/0xb00ac4278129928aecc72541b0bcd69d94c1691e#code) |
+| HorizonAchievements | [`0x568e0e3102bfa1f4045d3f62559c0f9823b469bc`](https://sepolia.basescan.org/address/0x568e0e3102bfa1f4045d3f62559c0f9823b469bc) | [✅](https://sepolia.basescan.org/address/0x568e0e3102bfa1f4045d3f62559c0f9823b469bc#code) |
 
 **Base Sepolia USDC:** [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e)
 
@@ -101,19 +101,26 @@ function claimExpired() external;            // Claim expired mission funds
 Routes payments with configurable fee splits.
 
 **Fee Structure:**
-- Protocol: 4% (fixed)
-- Labs: 4% (fixed)
-- Resolver: 2% (fixed)
-- Guild: 0-15% (variable, set by guild)
-- Performer: 90% - guildFee
+
+| Fee Type | Percentage | Recipient |
+|----------|------------|-----------|
+| Protocol Fee | 4% | Protocol Treasury |
+| Labs Fee | 4% | Labs Treasury |
+| Resolver Fee | 2% | Resolver Treasury |
+| Guild Fee | 0-15% (variable) | Guild Treasury |
+| Performer | 90% - guildFee | Performer |
 
 #### `DisputeResolver.sol`
 Handles mission disputes with economic incentives.
 
 **Mechanisms:**
-- **DDR (Dynamic Dispute Reserve):** 5% deposit from each party
-- **LPP (Loser-Pays Penalty):** 2% penalty redistributed
-- **Appeal Period:** 48 hours before finalization
+
+| Mechanism | Value | Description |
+|-----------|-------|-------------|
+| DDR (Dynamic Dispute Reserve) | 5% | Deposited by both parties when dispute is raised |
+| LPP (Loser-Pays Penalty) | 2% | Penalty redistributed to winner + resolver |
+| Appeal Period | 48 hours | Time before dispute can be finalized |
+
 - **DAO Override:** Protocol DAO can override resolutions
 
 ### Governance Contracts
