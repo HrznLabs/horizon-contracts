@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, console} from "forge-std/Test.sol";
-import {PaymentRouter} from "../src/PaymentRouter.sol";
-import {IPaymentRouter} from "../src/interfaces/IPaymentRouter.sol";
-import {MockERC20} from "./mocks/MockERC20.sol";
+import { Test, console } from "forge-std/Test.sol";
+import { PaymentRouter } from "../src/PaymentRouter.sol";
+import { IPaymentRouter } from "../src/interfaces/IPaymentRouter.sol";
+import { MockERC20 } from "./mocks/MockERC20.sol";
 
 contract PaymentRouterAuthRepro is Test {
     PaymentRouter public router;
@@ -38,7 +38,7 @@ contract PaymentRouterAuthRepro is Test {
         // This should now revert because msg.sender (attacker) is not the mission address
         vm.expectRevert(IPaymentRouter.OnlyMissionEscrow.selector);
         router.settlePayment(
-            12345, // fake missionId
+            12_345, // fake missionId
             attacker,
             1000e6, // Amount to drain
             address(0) // No guild
