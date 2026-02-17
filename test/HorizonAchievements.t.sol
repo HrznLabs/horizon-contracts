@@ -30,7 +30,8 @@ contract HorizonAchievementsTest is Test {
 
         assertEq(typeId, 1);
 
-        HorizonAchievements.AchievementType memory typeInfo = achievements.getAchievementType(typeId);
+        HorizonAchievements.AchievementType memory typeInfo =
+            achievements.getAchievementType(typeId);
         assertEq(typeInfo.name, "First Mission");
         assertEq(typeInfo.description, "Complete your first mission");
         assertEq(uint8(typeInfo.category), uint8(HorizonAchievements.AchievementCategory.Milestone));
