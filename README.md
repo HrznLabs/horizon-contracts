@@ -101,19 +101,26 @@ function claimExpired() external;            // Claim expired mission funds
 Routes payments with configurable fee splits.
 
 **Fee Structure:**
-- Protocol: 4% (fixed)
-- Labs: 4% (fixed)
-- Resolver: 2% (fixed)
-- Guild: 0-15% (variable, set by guild)
-- Performer: 90% - guildFee
+
+| Fee Type | Percentage | Recipient |
+|----------|------------|-----------|
+| Protocol Fee | 4% | Protocol Treasury |
+| Labs Fee | 4% | Labs Treasury |
+| Resolver Fee | 2% | Resolver Treasury |
+| Guild Fee | 0-15% (variable) | Guild Treasury |
+| Performer | 90% - guildFee | Performer |
 
 #### `DisputeResolver.sol`
 Handles mission disputes with economic incentives.
 
 **Mechanisms:**
-- **DDR (Dynamic Dispute Reserve):** 5% deposit from each party
-- **LPP (Loser-Pays Penalty):** 2% penalty redistributed
-- **Appeal Period:** 48 hours before finalization
+
+| Mechanism | Value | Description |
+|-----------|-------|-------------|
+| DDR (Dynamic Dispute Reserve) | 5% | Deposited by both parties when dispute is raised |
+| LPP (Loser-Pays Penalty) | 2% | Penalty redistributed to winner + resolver |
+| Appeal Period | 48 hours | Time before dispute can be finalized |
+
 - **DAO Override:** Protocol DAO can override resolutions
 
 ### Governance Contracts
