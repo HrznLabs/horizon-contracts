@@ -73,10 +73,10 @@ interface IMissionEscrow {
     // =============================================================================
 
     function initialize(
-        uint256 missionId,
+        uint96 missionId,
         address poster,
-        uint256 rewardAmount,
-        uint256 expiresAt,
+        uint96 rewardAmount,
+        uint64 expiresAt,
         address guild,
         bytes32 metadataHash,
         bytes32 locationHash,

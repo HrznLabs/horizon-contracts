@@ -105,10 +105,10 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      * @dev Called by MissionFactory after clone deployment
      */
     function initialize(
-        uint256 missionId,
+        uint96 missionId,
         address poster,
-        uint256 rewardAmount,
-        uint256 expiresAt,
+        uint96 rewardAmount,
+        uint64 expiresAt,
         address guild,
         bytes32 metadataHash,
         bytes32 locationHash,
@@ -116,20 +116,16 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         address usdc,
         address disputeResolver
     ) external initializer {
-        if (expiresAt > type(uint64).max) revert MissionExpired();
-        if (missionId > type(uint96).max) revert InvalidState();
-        if (rewardAmount > type(uint96).max) revert InvalidState();
-
-        _missionId = uint96(missionId);
+        _missionId = missionId;
         _poster = poster;
 
         _guild = guild;
         _state = MissionState.Open;
         _disputeRaised = false;
-        _expiresAt = uint64(expiresAt);
+        _expiresAt = expiresAt;
 
         _paymentRouter = paymentRouter;
-        _rewardAmount = uint96(rewardAmount);
+        _rewardAmount = rewardAmount;
 
         _usdc = usdc;
         _disputeResolver = disputeResolver;
