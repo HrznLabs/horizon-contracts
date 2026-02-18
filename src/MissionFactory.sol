@@ -137,18 +137,23 @@ contract MissionFactory is Ownable, ReentrancyGuard {
         if (disputeResolver == address(0)) revert InvalidDisputeResolver();
 
         // Increment mission counter
+        // Safe cast: missionCount is uint96, so missionId fits in uint96
         missionId = ++missionCount;
 
         // Deploy escrow clone
         address escrow = escrowImplementation.clone();
 
         // Initialize escrow
+        // Safe casts:
+        // - missionId is from uint96 counter
+        // - rewardAmount is validated <= MAX_REWARD (fits in uint96)
+        // - expiresAt is validated via duration <= MAX_DURATION (fits in uint64)
         IMissionEscrow(escrow)
             .initialize(
-                missionId,
+                uint96(missionId),
                 msg.sender,
-                rewardAmount,
-                expiresAt,
+                uint96(rewardAmount),
+                uint64(expiresAt),
                 guild,
                 metadataHash,
                 locationHash,

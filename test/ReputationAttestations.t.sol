@@ -3,18 +3,51 @@ pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
 import "../src/ReputationAttestations.sol";
+import "../src/interfaces/IMissionFactory.sol";
+import "../src/interfaces/IMissionEscrow.sol";
 
 contract ReputationAttestationsTest is Test {
     ReputationAttestations reputation;
     address rater1 = address(0x1);
     address rater2 = address(0x2);
     address ratee = address(0x3);
+    address factory = address(0x4);
+    address escrow = address(0x5);
 
     function setUp() public {
         reputation = new ReputationAttestations();
+        reputation.setMissionFactory(factory);
     }
 
     function testSubmitRating() public {
+        // Mock factory.getMission(1) -> escrow
+        vm.mockCall(
+            factory,
+            abi.encodeWithSelector(IMissionFactory.getMission.selector, 1),
+            abi.encode(escrow)
+        );
+
+        // Mock escrow.getRuntime() -> Completed, Performer=ratee
+        IMissionEscrow.MissionRuntime memory runtime;
+        runtime.state = IMissionEscrow.MissionState.Completed;
+        runtime.performer = ratee;
+
+        vm.mockCall(
+            escrow,
+            abi.encodeWithSelector(IMissionEscrow.getRuntime.selector),
+            abi.encode(runtime)
+        );
+
+        // Mock escrow.getParams() -> Poster=rater1
+        IMissionEscrow.MissionParams memory params;
+        params.poster = rater1;
+
+        vm.mockCall(
+            escrow,
+            abi.encodeWithSelector(IMissionEscrow.getParams.selector),
+            abi.encode(params)
+        );
+
         vm.prank(rater1);
         reputation.submitRating(1, ratee, 5, bytes32("comment1"));
 
@@ -29,8 +62,50 @@ contract ReputationAttestationsTest is Test {
     }
 
     function testSubmitMultipleRatings() public {
+        // Mock factory.getMission(1) -> escrow
+        vm.mockCall(
+            factory,
+            abi.encodeWithSelector(IMissionFactory.getMission.selector, 1),
+            abi.encode(escrow)
+        );
+        // Mock factory.getMission(2) -> escrow (reuse same escrow for simplicity)
+        vm.mockCall(
+            factory,
+            abi.encodeWithSelector(IMissionFactory.getMission.selector, 2),
+            abi.encode(escrow)
+        );
+
+        // Mock escrow for rater1 -> ratee (poster -> performer)
+        IMissionEscrow.MissionRuntime memory runtime;
+        runtime.state = IMissionEscrow.MissionState.Completed;
+        runtime.performer = ratee;
+
+        vm.mockCall(
+            escrow,
+            abi.encodeWithSelector(IMissionEscrow.getRuntime.selector),
+            abi.encode(runtime)
+        );
+
+        IMissionEscrow.MissionParams memory params;
+        params.poster = rater1;
+
+        vm.mockCall(
+            escrow,
+            abi.encodeWithSelector(IMissionEscrow.getParams.selector),
+            abi.encode(params)
+        );
+
         vm.prank(rater1);
         reputation.submitRating(1, ratee, 5, bytes32("comment1"));
+
+        // Mock escrow for rater2 -> ratee (also poster -> performer for simplicity, or change params)
+        // Let's say rater2 is also poster of mission 2
+        params.poster = rater2;
+        vm.mockCall(
+            escrow,
+            abi.encodeWithSelector(IMissionEscrow.getParams.selector),
+            abi.encode(params)
+        );
 
         vm.prank(rater2);
         reputation.submitRating(2, ratee, 3, bytes32("comment2"));
