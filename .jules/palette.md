@@ -14,6 +14,6 @@
 **Learning:** ASCII art diagrams are inaccessible to screen readers and difficult to maintain. Using Mermaid diagrams provides semantic structure and native rendering support on platforms like GitHub.
 **Action:** Replace complex ASCII diagrams with Mermaid sequence or flow charts in documentation.
 
-## 2026-02-13 - Deep Linking for Verification
-**Learning:** Developers frequently need to verify contract source code. Linking directly to the `#code` anchor on block explorers (e.g., `https://...#code`) saves a click and reduces friction compared to generic address links.
-**Action:** Always append `#code` to verified contract links in documentation tables.
+## 2026-02-13 - Deep Linking for Developer Efficiency
+**Learning:** Developers often need to verify contract source code, not just view the address state. Linking directly to the `#code` tab on block explorers saves a click and reduces friction for reviewers and integrators.
+**Action:** Append `#code` to block explorer links when the intent is to show the verified contract source.
