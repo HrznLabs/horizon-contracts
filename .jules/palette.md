@@ -17,3 +17,7 @@
 ## 2026-02-13 - Deep Linking for Developer Efficiency
 **Learning:** Developers often need to verify contract source code, not just view the address state. Linking directly to the `#code` tab on block explorers saves a click and reduces friction for reviewers and integrators.
 **Action:** Append `#code` to block explorer links when the intent is to show the verified contract source.
+
+## 2026-02-14 - Documentation as First-Time UX
+**Learning:** For backend repositories, the README is the user's first interaction. Providing immediate utility (like network setup and faucet links) reduces friction and improves the "onboarding UX".
+**Action:** When optimizing backend repos, look for friction points in the "Getting Started" flow and add direct links/instructions to external dependencies (faucets, RPCs).
