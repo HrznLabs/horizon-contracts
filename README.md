@@ -175,6 +175,16 @@ function hasAchievement(address user, uint256 typeId) external view returns (boo
 - [Foundry](https://book.getfoundry.sh/getting-started/installation)
 - [Node.js](https://nodejs.org/) (for scripts)
 
+### Network Setup (Base Sepolia)
+
+- **RPC URL:** `https://sepolia.base.org`
+- **Chain ID:** `84532`
+- **Currency:** ETH
+- **Explorer:** [Base Sepolia Scan](https://sepolia.basescan.org)
+- **Faucets:**
+  - [Coinbase Developer Platform Faucet](https://portal.cdp.coinbase.com/products/faucet) (ETH & USDC)
+  - [Base Network Faucets Docs](https://docs.base.org/base-chain/tools/network-faucets)
+
 ### Installation
 
 ```bash
