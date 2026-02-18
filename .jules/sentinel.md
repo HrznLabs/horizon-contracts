@@ -32,3 +32,7 @@
 **Vulnerability:** The `settleDispute` function in `MissionEscrow` directly transferred 100% of the reward to the performer if they won, bypassing the `PaymentRouter` fees (10%). This created a perverse incentive for performers to dispute every mission.
 **Learning:** Replicating logic ("simple version") instead of reusing existing secure components (`PaymentRouter`) often leads to inconsistent behavior and security gaps.
 **Prevention:** Always reuse established payment routing logic for fund distribution. Avoid "short-circuiting" logic for special cases if it means bypassing standard fees or checks.
+## 2025-06-15 - [Reputation System Bypass]
+**Vulnerability:** The `ReputationAttestations.submitRating` function allowed any address to rate any other address for any mission ID without verifying participation or mission completion, enabling trivial reputation falsification.
+**Learning:** The vulnerability existed because the contract relied on the caller to provide correct parameters (missionId, ratee) but did not validate them against the source of truth (MissionFactory/Escrow).
+**Prevention:** Always cross-reference user input against authoritative registries (like MissionFactory) and verify state/participation in related contracts before allowing state changes.

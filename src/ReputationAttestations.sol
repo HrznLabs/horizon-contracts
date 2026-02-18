@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IMissionFactory } from "./interfaces/IMissionFactory.sol";
+import { IMissionEscrow } from "./interfaces/IMissionEscrow.sol";
 
 /**
  * @title ReputationAttestations
@@ -22,6 +24,11 @@ contract ReputationAttestations is Ownable {
         uint256 timestamp;
     }
 
+    struct RatingStats {
+        uint128 count;
+        uint128 sum;
+    }
+
     // =============================================================================
     // STATE VARIABLES
     // =============================================================================
@@ -29,13 +36,8 @@ contract ReputationAttestations is Ownable {
     /// @notice Mapping: missionId => rater => ratee => Rating
     mapping(uint256 => mapping(address => mapping(address => Rating))) public ratings;
 
-    struct RatingStats {
-        uint128 count;
-        uint128 sum;
-    }
-
-    /// @notice Mapping: user => packed rating stats (count + sum)
-    mapping(address => RatingStats) private _stats;
+    /// @notice Mapping: user => rating stats (count and sum packed)
+    mapping(address => RatingStats) private _ratingStats;
 
     /// @notice Authorized mission escrow contracts
     mapping(address => bool) public authorizedContracts;
@@ -71,6 +73,9 @@ contract ReputationAttestations is Ownable {
     error AlreadyRated();
     error SelfRating();
     error NotAuthorized();
+    error MissionNotCompleted();
+    error NotParticipant();
+    error InvalidCounterparty();
 
     // =============================================================================
     // CONSTRUCTOR
@@ -95,6 +100,30 @@ contract ReputationAttestations is Ownable {
         if (score < 1 || score > 5) revert InvalidScore();
         if (msg.sender == ratee) revert SelfRating();
 
+        // Validate mission and participation
+        if (missionFactory == address(0)) revert NotAuthorized();
+
+        address escrow = IMissionFactory(missionFactory).getMission(missionId);
+        IMissionEscrow mission = IMissionEscrow(escrow);
+
+        // Check if mission is completed
+        IMissionEscrow.MissionRuntime memory runtime = mission.getRuntime();
+        if (runtime.state != IMissionEscrow.MissionState.Completed) {
+            revert MissionNotCompleted();
+        }
+
+        // Check if rater is a participant
+        IMissionEscrow.MissionParams memory params = mission.getParams();
+
+        bool isPoster = msg.sender == params.poster;
+        bool isPerformer = msg.sender == runtime.performer;
+
+        if (!isPoster && !isPerformer) revert NotParticipant();
+
+        // Check if ratee is the counterparty
+        if (isPoster && ratee != runtime.performer) revert InvalidCounterparty();
+        if (isPerformer && ratee != params.poster) revert InvalidCounterparty();
+
         // Check if already rated
         if (ratings[missionId][msg.sender][ratee].score != 0) {
             revert AlreadyRated();
@@ -105,10 +134,10 @@ contract ReputationAttestations is Ownable {
             Rating({ score: score, commentHash: commentHash, timestamp: block.timestamp });
 
         // Update ratee's statistics
-        RatingStats memory stats = _stats[ratee];
+        RatingStats memory stats = _ratingStats[ratee];
         stats.count++;
         stats.sum += score;
-        _stats[ratee] = stats;
+        _ratingStats[ratee] = stats;
 
         emit RatingSubmitted(missionId, msg.sender, ratee, score, commentHash);
     }
@@ -148,31 +177,35 @@ contract ReputationAttestations is Ownable {
     }
 
     /**
+     * @notice Get total ratings received by a user
+     * @param user User address
+     * @return Total number of ratings
+     */
+    function ratingCounts(address user) external view returns (uint256) {
+        return _ratingStats[user].count;
+    }
+
+    /**
+     * @notice Get sum of all ratings received by a user
+     * @param user User address
+     * @return Sum of ratings
+     */
+    function ratingSums(address user) external view returns (uint256) {
+        return _ratingStats[user].sum;
+    }
+
+    /**
      * @notice Get average rating for a user
      * @param user User address
      * @return average Average rating (multiplied by 100 for precision)
      * @return count Number of ratings
      */
     function getAverageRating(address user) external view returns (uint256 average, uint256 count) {
-        RatingStats memory stats = _stats[user];
-        count = uint256(stats.count);
+        RatingStats memory stats = _ratingStats[user];
+        count = stats.count;
         if (count == 0) return (0, 0);
 
         average = (uint256(stats.sum) * 100) / count;
-    }
-
-    /**
-     * @notice Get total ratings received by a user
-     */
-    function ratingCounts(address user) external view returns (uint256) {
-        return _stats[user].count;
-    }
-
-    /**
-     * @notice Get sum of all ratings for a user
-     */
-    function ratingSums(address user) external view returns (uint256) {
-        return _stats[user].sum;
     }
 
     // =============================================================================
