@@ -60,7 +60,7 @@ All contracts are verified on BaseScan. To verify the source code matches:
 
 ```bash
 # Clone the repository
-git clone https://github.com/horizon-labs/horizon-contracts.git
+git clone https://github.com/HrznLabs/horizon-contracts.git
 cd horizon-contracts
 
 # Install dependencies
