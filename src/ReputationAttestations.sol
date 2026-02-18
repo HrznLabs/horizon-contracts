@@ -24,6 +24,11 @@ contract ReputationAttestations is Ownable {
         uint256 timestamp;
     }
 
+    struct RatingStats {
+        uint128 count;
+        uint128 sum;
+    }
+
     // =============================================================================
     // STATE VARIABLES
     // =============================================================================
@@ -31,11 +36,8 @@ contract ReputationAttestations is Ownable {
     /// @notice Mapping: missionId => rater => ratee => Rating
     mapping(uint256 => mapping(address => mapping(address => Rating))) public ratings;
 
-    /// @notice Mapping: user => total ratings received
-    mapping(address => uint256) public ratingCounts;
-
-    /// @notice Mapping: user => sum of all ratings (for average calculation)
-    mapping(address => uint256) public ratingSums;
+    /// @notice Mapping: user => rating stats (count and sum packed)
+    mapping(address => RatingStats) private _ratingStats;
 
     /// @notice Authorized mission escrow contracts
     mapping(address => bool) public authorizedContracts;
@@ -132,8 +134,10 @@ contract ReputationAttestations is Ownable {
             Rating({ score: score, commentHash: commentHash, timestamp: block.timestamp });
 
         // Update ratee's statistics
-        ratingCounts[ratee]++;
-        ratingSums[ratee] += score;
+        RatingStats memory stats = _ratingStats[ratee];
+        stats.count++;
+        stats.sum += score;
+        _ratingStats[ratee] = stats;
 
         emit RatingSubmitted(missionId, msg.sender, ratee, score, commentHash);
     }
@@ -173,16 +177,35 @@ contract ReputationAttestations is Ownable {
     }
 
     /**
+     * @notice Get total ratings received by a user
+     * @param user User address
+     * @return Total number of ratings
+     */
+    function ratingCounts(address user) external view returns (uint256) {
+        return _ratingStats[user].count;
+    }
+
+    /**
+     * @notice Get sum of all ratings received by a user
+     * @param user User address
+     * @return Sum of ratings
+     */
+    function ratingSums(address user) external view returns (uint256) {
+        return _ratingStats[user].sum;
+    }
+
+    /**
      * @notice Get average rating for a user
      * @param user User address
      * @return average Average rating (multiplied by 100 for precision)
      * @return count Number of ratings
      */
     function getAverageRating(address user) external view returns (uint256 average, uint256 count) {
-        count = ratingCounts[user];
+        RatingStats memory stats = _ratingStats[user];
+        count = stats.count;
         if (count == 0) return (0, 0);
 
-        average = (ratingSums[user] * 100) / count;
+        average = (uint256(stats.sum) * 100) / count;
     }
 
     // =============================================================================
