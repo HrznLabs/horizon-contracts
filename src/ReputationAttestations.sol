@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IMissionFactory } from "./interfaces/IMissionFactory.sol";
+import { IMissionEscrow } from "./interfaces/IMissionEscrow.sol";
 
 /**
  * @title ReputationAttestations
@@ -69,6 +71,9 @@ contract ReputationAttestations is Ownable {
     error AlreadyRated();
     error SelfRating();
     error NotAuthorized();
+    error MissionNotCompleted();
+    error NotParticipant();
+    error InvalidCounterparty();
 
     // =============================================================================
     // CONSTRUCTOR
@@ -92,6 +97,30 @@ contract ReputationAttestations is Ownable {
     {
         if (score < 1 || score > 5) revert InvalidScore();
         if (msg.sender == ratee) revert SelfRating();
+
+        // Validate mission and participation
+        if (missionFactory == address(0)) revert NotAuthorized();
+
+        address escrow = IMissionFactory(missionFactory).getMission(missionId);
+        IMissionEscrow mission = IMissionEscrow(escrow);
+
+        // Check if mission is completed
+        IMissionEscrow.MissionRuntime memory runtime = mission.getRuntime();
+        if (runtime.state != IMissionEscrow.MissionState.Completed) {
+            revert MissionNotCompleted();
+        }
+
+        // Check if rater is a participant
+        IMissionEscrow.MissionParams memory params = mission.getParams();
+
+        bool isPoster = msg.sender == params.poster;
+        bool isPerformer = msg.sender == runtime.performer;
+
+        if (!isPoster && !isPerformer) revert NotParticipant();
+
+        // Check if ratee is the counterparty
+        if (isPoster && ratee != runtime.performer) revert InvalidCounterparty();
+        if (isPerformer && ratee != params.poster) revert InvalidCounterparty();
 
         // Check if already rated
         if (ratings[missionId][msg.sender][ratee].score != 0) {
