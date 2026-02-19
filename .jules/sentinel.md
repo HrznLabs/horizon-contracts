@@ -36,3 +36,8 @@
 **Vulnerability:** The `ReputationAttestations.submitRating` function allowed any address to rate any other address for any mission ID without verifying participation or mission completion, enabling trivial reputation falsification.
 **Learning:** The vulnerability existed because the contract relied on the caller to provide correct parameters (missionId, ratee) but did not validate them against the source of truth (MissionFactory/Escrow).
 **Prevention:** Always cross-reference user input against authoritative registries (like MissionFactory) and verify state/participation in related contracts before allowing state changes.
+
+## 2025-06-16 - [Unauthorized Event Emission]
+**Vulnerability:** The `ReputationAttestations.recordOutcome` function was publicly accessible, allowing any address to emit `MissionOutcomeRecorded` events with arbitrary data, potentially corrupting off-chain indexers.
+**Learning:** Functions intended for "trusted callers only" (like other contracts) often lack enforcement mechanisms if the system architecture doesn't provide a clear way to verify the caller (e.g., dynamic proxies).
+**Prevention:** Implement strict access control by verifying the caller against a factory or registry (e.g., `MissionFactory.getMission(id) == msg.sender`) for dynamic contract interactions.
