@@ -1,0 +1,17 @@
+tasks:
+  - name: Setup Environment
+    init: |
+      ./install_foundry.sh
+      export PATH=$PATH:$HOME/.foundry/bin
+      foundryup
+      forge install
+      forge build
+    command: |
+      export PATH=$PATH:$HOME/.foundry/bin
+      forge test
+ports:
+  - port: 8545
+    onOpen: ignore
+vscode:
+  extensions:
+    - JuanBlanco.solidity

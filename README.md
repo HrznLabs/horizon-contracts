@@ -4,10 +4,24 @@
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-blue)](https://docs.soliditylang.org/)
 [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-orange)](https://book.getfoundry.sh/)
 [![Base](https://img.shields.io/badge/Deployed%20on-Base-0052FF)](https://base.org)
+[![Open in Gitpod](https://img.shields.io/badge/Gitpod-Open%20in%20Gitpod-908a85?logo=gitpod)](https://gitpod.io/#https://github.com/HrznLabs/horizon-contracts)
 
 **Decentralized mission coordination protocol built on Base (Optimism L2).**
 
 Horizon Protocol enables trustless, escrow-backed task coordination with USDC payments, reputation attestations, dispute resolution, and community governance through DAOs.
+
+## 📖 Table of Contents
+
+- [Why Horizon?](#-why-horizon)
+- [Deployed Contracts](#-deployed-contracts-base-sepolia)
+- [Overview](#-overview)
+- [Architecture](#-architecture)
+- [Contract Suite](#-contract-suite)
+- [Getting Started](#-getting-started)
+- [Interfaces](#-interfaces)
+- [Security](#-security)
+- [SDK](#-sdk)
+- [Links](#-links)
 
 ## 🎯 Why Horizon?
 
