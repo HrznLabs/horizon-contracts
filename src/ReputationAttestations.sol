@@ -166,7 +166,11 @@ contract ReputationAttestations is Ownable {
         bool completed,
         uint256 rewardAmount
     ) external {
-        // In production, verify caller is authorized MissionEscrow
+        if (missionFactory == address(0)) revert NotAuthorized();
+        if (msg.sender != IMissionFactory(missionFactory).getMission(missionId)) {
+            revert NotAuthorized();
+        }
+
         emit MissionOutcomeRecorded(missionId, poster, performer, completed, rewardAmount);
     }
 
