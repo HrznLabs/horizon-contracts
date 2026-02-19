@@ -24,6 +24,12 @@ contract ReputationAttestations is Ownable {
         uint256 timestamp;
     }
 
+    struct PackedRating {
+        uint8 score;
+        uint64 timestamp;
+        bytes32 commentHash;
+    }
+
     struct RatingStats {
         uint128 count;
         uint128 sum;
@@ -33,8 +39,8 @@ contract ReputationAttestations is Ownable {
     // STATE VARIABLES
     // =============================================================================
 
-    /// @notice Mapping: missionId => rater => ratee => Rating
-    mapping(uint256 => mapping(address => mapping(address => Rating))) public ratings;
+    /// @notice Mapping: missionId => rater => ratee => PackedRating
+    mapping(uint256 => mapping(address => mapping(address => PackedRating))) private _ratings;
 
     /// @notice Mapping: user => rating stats (count and sum packed)
     mapping(address => RatingStats) private _ratingStats;
@@ -125,13 +131,16 @@ contract ReputationAttestations is Ownable {
         if (isPerformer && ratee != params.poster) revert InvalidCounterparty();
 
         // Check if already rated
-        if (ratings[missionId][msg.sender][ratee].score != 0) {
+        if (_ratings[missionId][msg.sender][ratee].score != 0) {
             revert AlreadyRated();
         }
 
         // Store rating
-        ratings[missionId][msg.sender][ratee] =
-            Rating({ score: score, commentHash: commentHash, timestamp: block.timestamp });
+        _ratings[missionId][msg.sender][ratee] = PackedRating({
+            score: score,
+            timestamp: uint64(block.timestamp),
+            commentHash: commentHash
+        });
 
         // Update ratee's statistics
         RatingStats memory stats = _ratingStats[ratee];
@@ -173,7 +182,24 @@ contract ReputationAttestations is Ownable {
         view
         returns (Rating memory)
     {
-        return ratings[missionId][rater][ratee];
+        PackedRating storage r = _ratings[missionId][rater][ratee];
+        return Rating({
+            score: r.score,
+            commentHash: r.commentHash,
+            timestamp: uint256(r.timestamp)
+        });
+    }
+
+    /**
+     * @notice Get rating tuple (legacy getter compatibility)
+     */
+    function ratings(uint256 missionId, address rater, address ratee)
+        external
+        view
+        returns (uint8 score, bytes32 commentHash, uint256 timestamp)
+    {
+        PackedRating storage r = _ratings[missionId][rater][ratee];
+        return (r.score, r.commentHash, uint256(r.timestamp));
     }
 
     /**
