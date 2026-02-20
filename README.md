@@ -193,6 +193,7 @@ function hasAchievement(address user, uint256 typeId) external view returns (boo
 
 - **RPC URL:** `https://sepolia.base.org`
 - **Chain ID:** `84532`
+- **Add to Wallet:** [Chainlist](https://chainlist.org/chain/84532)
 - **Currency:** ETH
 - **Explorer:** [Base Sepolia Scan](https://sepolia.basescan.org)
 - **Faucets:**
@@ -307,7 +308,7 @@ MIT License - see [LICENSE](./LICENSE)
 
 - [SDK Repository](https://github.com/HrznLabs/horizon-sdk)
 - [Base Sepolia Explorer](https://sepolia.basescan.org)
-- [Verified Contracts](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c#code)
+- [Verified Contracts](#-deployed-contracts-base-sepolia)
 
 ---
 
