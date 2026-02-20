@@ -12,11 +12,11 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  * @author Horizon Protocol
  * @notice NFT contract for achievements and collectibles
  * @dev Supports both Soulbound (non-transferable) and Tradable NFTs
- * 
+ *
  * Achievement Types:
  * - Soulbound: Cannot be transferred, represents personal achievements
  * - Tradable: Can be transferred, represents collectibles and special items
- * 
+ *
  * NatSpec Events:
  * - AchievementMinted: When a new achievement is minted
  * - AchievementTypeCreated: When a new achievement type is registered
@@ -36,36 +36,68 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
     // =============================================================================
 
     enum AchievementCategory {
-        Milestone,      // Mission milestones (first mission, 100 missions, etc.)
-        Performance,    // Performance-based (speed runner, perfect rating)
-        Guild,          // Guild-related achievements
-        Seasonal,       // Limited-time seasonal achievements
-        Special         // Special events and promotions
+        Milestone, // Mission milestones (first mission, 100 missions, etc.)
+        Performance, // Performance-based (speed runner, perfect rating)
+        Guild, // Guild-related achievements
+        Seasonal, // Limited-time seasonal achievements
+        Special // Special events and promotions
     }
 
     // =============================================================================
     // STRUCTS
     // =============================================================================
 
+    /// @dev Optimized storage layout for AchievementType
+    /// Slot 0: name
+    /// Slot 1: description
+    /// Slot 2: baseTokenURI
+    /// Slot 3: typeId (12) + xpReward (12) + maxSupply (8) = 32 bytes (Packed)
+    /// Slot 4: currentSupply (8) + category (1) + isSoulbound (1) + isActive (1) = 11 bytes (Packed)
+    struct AchievementTypeStorage {
+        string name;
+        string description;
+        string baseTokenURI;
+        uint96 typeId;
+        uint96 xpReward;
+        uint64 maxSupply;
+        uint64 currentSupply;
+        AchievementCategory category;
+        bool isSoulbound;
+        bool isActive;
+    }
+
+    /// @dev External facing struct for ABI compatibility
     struct AchievementType {
         uint256 typeId;
         string name;
         string description;
         AchievementCategory category;
-        bool isSoulbound;           // True = non-transferable
-        bool isActive;              // Can still be minted
-        uint256 maxSupply;          // 0 = unlimited
+        bool isSoulbound; // True = non-transferable
+        bool isActive; // Can still be minted
+        uint256 maxSupply; // 0 = unlimited
         uint256 currentSupply;
         string baseTokenURI;
-        uint256 xpReward;           // XP awarded when earned
+        uint256 xpReward; // XP awarded when earned
     }
 
+    /// @dev Optimized storage layout for Achievement
+    /// Slot 0: originalOwner (20) + mintedAt (8) + typeId (4) = 32 bytes (Packed)
+    /// Slot 1: proofHash (32)
+    struct AchievementStorage {
+        // tokenId is not stored as it is the key
+        address originalOwner;
+        uint64 mintedAt;
+        uint32 typeId;
+        bytes32 proofHash;
+    }
+
+    /// @dev External facing struct for ABI compatibility
     struct Achievement {
         uint256 tokenId;
         uint256 typeId;
-        address originalOwner;      // For soulbound verification
+        address originalOwner; // For soulbound verification
         uint256 mintedAt;
-        bytes32 proofHash;          // Hash of proof data (mission ID, etc.)
+        bytes32 proofHash; // Hash of proof data (mission ID, etc.)
     }
 
     // =============================================================================
@@ -78,11 +110,11 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
     /// @notice Counter for achievement type IDs
     uint256 private _typeIdCounter;
 
-    /// @notice Mapping from type ID to AchievementType
-    mapping(uint256 => AchievementType) private _achievementTypes;
+    /// @notice Mapping from type ID to AchievementTypeStorage
+    mapping(uint256 => AchievementTypeStorage) private _achievementTypes;
 
-    /// @notice Mapping from token ID to Achievement data
-    mapping(uint256 => Achievement) private _achievements;
+    /// @notice Mapping from token ID to AchievementStorage data
+    mapping(uint256 => AchievementStorage) private _achievements;
 
     /// @notice Mapping to track which achievements a user has (type ID => user => bool)
     mapping(uint256 => mapping(address => bool)) private _userHasAchievement;
@@ -112,10 +144,7 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
         bytes32 proofHash
     );
 
-    event AchievementTypeUpdated(
-        uint256 indexed typeId,
-        bool isActive
-    );
+    event AchievementTypeUpdated(uint256 indexed typeId, bool isActive);
 
     // =============================================================================
     // ERRORS
@@ -133,13 +162,11 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
     // CONSTRUCTOR
     // =============================================================================
 
-    constructor(
-        string memory name,
-        string memory symbol,
-        string memory baseURI
-    ) ERC721(name, symbol) {
+    constructor(string memory name, string memory symbol, string memory baseURI)
+        ERC721(name, symbol)
+    {
         _baseTokenURI = baseURI;
-        
+
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
@@ -154,9 +181,9 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
      * @param name Name of the achievement
      * @param description Description of how to earn it
      * @param category Achievement category
-     * @param isSoulbound Whether the achievement is non-transferable
+     * @param _isSoulbound Whether the achievement is non-transferable
      * @param maxSupply Maximum number that can be minted (0 = unlimited)
-     * @param tokenURI Base URI for this achievement type
+     * @param _tokenURI Base URI for this achievement type
      * @param xpReward XP awarded when achievement is earned
      * @return typeId The ID of the created achievement type
      */
@@ -164,28 +191,28 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
         string calldata name,
         string calldata description,
         AchievementCategory category,
-        bool isSoulbound,
+        bool _isSoulbound,
         uint256 maxSupply,
-        string calldata tokenURI,
+        string calldata _tokenURI,
         uint256 xpReward
     ) external onlyRole(ADMIN_ROLE) returns (uint256 typeId) {
         _typeIdCounter++;
         typeId = _typeIdCounter;
 
-        _achievementTypes[typeId] = AchievementType({
-            typeId: typeId,
+        _achievementTypes[typeId] = AchievementTypeStorage({
             name: name,
             description: description,
-            category: category,
-            isSoulbound: isSoulbound,
-            isActive: true,
-            maxSupply: maxSupply,
+            baseTokenURI: _tokenURI,
+            typeId: uint96(typeId),
+            xpReward: uint96(xpReward),
+            maxSupply: uint64(maxSupply),
             currentSupply: 0,
-            baseTokenURI: tokenURI,
-            xpReward: xpReward
+            category: category,
+            isSoulbound: _isSoulbound,
+            isActive: true
         });
 
-        emit AchievementTypeCreated(typeId, name, category, isSoulbound, maxSupply);
+        emit AchievementTypeCreated(typeId, name, category, _isSoulbound, maxSupply);
     }
 
     /**
@@ -193,10 +220,7 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
      * @param typeId The achievement type ID
      * @param isActive Whether the achievement is still mintable
      */
-    function setAchievementTypeActive(
-        uint256 typeId,
-        bool isActive
-    ) external onlyRole(ADMIN_ROLE) {
+    function setAchievementTypeActive(uint256 typeId, bool isActive) external onlyRole(ADMIN_ROLE) {
         if (_achievementTypes[typeId].typeId == 0) {
             revert AchievementTypeNotFound();
         }
@@ -225,14 +249,14 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
      * @param proofHash Hash of proof data (mission ID, etc.)
      * @return tokenId The ID of the minted token
      */
-    function mintAchievement(
-        address to,
-        uint256 typeId,
-        bytes32 proofHash
-    ) external onlyRole(MINTER_ROLE) returns (uint256 tokenId) {
+    function mintAchievement(address to, uint256 typeId, bytes32 proofHash)
+        external
+        onlyRole(MINTER_ROLE)
+        returns (uint256 tokenId)
+    {
         if (to == address(0)) revert InvalidRecipient();
 
-        AchievementType storage achievementType = _achievementTypes[typeId];
+        AchievementTypeStorage storage achievementType = _achievementTypes[typeId];
 
         if (achievementType.typeId == 0) {
             revert AchievementTypeNotFound();
@@ -242,8 +266,10 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
             revert AchievementTypeInactive();
         }
 
-        if (achievementType.maxSupply > 0 && 
-            achievementType.currentSupply >= achievementType.maxSupply) {
+        if (
+            achievementType.maxSupply > 0
+                && achievementType.currentSupply >= achievementType.maxSupply
+        ) {
             revert MaxSupplyReached();
         }
 
@@ -258,11 +284,10 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
         achievementType.currentSupply++;
 
         // Create achievement data
-        _achievements[tokenId] = Achievement({
-            tokenId: tokenId,
-            typeId: typeId,
+        _achievements[tokenId] = AchievementStorage({
             originalOwner: to,
-            mintedAt: block.timestamp,
+            mintedAt: uint64(block.timestamp),
+            typeId: uint32(typeId),
             proofHash: proofHash
         });
 
@@ -294,16 +319,12 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
 
         for (uint256 i = 0; i < recipients.length; i++) {
             // Skip if already has achievement (for soulbound)
-            if (_achievementTypes[typeId].isSoulbound && 
-                _userHasAchievement[typeId][recipients[i]]) {
+            if (_achievementTypes[typeId].isSoulbound && _userHasAchievement[typeId][recipients[i]])
+            {
                 continue;
             }
 
-            tokenIds[i] = _mintAchievementInternal(
-                recipients[i],
-                typeId,
-                proofHashes[i]
-            );
+            tokenIds[i] = _mintAchievementInternal(recipients[i], typeId, proofHashes[i]);
         }
     }
 
@@ -317,7 +338,19 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
      * @return Achievement type data
      */
     function getAchievementType(uint256 typeId) external view returns (AchievementType memory) {
-        return _achievementTypes[typeId];
+        AchievementTypeStorage storage s = _achievementTypes[typeId];
+        return AchievementType({
+            typeId: uint256(s.typeId),
+            name: s.name,
+            description: s.description,
+            category: s.category,
+            isSoulbound: s.isSoulbound,
+            isActive: s.isActive,
+            maxSupply: uint256(s.maxSupply),
+            currentSupply: uint256(s.currentSupply),
+            baseTokenURI: s.baseTokenURI,
+            xpReward: uint256(s.xpReward)
+        });
     }
 
     /**
@@ -326,7 +359,14 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
      * @return Achievement data
      */
     function getAchievement(uint256 tokenId) external view returns (Achievement memory) {
-        return _achievements[tokenId];
+        AchievementStorage storage s = _achievements[tokenId];
+        return Achievement({
+            tokenId: tokenId,
+            typeId: uint256(s.typeId),
+            originalOwner: s.originalOwner,
+            mintedAt: uint256(s.mintedAt),
+            proofHash: s.proofHash
+        });
     }
 
     /**
@@ -370,12 +410,11 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
     // INTERNAL FUNCTIONS
     // =============================================================================
 
-    function _mintAchievementInternal(
-        address to,
-        uint256 typeId,
-        bytes32 proofHash
-    ) internal returns (uint256 tokenId) {
-        AchievementType storage achievementType = _achievementTypes[typeId];
+    function _mintAchievementInternal(address to, uint256 typeId, bytes32 proofHash)
+        internal
+        returns (uint256 tokenId)
+    {
+        AchievementTypeStorage storage achievementType = _achievementTypes[typeId];
 
         // Increment counters
         _tokenIdCounter++;
@@ -383,11 +422,10 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
         achievementType.currentSupply++;
 
         // Create achievement data
-        _achievements[tokenId] = Achievement({
-            tokenId: tokenId,
-            typeId: typeId,
+        _achievements[tokenId] = AchievementStorage({
             originalOwner: to,
-            mintedAt: block.timestamp,
+            mintedAt: uint64(block.timestamp),
+            typeId: uint32(typeId),
             proofHash: proofHash
         });
 
@@ -408,17 +446,17 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
     /**
      * @notice Override transfer to enforce soulbound restrictions
      */
-    function _update(
-        address to,
-        uint256 tokenId,
-        address auth
-    ) internal override(ERC721, ERC721Enumerable) returns (address) {
+    function _update(address to, uint256 tokenId, address auth)
+        internal
+        override(ERC721, ERC721Enumerable)
+        returns (address)
+    {
         address from = _ownerOf(tokenId);
 
         // If this is a transfer (not mint/burn), check soulbound
         if (from != address(0) && to != address(0)) {
-            Achievement storage achievement = _achievements[tokenId];
-            AchievementType storage achievementType = _achievementTypes[achievement.typeId];
+            AchievementStorage storage achievement = _achievements[tokenId];
+            AchievementTypeStorage storage achievementType = _achievementTypes[achievement.typeId];
 
             if (achievementType.isSoulbound) {
                 revert SoulboundTransferNotAllowed();
@@ -434,18 +472,21 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
         return super._update(to, tokenId, auth);
     }
 
-    function _increaseBalance(
-        address account,
-        uint128 value
-    ) internal override(ERC721, ERC721Enumerable) {
+    function _increaseBalance(address account, uint128 value)
+        internal
+        override(ERC721, ERC721Enumerable)
+    {
         super._increaseBalance(account, value);
     }
 
-    function tokenURI(
-        uint256 tokenId
-    ) public view override(ERC721, ERC721URIStorage) returns (string memory) {
-        Achievement storage achievement = _achievements[tokenId];
-        AchievementType storage achievementType = _achievementTypes[achievement.typeId];
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override(ERC721, ERC721URIStorage)
+        returns (string memory)
+    {
+        AchievementStorage storage achievement = _achievements[tokenId];
+        AchievementTypeStorage storage achievementType = _achievementTypes[achievement.typeId];
 
         // Use achievement type's base URI if set
         if (bytes(achievementType.baseTokenURI).length > 0) {
@@ -455,10 +496,12 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
         return string(abi.encodePacked(_baseTokenURI, tokenId.toString()));
     }
 
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view override(ERC721, ERC721Enumerable, ERC721URIStorage, AccessControl) returns (bool) {
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, ERC721Enumerable, ERC721URIStorage, AccessControl)
+        returns (bool)
+    {
         return super.supportsInterface(interfaceId);
     }
 }
-
