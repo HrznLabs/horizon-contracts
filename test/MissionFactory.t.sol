@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, console} from "forge-std/Test.sol";
-import {MissionFactory} from "../src/MissionFactory.sol";
-import {MissionEscrow} from "../src/MissionEscrow.sol";
-import {PaymentRouter} from "../src/PaymentRouter.sol";
-import {IMissionEscrow} from "../src/interfaces/IMissionEscrow.sol";
-import {MockERC20} from "./mocks/MockERC20.sol";
+import { Test, console } from "forge-std/Test.sol";
+import { MissionFactory } from "../src/MissionFactory.sol";
+import { MissionEscrow } from "../src/MissionEscrow.sol";
+import { PaymentRouter } from "../src/PaymentRouter.sol";
+import { IMissionEscrow } from "../src/interfaces/IMissionEscrow.sol";
+import { MockERC20 } from "./mocks/MockERC20.sol";
 
 contract MissionFactoryTest is Test {
     MissionFactory public factory;
@@ -31,16 +31,14 @@ contract MissionFactoryTest is Test {
         usdc = new MockERC20("USD Coin", "USDC", 6);
 
         // Deploy PaymentRouter
-        router = new PaymentRouter(
-            address(usdc),
-            protocolTreasury,
-            resolverTreasury,
-            labsTreasury
-        );
+        router = new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury);
 
         // Deploy MissionFactory
         factory = new MissionFactory(address(usdc), address(router));
         factory.setDisputeResolver(address(999)); // Dummy resolver
+
+        // Set MissionFactory in PaymentRouter
+        router.setMissionFactory(address(factory));
 
         vm.stopPrank();
 
@@ -50,7 +48,7 @@ contract MissionFactoryTest is Test {
 
     function test_CreateMission() public {
         vm.startPrank(poster);
-        
+
         // Approve USDC spending
         usdc.approve(address(factory), REWARD_AMOUNT);
 
@@ -94,7 +92,11 @@ contract MissionFactoryTest is Test {
         vm.startPrank(poster);
         usdc.approve(address(factory), 0.5e6);
 
-        vm.expectRevert(MissionFactory.InvalidRewardAmount.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                MissionFactory.InvalidRewardAmount.selector, 0.5e6, 1e6, 100_000e6
+            )
+        );
         factory.createMission(
             0.5e6, // Below minimum
             block.timestamp + 1 days,
@@ -110,7 +112,9 @@ contract MissionFactoryTest is Test {
         vm.startPrank(poster);
         usdc.approve(address(factory), REWARD_AMOUNT);
 
-        vm.expectRevert(MissionFactory.InvalidDuration.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(MissionFactory.InvalidDuration.selector, 1800, 3600, 30 days)
+        );
         factory.createMission(
             REWARD_AMOUNT,
             block.timestamp + 30 minutes, // Below minimum
@@ -127,11 +131,7 @@ contract MissionFactoryTest is Test {
         vm.startPrank(poster);
         usdc.approve(address(factory), REWARD_AMOUNT);
         uint256 missionId = factory.createMission(
-            REWARD_AMOUNT,
-            block.timestamp + 1 days,
-            address(0),
-            METADATA_HASH,
-            LOCATION_HASH
+            REWARD_AMOUNT, block.timestamp + 1 days, address(0), METADATA_HASH, LOCATION_HASH
         );
         vm.stopPrank();
 
@@ -151,11 +151,7 @@ contract MissionFactoryTest is Test {
         vm.startPrank(poster);
         usdc.approve(address(factory), REWARD_AMOUNT);
         uint256 missionId = factory.createMission(
-            REWARD_AMOUNT,
-            block.timestamp + 1 days,
-            address(0),
-            METADATA_HASH,
-            LOCATION_HASH
+            REWARD_AMOUNT, block.timestamp + 1 days, address(0), METADATA_HASH, LOCATION_HASH
         );
         vm.stopPrank();
 
@@ -179,16 +175,12 @@ contract MissionFactoryTest is Test {
         vm.startPrank(poster);
         usdc.approve(address(factory), REWARD_AMOUNT);
         uint256 missionId = factory.createMission(
-            REWARD_AMOUNT,
-            block.timestamp + 1 days,
-            address(0),
-            METADATA_HASH,
-            LOCATION_HASH
+            REWARD_AMOUNT, block.timestamp + 1 days, address(0), METADATA_HASH, LOCATION_HASH
         );
         vm.stopPrank();
 
         address escrow = factory.missions(missionId);
-        
+
         vm.prank(performer);
         IMissionEscrow(escrow).acceptMission();
 
@@ -212,11 +204,7 @@ contract MissionFactoryTest is Test {
         vm.startPrank(poster);
         usdc.approve(address(factory), REWARD_AMOUNT);
         uint256 missionId = factory.createMission(
-            REWARD_AMOUNT,
-            block.timestamp + 1 days,
-            address(0),
-            METADATA_HASH,
-            LOCATION_HASH
+            REWARD_AMOUNT, block.timestamp + 1 days, address(0), METADATA_HASH, LOCATION_HASH
         );
 
         uint256 posterBalanceBefore = usdc.balanceOf(poster);
