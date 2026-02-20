@@ -17,11 +17,11 @@ interface IPaymentRouter {
 
     /// @notice Breakdown of payment distribution
     struct FeeSplit {
-        uint256 performerAmount;  // Base 90% minus guild fee
-        uint256 protocolAmount;   // Fixed 4%
-        uint256 guildAmount;      // Variable (0-15%)
-        uint256 resolverAmount;   // Fixed 2%
-        uint256 labsAmount;       // Fixed 4%
+        uint256 performerAmount; // Base 90% minus guild fee
+        uint256 protocolAmount; // Fixed 4%
+        uint256 guildAmount; // Variable (0-15%)
+        uint256 resolverAmount; // Fixed 2%
+        uint256 labsAmount; // Fixed 4%
     }
 
     // =============================================================================
@@ -71,24 +71,22 @@ interface IPaymentRouter {
     ) external;
 
     /// @notice Calculate fee split for given parameters
-    function getFeeSplit(
-        uint256 rewardAmount,
-        address guild,
-        uint16 guildFeeBps
-    ) external pure returns (FeeSplit memory);
+    function getFeeSplit(uint256 rewardAmount, address guild, uint16 guildFeeBps)
+        external
+        pure
+        returns (FeeSplit memory);
 
     /// @notice Get fee split (backward compatible)
-    function getFeeSplit(
-        uint256 rewardAmount,
-        bool hasGuild
-    ) external view returns (FeeSplit memory);
+    function getFeeSplit(uint256 rewardAmount, bool hasGuild)
+        external
+        view
+        returns (FeeSplit memory);
 
     /// @notice Get fixed fee configuration
-    function getFixedFees() external pure returns (
-        uint16 protocolFeeBps,
-        uint16 labsFeeBps,
-        uint16 resolverFeeBps
-    );
+    function getFixedFees()
+        external
+        pure
+        returns (uint16 protocolFeeBps, uint16 labsFeeBps, uint16 resolverFeeBps);
 
     /// @notice Get guild's default fee
     function getGuildFeeBps(address guild) external view returns (uint16);

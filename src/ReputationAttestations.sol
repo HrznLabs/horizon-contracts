@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IMissionFactory } from "./interfaces/IMissionFactory.sol";
+import { IMissionEscrow } from "./interfaces/IMissionEscrow.sol";
 
 /**
  * @title ReputationAttestations
@@ -22,18 +24,26 @@ contract ReputationAttestations is Ownable {
         uint256 timestamp;
     }
 
+    struct PackedRating {
+        uint8 score;
+        uint64 timestamp;
+        bytes32 commentHash;
+    }
+
+    struct RatingStats {
+        uint128 count;
+        uint128 sum;
+    }
+
     // =============================================================================
     // STATE VARIABLES
     // =============================================================================
 
-    /// @notice Mapping: missionId => rater => ratee => Rating
-    mapping(uint256 => mapping(address => mapping(address => Rating))) public ratings;
+    /// @notice Mapping: missionId => rater => ratee => PackedRating
+    mapping(uint256 => mapping(address => mapping(address => PackedRating))) private _ratings;
 
-    /// @notice Mapping: user => total ratings received
-    mapping(address => uint256) public ratingCounts;
-
-    /// @notice Mapping: user => sum of all ratings (for average calculation)
-    mapping(address => uint256) public ratingSums;
+    /// @notice Mapping: user => rating stats (count and sum packed)
+    mapping(address => RatingStats) private _ratingStats;
 
     /// @notice Authorized mission escrow contracts
     mapping(address => bool) public authorizedContracts;
@@ -69,12 +79,15 @@ contract ReputationAttestations is Ownable {
     error AlreadyRated();
     error SelfRating();
     error NotAuthorized();
+    error MissionNotCompleted();
+    error NotParticipant();
+    error InvalidCounterparty();
 
     // =============================================================================
     // CONSTRUCTOR
     // =============================================================================
 
-    constructor() Ownable(msg.sender) {}
+    constructor() Ownable(msg.sender) { }
 
     // =============================================================================
     // RATING FUNCTIONS
@@ -87,30 +100,53 @@ contract ReputationAttestations is Ownable {
      * @param score Rating score (1-5)
      * @param commentHash IPFS hash of rating comment
      */
-    function submitRating(
-        uint256 missionId,
-        address ratee,
-        uint8 score,
-        bytes32 commentHash
-    ) external {
+    function submitRating(uint256 missionId, address ratee, uint8 score, bytes32 commentHash)
+        external
+    {
         if (score < 1 || score > 5) revert InvalidScore();
         if (msg.sender == ratee) revert SelfRating();
-        
+
+        // Validate mission and participation
+        if (missionFactory == address(0)) revert NotAuthorized();
+
+        address escrow = IMissionFactory(missionFactory).getMission(missionId);
+        IMissionEscrow mission = IMissionEscrow(escrow);
+
+        // Check if mission is completed
+        IMissionEscrow.MissionRuntime memory runtime = mission.getRuntime();
+        if (runtime.state != IMissionEscrow.MissionState.Completed) {
+            revert MissionNotCompleted();
+        }
+
+        // Check if rater is a participant
+        IMissionEscrow.MissionParams memory params = mission.getParams();
+
+        bool isPoster = msg.sender == params.poster;
+        bool isPerformer = msg.sender == runtime.performer;
+
+        if (!isPoster && !isPerformer) revert NotParticipant();
+
+        // Check if ratee is the counterparty
+        if (isPoster && ratee != runtime.performer) revert InvalidCounterparty();
+        if (isPerformer && ratee != params.poster) revert InvalidCounterparty();
+
         // Check if already rated
-        if (ratings[missionId][msg.sender][ratee].score != 0) {
+        if (_ratings[missionId][msg.sender][ratee].score != 0) {
             revert AlreadyRated();
         }
 
         // Store rating
-        ratings[missionId][msg.sender][ratee] = Rating({
+        _ratings[missionId][msg.sender][ratee] = PackedRating({
             score: score,
-            commentHash: commentHash,
-            timestamp: block.timestamp
+            timestamp: uint64(block.timestamp),
+            commentHash: commentHash
         });
 
         // Update ratee's statistics
-        ratingCounts[ratee]++;
-        ratingSums[ratee] += score;
+        RatingStats memory stats = _ratingStats[ratee];
+        stats.count++;
+        stats.sum += score;
+        _ratingStats[ratee] = stats;
 
         emit RatingSubmitted(missionId, msg.sender, ratee, score, commentHash);
     }
@@ -130,14 +166,12 @@ contract ReputationAttestations is Ownable {
         bool completed,
         uint256 rewardAmount
     ) external {
-        // In production, verify caller is authorized MissionEscrow
-        emit MissionOutcomeRecorded(
-            missionId,
-            poster,
-            performer,
-            completed,
-            rewardAmount
-        );
+        if (missionFactory == address(0)) revert NotAuthorized();
+        if (msg.sender != IMissionFactory(missionFactory).getMission(missionId)) {
+            revert NotAuthorized();
+        }
+
+        emit MissionOutcomeRecorded(missionId, poster, performer, completed, rewardAmount);
     }
 
     // =============================================================================
@@ -147,12 +181,47 @@ contract ReputationAttestations is Ownable {
     /**
      * @notice Get rating for a specific mission/rater/ratee combination
      */
-    function getRating(
-        uint256 missionId,
-        address rater,
-        address ratee
-    ) external view returns (Rating memory) {
-        return ratings[missionId][rater][ratee];
+    function getRating(uint256 missionId, address rater, address ratee)
+        external
+        view
+        returns (Rating memory)
+    {
+        PackedRating storage r = _ratings[missionId][rater][ratee];
+        return Rating({
+            score: r.score,
+            commentHash: r.commentHash,
+            timestamp: uint256(r.timestamp)
+        });
+    }
+
+    /**
+     * @notice Get rating tuple (legacy getter compatibility)
+     */
+    function ratings(uint256 missionId, address rater, address ratee)
+        external
+        view
+        returns (uint8 score, bytes32 commentHash, uint256 timestamp)
+    {
+        PackedRating storage r = _ratings[missionId][rater][ratee];
+        return (r.score, r.commentHash, uint256(r.timestamp));
+    }
+
+    /**
+     * @notice Get total ratings received by a user
+     * @param user User address
+     * @return Total number of ratings
+     */
+    function ratingCounts(address user) external view returns (uint256) {
+        return _ratingStats[user].count;
+    }
+
+    /**
+     * @notice Get sum of all ratings received by a user
+     * @param user User address
+     * @return Sum of ratings
+     */
+    function ratingSums(address user) external view returns (uint256) {
+        return _ratingStats[user].sum;
     }
 
     /**
@@ -161,15 +230,12 @@ contract ReputationAttestations is Ownable {
      * @return average Average rating (multiplied by 100 for precision)
      * @return count Number of ratings
      */
-    function getAverageRating(address user) 
-        external 
-        view 
-        returns (uint256 average, uint256 count) 
-    {
-        count = ratingCounts[user];
+    function getAverageRating(address user) external view returns (uint256 average, uint256 count) {
+        RatingStats memory stats = _ratingStats[user];
+        count = stats.count;
         if (count == 0) return (0, 0);
-        
-        average = (ratingSums[user] * 100) / count;
+
+        average = (uint256(stats.sum) * 100) / count;
     }
 
     // =============================================================================
@@ -197,5 +263,4 @@ contract ReputationAttestations is Ownable {
         authorizedContracts[_contract] = false;
     }
 }
-
 

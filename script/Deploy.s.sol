@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Script, console} from "forge-std/Script.sol";
-import {MissionFactory} from "../src/MissionFactory.sol";
-import {PaymentRouter} from "../src/PaymentRouter.sol";
-import {GuildFactory} from "../src/GuildFactory.sol";
-import {ReputationAttestations} from "../src/ReputationAttestations.sol";
-import {DisputeResolver} from "../src/DisputeResolver.sol";
-import {HorizonAchievements} from "../src/HorizonAchievements.sol";
+import { Script, console } from "forge-std/Script.sol";
+import { MissionFactory } from "../src/MissionFactory.sol";
+import { PaymentRouter } from "../src/PaymentRouter.sol";
+import { GuildFactory } from "../src/GuildFactory.sol";
+import { ReputationAttestations } from "../src/ReputationAttestations.sol";
+import { DisputeResolver } from "../src/DisputeResolver.sol";
+import { HorizonAchievements } from "../src/HorizonAchievements.sol";
 
 /**
  * @title DeployScript
  * @notice Deployment script for Horizon Protocol contracts (v2.1)
  * @dev Deploy to Base Sepolia: forge script script/Deploy.s.sol --rpc-url base-sepolia --broadcast
- * 
+ *
  * Fee Structure (updated):
  * - Protocol: 4% (fixed)
  * - Labs: 4% (fixed)
@@ -24,7 +24,7 @@ import {HorizonAchievements} from "../src/HorizonAchievements.sol";
 contract DeployScript is Script {
     // Base Sepolia USDC
     address public constant USDC_BASE_SEPOLIA = 0x036CbD53842c5426634e7929541eC2318f3dCF7e;
-    
+
     // jollyv.eth / jollyv.base.eth - Protocol Owner
     address public constant JOLLYV_ETH = 0x2b30efBA367D669c9cd7723587346a79b67A42DB;
 
@@ -49,17 +49,15 @@ contract DeployScript is Script {
             USDC_BASE_SEPOLIA,
             JOLLYV_ETH, // Protocol treasury
             JOLLYV_ETH, // Resolver treasury
-            JOLLYV_ETH  // Labs treasury
+            JOLLYV_ETH // Labs treasury
         );
         console.log("   PaymentRouter:", address(paymentRouter));
         console.log("   Fee structure: Protocol 4%, Labs 4%, Resolver 2%, Guild variable");
 
         // 2. Deploy MissionFactory
         console.log("2. Deploying MissionFactory...");
-        MissionFactory missionFactory = new MissionFactory(
-            USDC_BASE_SEPOLIA,
-            address(paymentRouter)
-        );
+        MissionFactory missionFactory =
+            new MissionFactory(USDC_BASE_SEPOLIA, address(paymentRouter));
         console.log("   MissionFactory:", address(missionFactory));
 
         // 3. Deploy GuildFactory
@@ -79,7 +77,7 @@ contract DeployScript is Script {
             JOLLYV_ETH, // ResolversDAO
             JOLLYV_ETH, // ProtocolDAO
             JOLLYV_ETH, // Protocol treasury
-            JOLLYV_ETH  // Resolver treasury
+            JOLLYV_ETH // Resolver treasury
         );
         console.log("   DisputeResolver:", address(disputeResolver));
         console.log("   DDR Rate: 5%, LPP Rate: 2%");
@@ -87,19 +85,17 @@ contract DeployScript is Script {
         // 6. Deploy HorizonAchievements (NFT contract)
         console.log("6. Deploying HorizonAchievements...");
         HorizonAchievements achievements = new HorizonAchievements(
-            "Horizon Achievements",
-            "HRZN",
-            "https://horizon.xyz/api/achievements/"
+            "Horizon Achievements", "HRZN", "https://horizon.xyz/api/achievements/"
         );
         console.log("   HorizonAchievements:", address(achievements));
 
         // 7. Configure contracts
         console.log("");
         console.log("Configuring contracts...");
-        
+
         paymentRouter.setMissionFactory(address(missionFactory));
         console.log("   PaymentRouter.setMissionFactory done");
-        
+
         reputationAttestations.setMissionFactory(address(missionFactory));
         console.log("   ReputationAttestations.setMissionFactory done");
 
@@ -109,19 +105,19 @@ contract DeployScript is Script {
         // 8. Transfer ownership to jollyv.eth
         console.log("");
         console.log("Transferring ownership to jollyv.eth...");
-        
+
         paymentRouter.transferOwnership(JOLLYV_ETH);
         console.log("   PaymentRouter ownership transferred");
-        
+
         missionFactory.transferOwnership(JOLLYV_ETH);
         console.log("   MissionFactory ownership transferred");
-        
+
         reputationAttestations.transferOwnership(JOLLYV_ETH);
         console.log("   ReputationAttestations ownership transferred");
-        
+
         disputeResolver.transferOwnership(JOLLYV_ETH);
         console.log("   DisputeResolver ownership transferred");
-        
+
         // Note: HorizonAchievements uses AccessControl, not Ownable
         // Admin role can grant roles to jollyv.eth after deployment
 
