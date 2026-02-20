@@ -4,10 +4,24 @@
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-blue)](https://docs.soliditylang.org/)
 [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-orange)](https://book.getfoundry.sh/)
 [![Base](https://img.shields.io/badge/Deployed%20on-Base-0052FF)](https://base.org)
+[![Open in Gitpod](https://img.shields.io/badge/Gitpod-Open%20in%20Gitpod-908a85?logo=gitpod)](https://gitpod.io/#https://github.com/HrznLabs/horizon-contracts)
 
 **Decentralized mission coordination protocol built on Base (Optimism L2).**
 
 Horizon Protocol enables trustless, escrow-backed task coordination with USDC payments, reputation attestations, dispute resolution, and community governance through DAOs.
+
+## 📖 Table of Contents
+
+- [Why Horizon?](#-why-horizon)
+- [Deployed Contracts](#-deployed-contracts-base-sepolia)
+- [Overview](#-overview)
+- [Architecture](#-architecture)
+- [Contract Suite](#-contract-suite)
+- [Getting Started](#-getting-started)
+- [Interfaces](#-interfaces)
+- [Security](#-security)
+- [SDK](#-sdk)
+- [Links](#-links)
 
 ## 🎯 Why Horizon?
 
@@ -21,14 +35,15 @@ Horizon Protocol enables trustless, escrow-backed task coordination with USDC pa
 
 | Contract | Address | Verified |
 |----------|---------|----------|
-| PaymentRouter | `0x94fb7908257ec36f701d2605b51eefed4326ddf5` | ✅ |
-| MissionFactory | `0xee9234954b134c39c17a75482da78e46b16f466c` | ✅ |
-| GuildFactory | `0xfeae3538a4a1801e47b6d16104aa8586edb55f00` | ✅ |
-| ReputationAttestations | `0xedae9682a0fb6fb3c18d6865461f67db7d748002` | ✅ |
-| DisputeResolver | `0xb00ac4278129928aecc72541b0bcd69d94c1691e` | ✅ |
-| HorizonAchievements | `0x568e0e3102bfa1f4045d3f62559c0f9823b469bc` | ✅ |
+| PaymentRouter | [`0x94fb7908257ec36f701d2605b51eefed4326ddf5`](https://sepolia.basescan.org/address/0x94fb7908257ec36f701d2605b51eefed4326ddf5#code) | ✅ |
+| MissionFactory | [`0xee9234954b134c39c17a75482da78e46b16f466c`](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c#code) | ✅ |
+| MissionEscrow (Implementation) | [`0x873Ea710B6b289b0e9D6867B1630066e9721B5c9`](https://sepolia.basescan.org/address/0x873Ea710B6b289b0e9D6867B1630066e9721B5c9#code) | ✅ |
+| GuildFactory | [`0xfeae3538a4a1801e47b6d16104aa8586edb55f00`](https://sepolia.basescan.org/address/0xfeae3538a4a1801e47b6d16104aa8586edb55f00#code) | ✅ |
+| ReputationAttestations | [`0xedae9682a0fb6fb3c18d6865461f67db7d748002`](https://sepolia.basescan.org/address/0xedae9682a0fb6fb3c18d6865461f67db7d748002#code) | ✅ |
+| DisputeResolver | [`0xb00ac4278129928aecc72541b0bcd69d94c1691e`](https://sepolia.basescan.org/address/0xb00ac4278129928aecc72541b0bcd69d94c1691e#code) | ✅ |
+| HorizonAchievements | [`0x568e0e3102bfa1f4045d3f62559c0f9823b469bc`](https://sepolia.basescan.org/address/0x568e0e3102bfa1f4045d3f62559c0f9823b469bc#code) | ✅ |
 
-**Base Sepolia USDC:** `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
+**Base Sepolia USDC:** [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e#code)
 
 ## 📋 Overview
 
@@ -44,36 +59,25 @@ Horizon Protocol is a decentralized platform for coordinating real-world tasks (
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Mission Flow                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Poster                    MissionFactory                        │
-│    │                            │                                │
-│    ├── createMission() ────────>│                                │
-│    │   (USDC + params)          │                                │
-│    │                            ├── Deploy MissionEscrow Clone   │
-│    │                            │   (EIP-1167 minimal proxy)     │
-│    │                            │                                │
-│    │                     MissionEscrow                           │
-│    │                            │                                │
-│  Performer                      │                                │
-│    ├── acceptMission() ────────>│                                │
-│    ├── submitProof() ──────────>│                                │
-│    │                            │                                │
-│  Poster                         │                                │
-│    ├── approveCompletion() ────>│                                │
-│    │                            │                                │
-│    │                     PaymentRouter                           │
-│    │                            │                                │
-│    │                            ├── 4% → Protocol Treasury       │
-│    │                            ├── 4% → Labs Treasury           │
-│    │                            ├── 2% → Resolver Treasury       │
-│    │                            ├── 0-15% → Guild Treasury       │
-│    │                            └── 75-90% → Performer           │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    actor Poster
+    actor Performer
+    participant MF as MissionFactory
+    participant ME as MissionEscrow
+    participant PR as PaymentRouter
+
+    Poster->>MF: createMission(USDC + params)
+    MF-->>ME: Deploy MissionEscrow Clone<br/>(EIP-1167 minimal proxy)
+
+    Performer->>ME: acceptMission()
+    Performer->>ME: submitProof()
+
+    Poster->>ME: approveCompletion()
+
+    ME->>PR: Settle Payment
+
+    Note right of PR: 4% → Protocol Treasury<br/>4% → Labs Treasury<br/>2% → Resolver Treasury<br/>0-15% → Guild Treasury<br/>75-90% → Performer
 ```
 
 ## 📦 Contract Suite
@@ -111,19 +115,26 @@ function claimExpired() external;            // Claim expired mission funds
 Routes payments with configurable fee splits.
 
 **Fee Structure:**
-- Protocol: 4% (fixed)
-- Labs: 4% (fixed)
-- Resolver: 2% (fixed)
-- Guild: 0-15% (variable, set by guild)
-- Performer: 90% - guildFee
+
+| Fee Type | Percentage | Recipient |
+|----------|------------|-----------|
+| Protocol Fee | 4% | Protocol Treasury |
+| Labs Fee | 4% | Labs Treasury |
+| Resolver Fee | 2% | Resolver Treasury |
+| Guild Fee | 0-15% (variable) | Guild Treasury |
+| Performer | 90% - guildFee | Performer |
 
 #### `DisputeResolver.sol`
 Handles mission disputes with economic incentives.
 
 **Mechanisms:**
-- **DDR (Dynamic Dispute Reserve):** 5% deposit from each party
-- **LPP (Loser-Pays Penalty):** 2% penalty redistributed
-- **Appeal Period:** 48 hours before finalization
+
+| Mechanism | Value | Description |
+|-----------|-------|-------------|
+| DDR (Dynamic Dispute Reserve) | 5% | Deposited by both parties when dispute is raised |
+| LPP (Loser-Pays Penalty) | 2% | Penalty redistributed to winner + resolver |
+| Appeal Period | 48 hours | Time before dispute can be finalized |
+
 - **DAO Override:** Protocol DAO can override resolutions
 
 ### Governance Contracts
@@ -178,6 +189,17 @@ function hasAchievement(address user, uint256 typeId) external view returns (boo
 - [Foundry](https://book.getfoundry.sh/getting-started/installation)
 - [Node.js](https://nodejs.org/) (for scripts)
 
+### Network Setup (Base Sepolia)
+
+- **RPC URL:** `https://sepolia.base.org`
+- **Chain ID:** `84532`
+- **Add to Wallet:** [Chainlist](https://chainlist.org/chain/84532)
+- **Currency:** ETH
+- **Explorer:** [Base Sepolia Scan](https://sepolia.basescan.org)
+- **Faucets:**
+  - [Coinbase Developer Platform Faucet](https://portal.cdp.coinbase.com/products/faucet) (ETH & USDC)
+  - [Base Network Faucets Docs](https://docs.base.org/base-chain/tools/network-faucets)
+
 ### Installation
 
 ```bash
@@ -208,13 +230,29 @@ forge test --match-test testCreateMission
 forge test --gas-report
 ```
 
+### Developer Commands (Makefile)
+
+A `Makefile` is included to simplify common tasks:
+
+```bash
+make all            # Clean, install, and build
+make test           # Run tests
+make test-v         # Run tests with verbosity
+make gas            # Run gas report
+make deploy-sepolia # Deploy to Base Sepolia
+make verify         # Verify contract
+```
+
 ### Deployment
 
 ```bash
-# Set environment variables
-export DEPLOYER_PRIVATE_KEY=your_private_key
-export BASE_RPC_URL=https://sepolia.base.org
-export BASESCAN_API_KEY=your_api_key
+# Configure environment
+cp .env.example .env
+
+# Edit .env with your private key and API keys
+# DEPLOYER_PRIVATE_KEY=0x...
+# BASE_RPC_URL=https://sepolia.base.org
+# BASESCAN_API_KEY=...
 
 # Deploy to Base Sepolia
 forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --verify
@@ -270,7 +308,7 @@ MIT License - see [LICENSE](./LICENSE)
 
 - [SDK Repository](https://github.com/HrznLabs/horizon-sdk)
 - [Base Sepolia Explorer](https://sepolia.basescan.org)
-- [Verified Contracts](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c)
+- [Verified Contracts](#-deployed-contracts-base-sepolia)
 
 ---
 
