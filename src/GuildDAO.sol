@@ -39,8 +39,10 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
 
     struct GuildMember {
         bool isMember;
-        uint256 joinedAt;
-        uint256 leftAt;
+        // Timestamps fit in uint64 (good for 500+ billion years)
+        // Packed with bool to fit entire struct in 1 storage slot (1 + 8 + 8 = 17 bytes)
+        uint64 joinedAt;
+        uint64 leftAt;
     }
 
     struct GuildEligibilitySchema {
@@ -57,7 +59,7 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     GuildConfig public config;
     GuildEligibilitySchema public defaultEligibility;
 
-    mapping(address => GuildMember) public members;
+    mapping(address => GuildMember) private _members;
     uint256 public memberCount;
 
     // =============================================================================
@@ -130,9 +132,9 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     }
 
     function _addMember(address member) internal {
-        if (members[member].isMember) revert AlreadyMember();
+        if (_members[member].isMember) revert AlreadyMember();
 
-        members[member] = GuildMember({ isMember: true, joinedAt: block.timestamp, leftAt: 0 });
+        _members[member] = GuildMember({ isMember: true, joinedAt: uint64(block.timestamp), leftAt: 0 });
 
         memberCount++;
         emit GuildMemberAdded(address(this), member);
@@ -143,10 +145,10 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @param member Address to remove
      */
     function removeMember(address member) external onlyRole(OFFICER_ROLE) {
-        if (!members[member].isMember) revert NotMember();
+        if (!_members[member].isMember) revert NotMember();
 
-        members[member].isMember = false;
-        members[member].leftAt = block.timestamp;
+        _members[member].isMember = false;
+        _members[member].leftAt = uint64(block.timestamp);
 
         memberCount--;
         emit GuildMemberRemoved(address(this), member);
@@ -157,7 +159,7 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @param member Address to grant role
      */
     function grantCuratorRole(address member) external onlyRole(ADMIN_ROLE) {
-        if (!members[member].isMember) revert NotMember();
+        if (!_members[member].isMember) revert NotMember();
         _grantRole(CURATOR_ROLE, member);
         emit GuildRoleGranted(address(this), member, "curator");
     }
@@ -167,7 +169,7 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @param member Address to grant role
      */
     function grantOfficerRole(address member) external onlyRole(ADMIN_ROLE) {
-        if (!members[member].isMember) revert NotMember();
+        if (!_members[member].isMember) revert NotMember();
         _grantRole(OFFICER_ROLE, member);
         emit GuildRoleGranted(address(this), member, "officer");
     }
@@ -236,7 +238,19 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     // =============================================================================
 
     function isMember(address account) external view returns (bool) {
-        return members[account].isMember;
+        return _members[account].isMember;
+    }
+
+    /**
+     * @notice Get member details (compatibility wrapper)
+     * @param account Member address
+     * @return isMember Whether the address is a member
+     * @return joinedAt Timestamp when joined
+     * @return leftAt Timestamp when left
+     */
+    function members(address account) external view returns (bool, uint256, uint256) {
+        GuildMember memory m = _members[account];
+        return (m.isMember, uint256(m.joinedAt), uint256(m.leftAt));
     }
 
     function isCurator(address account) external view returns (bool) {
@@ -259,4 +273,3 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
         return defaultEligibility;
     }
 }
-
