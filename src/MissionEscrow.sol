@@ -277,6 +277,14 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         return _disputeResolver;
     }
 
+    function getParticipants()
+        external
+        view
+        returns (address poster, address performer, MissionState state)
+    {
+        return (_poster, _performer, _state);
+    }
+
     // =============================================================================
     // DISPUTE SETTLEMENT
     // =============================================================================

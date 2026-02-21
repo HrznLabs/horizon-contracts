@@ -27,25 +27,11 @@ contract ReputationAttestationsTest is Test {
             abi.encode(escrow)
         );
 
-        // Mock escrow.getRuntime() -> Completed, Performer=ratee
-        IMissionEscrow.MissionRuntime memory runtime;
-        runtime.state = IMissionEscrow.MissionState.Completed;
-        runtime.performer = ratee;
-
+        // Mock escrow.getParticipants() -> Poster=rater1, Performer=ratee, State=Completed
         vm.mockCall(
             escrow,
-            abi.encodeWithSelector(IMissionEscrow.getRuntime.selector),
-            abi.encode(runtime)
-        );
-
-        // Mock escrow.getParams() -> Poster=rater1
-        IMissionEscrow.MissionParams memory params;
-        params.poster = rater1;
-
-        vm.mockCall(
-            escrow,
-            abi.encodeWithSelector(IMissionEscrow.getParams.selector),
-            abi.encode(params)
+            abi.encodeWithSelector(IMissionEscrow.getParticipants.selector),
+            abi.encode(rater1, ratee, IMissionEscrow.MissionState.Completed)
         );
 
         vm.prank(rater1);
@@ -76,23 +62,10 @@ contract ReputationAttestationsTest is Test {
         );
 
         // Mock escrow for rater1 -> ratee (poster -> performer)
-        IMissionEscrow.MissionRuntime memory runtime;
-        runtime.state = IMissionEscrow.MissionState.Completed;
-        runtime.performer = ratee;
-
         vm.mockCall(
             escrow,
-            abi.encodeWithSelector(IMissionEscrow.getRuntime.selector),
-            abi.encode(runtime)
-        );
-
-        IMissionEscrow.MissionParams memory params;
-        params.poster = rater1;
-
-        vm.mockCall(
-            escrow,
-            abi.encodeWithSelector(IMissionEscrow.getParams.selector),
-            abi.encode(params)
+            abi.encodeWithSelector(IMissionEscrow.getParticipants.selector),
+            abi.encode(rater1, ratee, IMissionEscrow.MissionState.Completed)
         );
 
         vm.prank(rater1);
@@ -100,11 +73,10 @@ contract ReputationAttestationsTest is Test {
 
         // Mock escrow for rater2 -> ratee (also poster -> performer for simplicity, or change params)
         // Let's say rater2 is also poster of mission 2
-        params.poster = rater2;
         vm.mockCall(
             escrow,
-            abi.encodeWithSelector(IMissionEscrow.getParams.selector),
-            abi.encode(params)
+            abi.encodeWithSelector(IMissionEscrow.getParticipants.selector),
+            abi.encode(rater2, ratee, IMissionEscrow.MissionState.Completed)
         );
 
         vm.prank(rater2);

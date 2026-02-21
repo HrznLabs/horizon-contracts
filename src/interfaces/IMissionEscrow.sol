@@ -101,4 +101,8 @@ interface IMissionEscrow {
     function getRuntime() external view returns (MissionRuntime memory);
     function getMissionId() external view returns (uint256);
     function getDisputeResolver() external view returns (address);
+    function getParticipants()
+        external
+        view
+        returns (address poster, address performer, MissionState state);
 }
