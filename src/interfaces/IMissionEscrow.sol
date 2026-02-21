@@ -54,6 +54,8 @@ interface IMissionEscrow {
         uint256 indexed id, uint8 outcome, uint256 posterAmount, uint256 performerAmount
     );
 
+    event ReputationUpdateFailed(uint256 indexed id);
+
     // =============================================================================
     // ERRORS
     // =============================================================================
@@ -82,7 +84,8 @@ interface IMissionEscrow {
         bytes32 locationHash,
         address paymentRouter,
         address usdc,
-        address disputeResolver
+        address disputeResolver,
+        address reputationAttestations
     ) external;
 
     function acceptMission() external;

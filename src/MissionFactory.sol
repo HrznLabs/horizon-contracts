@@ -37,6 +37,9 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     /// @notice DisputeResolver contract address
     address public disputeResolver;
 
+    /// @notice ReputationAttestations contract address
+    address public reputationAttestations;
+
     /// @notice Current mission counter
     /// @dev Packed with disputeResolver (20 bytes + 12 bytes = 32 bytes)
     uint96 public missionCount;
@@ -73,6 +76,7 @@ contract MissionFactory is Ownable, ReentrancyGuard {
 
     event PaymentRouterUpdated(address indexed newRouter);
     event DisputeResolverUpdated(address indexed resolver);
+    event ReputationAttestationsUpdated(address indexed reputation);
 
     // =============================================================================
     // ERRORS
@@ -159,7 +163,8 @@ contract MissionFactory is Ownable, ReentrancyGuard {
                 locationHash,
                 paymentRouter,
                 address(usdc),
-                disputeResolver
+                disputeResolver,
+                reputationAttestations
             );
 
         // Store mission mapping
@@ -246,6 +251,16 @@ contract MissionFactory is Ownable, ReentrancyGuard {
         if (_disputeResolver == address(0)) revert InvalidDisputeResolver();
         disputeResolver = _disputeResolver;
         emit DisputeResolverUpdated(_disputeResolver);
+    }
+
+    /**
+     * @notice Update the reputation attestations address
+     * @param _reputationAttestations New reputation attestations address
+     */
+    function setReputationAttestations(address _reputationAttestations) external onlyOwner {
+        // Allow setting to 0 to disable
+        reputationAttestations = _reputationAttestations;
+        emit ReputationAttestationsUpdated(_reputationAttestations);
     }
 }
 
