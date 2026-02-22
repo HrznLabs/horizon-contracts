@@ -102,6 +102,9 @@ contract DeployScript is Script {
         missionFactory.setDisputeResolver(address(disputeResolver));
         console.log("   MissionFactory.setDisputeResolver done");
 
+        missionFactory.setReputationAttestations(address(reputationAttestations));
+        console.log("   MissionFactory.setReputationAttestations done");
+
         // 8. Transfer ownership to jollyv.eth
         console.log("");
         console.log("Transferring ownership to jollyv.eth...");

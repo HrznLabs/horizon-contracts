@@ -6,6 +6,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { IMissionEscrow } from "./interfaces/IMissionEscrow.sol";
 import { IPaymentRouter } from "./interfaces/IPaymentRouter.sol";
+import { IReputationAttestations } from "./interfaces/IReputationAttestations.sol";
 
 /**
  * @title MissionEscrow
@@ -56,7 +57,9 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     uint64 private _createdAt; // 8
     // 4 bytes gap
 
-    // Slot 6 Removed
+    // Slot 6: ReputationAttestations
+    address private _reputationAttestations; // 20
+    // 12 bytes gap
 
     // Slot 7: MetadataHash
     bytes32 private _metadataHash; // 32
@@ -114,7 +117,8 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         bytes32 locationHash,
         address paymentRouter,
         address usdc,
-        address disputeResolver
+        address disputeResolver,
+        address reputationAttestations
     ) external initializer {
         _missionId = missionId;
         _poster = poster;
@@ -129,6 +133,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
         _usdc = usdc;
         _disputeResolver = disputeResolver;
+        _reputationAttestations = reputationAttestations;
         // _performer is 0
 
         _createdAt = uint64(block.timestamp);
@@ -184,6 +189,16 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
         // Settle payment through router
         IPaymentRouter(_paymentRouter).settlePayment(_missionId, _performer, _rewardAmount, _guild);
+
+        if (_reputationAttestations != address(0)) {
+            try IReputationAttestations(_reputationAttestations).recordOutcome(
+                uint256(_missionId), _poster, _performer, true, uint256(_rewardAmount)
+            ) {
+                // Success
+            } catch {
+                emit ReputationUpdateFailed(_missionId);
+            }
+        }
 
         emit MissionCompleted(_missionId);
     }
@@ -326,6 +341,18 @@ contract MissionEscrow is Initializable, IMissionEscrow {
             IERC20(_usdc).safeTransfer(_paymentRouter, performerAmount);
             IPaymentRouter(_paymentRouter)
                 .settlePayment(_missionId, _performer, performerAmount, _guild);
+        }
+
+        if (_reputationAttestations != address(0)) {
+            // 2=PerformerWins, 3=Split -> Completed=true
+            bool completed = (outcome == 2 || outcome == 3);
+            try IReputationAttestations(_reputationAttestations).recordOutcome(
+                uint256(_missionId), _poster, _performer, completed, performerAmount
+            ) {
+                // Success
+            } catch {
+                emit ReputationUpdateFailed(_missionId);
+            }
         }
 
         emit DisputeSettled(_missionId, outcome, posterAmount, performerAmount);
