@@ -219,15 +219,13 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     /**
      * @notice Raise a dispute
      * @param disputeHash IPFS hash of dispute evidence
-     * @dev Can be called by poster or performer after acceptance
+     * @dev Can only be called by DisputeResolver to ensure DDR is paid
      */
     function raiseDispute(bytes32 disputeHash) external {
+        if (msg.sender != _disputeResolver) revert NotDisputeResolver();
+
         if (_state != MissionState.Accepted && _state != MissionState.Submitted) {
             revert InvalidState();
-        }
-
-        if (msg.sender != _poster && msg.sender != _performer) {
-            revert NotParty();
         }
 
         if (_state == MissionState.Accepted && block.timestamp > _expiresAt) {
