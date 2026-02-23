@@ -1,0 +1,24 @@
+{
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit"
+  },
+  "solidity.packageDefaultDependenciesContractsDirectory": "src",
+  "solidity.packageDefaultDependenciesDirectory": "lib",
+  "solidity.formatter": "forge",
+  "[solidity]": {
+    "editor.defaultFormatter": "JuanBlanco.solidity"
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/out": true,
+    "**/cache": true,
+    "**/broadcast": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules": true,
+    "**/out": true,
+    "**/cache": true,
+    "**/broadcast": true
+  }
+}
