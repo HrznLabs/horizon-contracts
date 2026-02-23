@@ -53,8 +53,8 @@ contract ClaimExpiredRepro is Test {
         vm.prank(performer);
         escrow.acceptMission();
 
-        // 3. Dispute is raised by performer
-        vm.prank(performer);
+        // 3. Dispute is raised by performer (via Resolver)
+        vm.prank(disputeResolver);
         escrow.raiseDispute(keccak256("evidence"));
 
         assertEq(uint256(escrow.getRuntime().state), uint256(IMissionEscrow.MissionState.Disputed));

@@ -167,6 +167,9 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         // Transfer DDR from initiator
         usdc.safeTransferFrom(msg.sender, address(this), ddrAmount);
 
+        // Raise dispute on escrow (locks funds and state)
+        IMissionEscrow(escrowAddress).raiseDispute(evidenceHash);
+
         // Create dispute
         _disputeIdCounter++;
         disputeId = _disputeIdCounter;
