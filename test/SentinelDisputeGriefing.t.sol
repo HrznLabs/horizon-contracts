@@ -7,10 +7,9 @@ import { MissionEscrow } from "../src/MissionEscrow.sol";
 import { PaymentRouter } from "../src/PaymentRouter.sol";
 import { DisputeResolver } from "../src/DisputeResolver.sol";
 import { IMissionEscrow } from "../src/interfaces/IMissionEscrow.sol";
-import { IDisputeResolver } from "../src/interfaces/IDisputeResolver.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
 
-contract DisputeResolverSecurity is Test {
+contract SentinelDisputeGriefing is Test {
     MissionFactory public factory;
     PaymentRouter public paymentRouter;
     DisputeResolver public disputeResolverContract;
@@ -19,14 +18,12 @@ contract DisputeResolverSecurity is Test {
     address public owner = address(0x1);
     address public poster = address(0x2);
     address public performer = address(0x3);
-    address public resolver = address(0x4);
-    address public resolversDAO = address(0x5);
-    address public protocolDAO = address(0x6);
-    address public attacker = address(0x7);
 
     address public protocolTreasury = address(0x10);
     address public resolverTreasury = address(0x11);
     address public labsTreasury = address(0x12);
+    address public resolversDAO = address(0x13);
+    address public protocolDAO = address(0x14);
 
     uint256 public constant REWARD_AMOUNT = 100e6; // 100 USDC
 
@@ -49,21 +46,18 @@ contract DisputeResolverSecurity is Test {
         factory.setDisputeResolver(address(disputeResolverContract));
         vm.stopPrank();
 
-        // Mint USDC to poster and performer (for DDR)
+        // Mint USDC to poster and performer
         usdc.mint(poster, 1000e6);
         usdc.mint(performer, 1000e6);
 
         vm.prank(poster);
         usdc.approve(address(factory), 1000e6);
 
-        vm.prank(poster);
-        usdc.approve(address(disputeResolverContract), 1000e6);
-
         vm.prank(performer);
-        usdc.approve(address(disputeResolverContract), 1000e6);
+        usdc.approve(address(disputeResolverContract), 1000e6); // For DDR if needed
     }
 
-    function test_AppealBypass() public {
+    function test_Griefing_DirectRaiseDispute_Reverts() public {
         // 1. Poster creates a mission
         vm.startPrank(poster);
         uint256 expiresAt = block.timestamp + 1 days;
@@ -78,48 +72,45 @@ contract DisputeResolverSecurity is Test {
         vm.prank(performer);
         escrow.acceptMission();
 
-        // 3. Performer submits proof
+        // 3. Performer tries to raise dispute DIRECTLY (bypassing DDR)
+        // This MUST revert with NotDisputeResolver
         vm.prank(performer);
-        escrow.submitProof(keccak256("proof"));
+        vm.expectRevert(IMissionEscrow.NotDisputeResolver.selector);
+        escrow.raiseDispute(keccak256("griefing"));
 
-        // 4. Poster creates dispute on Resolver (which calls Escrow.raiseDispute)
-        vm.prank(poster);
-        uint256 disputeId =
-            disputeResolverContract.createDispute(escrowAddress, missionId, keccak256("evidence"));
+        // 4. Verify state is STILL Accepted (not Disputed)
+        assertEq(uint256(escrow.getRuntime().state), uint256(IMissionEscrow.MissionState.Accepted));
+    }
 
-        // 5. Assign resolver
-        vm.prank(resolversDAO);
-        disputeResolverContract.assignResolver(disputeId, resolver);
+    function test_ValidDispute_ViaResolver_Succeeds() public {
+        // 1. Poster creates a mission
+        vm.startPrank(poster);
+        uint256 expiresAt = block.timestamp + 1 days;
+        uint256 missionId =
+            factory.createMission(REWARD_AMOUNT, expiresAt, address(0), bytes32(0), bytes32(0));
+        vm.stopPrank();
 
-        // 6. Performer deposits DDR and submits evidence
+        address escrowAddress = factory.missions(missionId);
+        MissionEscrow escrow = MissionEscrow(escrowAddress);
+
+        // 2. Performer accepts
         vm.prank(performer);
-        disputeResolverContract.submitEvidence(disputeId, keccak256("evidence2"));
+        escrow.acceptMission();
 
-        // 7. Resolver resolves dispute (PosterWins)
-        vm.prank(resolver);
-        disputeResolverContract.resolveDispute(
-            disputeId, IDisputeResolver.DisputeOutcome.PosterWins, keccak256("resolution"), 0
-        );
-
-        // Verify state is Resolved
-        IDisputeResolver.Dispute memory dispute = disputeResolverContract.getDispute(disputeId);
-        assertEq(uint256(dispute.state), uint256(IDisputeResolver.DisputeState.Resolved));
-
-        // 8. Performer appeals
+        // 3. Performer raises dispute via DisputeResolver (paying DDR)
         vm.prank(performer);
-        disputeResolverContract.appealResolution(disputeId);
+        disputeResolverContract.createDispute(escrowAddress, missionId, keccak256("valid dispute"));
 
-        // Verify state is Appealed
-        dispute = disputeResolverContract.getDispute(disputeId);
-        assertEq(uint256(dispute.state), uint256(IDisputeResolver.DisputeState.Appealed));
+        // 4. Verify state is Disputed (Escrow state updated)
+        assertEq(uint256(escrow.getRuntime().state), uint256(IMissionEscrow.MissionState.Disputed));
 
-        // 9. Attacker calls finalizeDispute - SHOULD REVERT
-        vm.prank(attacker);
-        vm.expectRevert(IDisputeResolver.InvalidDisputeState.selector);
-        disputeResolverContract.finalizeDispute(disputeId);
+        // 5. Verify DisputeResolver has the dispute
+        uint256[] memory disputes = disputeResolverContract.getDisputesByMission(missionId);
+        assertEq(disputes.length, 1);
 
-        // 10. Verify state is still Appealed
-        dispute = disputeResolverContract.getDispute(disputeId);
-        assertEq(uint256(dispute.state), uint256(IDisputeResolver.DisputeState.Appealed));
+        // 6. Verify DDR was collected
+        uint256 disputeId = disputes[0];
+        uint256 ddrAmount = disputeResolverContract.getDDRDeposit(disputeId, performer);
+        assertEq(ddrAmount, 5e6); // 5% of 100 USDC = 5 USDC
     }
 }
