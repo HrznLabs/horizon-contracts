@@ -148,9 +148,10 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert NotParty();
         }
 
-        // Must be in submitted state or already disputed
+        // Must be in accepted, submitted state or already disputed
         if (
-            runtime.state != IMissionEscrow.MissionState.Submitted
+            runtime.state != IMissionEscrow.MissionState.Accepted
+                && runtime.state != IMissionEscrow.MissionState.Submitted
                 && runtime.state != IMissionEscrow.MissionState.Disputed
         ) {
             revert InvalidDisputeState();
@@ -197,6 +198,9 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         // Track dispute
         _missionDisputes[missionId].push(disputeId);
         _escrowDispute[escrowAddress] = disputeId;
+
+        // Call raiseDispute on escrow to update state and lock funds
+        IMissionEscrow(escrowAddress).raiseDispute(evidenceHash);
 
         emit DisputeCreated(disputeId, escrowAddress, missionId, msg.sender, ddrAmount);
     }

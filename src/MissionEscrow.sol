@@ -222,12 +222,11 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      * @dev Can be called by poster or performer after acceptance
      */
     function raiseDispute(bytes32 disputeHash) external {
+        // Only dispute resolver can raise dispute (after DDR payment)
+        if (msg.sender != _disputeResolver) revert NotDisputeResolver();
+
         if (_state != MissionState.Accepted && _state != MissionState.Submitted) {
             revert InvalidState();
-        }
-
-        if (msg.sender != _poster && msg.sender != _performer) {
-            revert NotParty();
         }
 
         if (_state == MissionState.Accepted && block.timestamp > _expiresAt) {
