@@ -55,7 +55,7 @@ contract DisputeAfterExpiryTest is Test {
 
         // Performer tries to raise dispute (Griefing Attack) - SHOULD FAIL WITH FIX
         vm.prank(performer);
-        vm.expectRevert(IMissionEscrow.MissionExpired.selector);
+        vm.expectRevert(abi.encodeWithSelector(IMissionEscrow.MissionExpired.selector, expiresAt + 1, expiresAt));
         escrow.raiseDispute(bytes32("grief"));
 
         // Verify state is still Accepted (not Disputed)

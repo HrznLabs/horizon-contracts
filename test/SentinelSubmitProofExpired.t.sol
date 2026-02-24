@@ -59,7 +59,7 @@ contract SentinelSubmitProofExpiredTest is Test {
 
         // Performer submits proof - SHOULD REVERT now
         vm.prank(performer);
-        vm.expectRevert(IMissionEscrow.MissionExpired.selector);
+        vm.expectRevert(abi.encodeWithSelector(IMissionEscrow.MissionExpired.selector, expiresAt + 1, expiresAt));
         escrow.submitProof(bytes32("late_proof"));
 
         // Confirm state is STILL Accepted (not Submitted)

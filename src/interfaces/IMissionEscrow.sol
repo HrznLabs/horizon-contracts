@@ -60,13 +60,14 @@ interface IMissionEscrow {
     // ERRORS
     // =============================================================================
 
-    error InvalidState();
+    error InvalidState(MissionState current);
+    error InvalidOutcome(uint8 outcome);
     error NotPoster();
     error NotPerformer();
     error NotParty();
     error NotDisputeResolver();
-    error MissionExpired();
-    error MissionNotExpired();
+    error MissionExpired(uint256 currentTimestamp, uint256 expiresAt);
+    error MissionNotExpired(uint256 currentTimestamp, uint256 expiresAt);
     error AlreadyAccepted();
     error DisputeAlreadyRaised();
 
