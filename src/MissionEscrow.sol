@@ -85,12 +85,12 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     }
 
     modifier inState(MissionState state) {
-        if (_state != state) revert InvalidState();
+        if (_state != state) revert InvalidState(_state);
         _;
     }
 
     modifier notExpired() {
-        if (block.timestamp > _expiresAt) revert MissionExpired();
+        if (block.timestamp > _expiresAt) revert MissionExpired(block.timestamp, _expiresAt);
         _;
     }
 
@@ -191,11 +191,13 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         IPaymentRouter(_paymentRouter).settlePayment(_missionId, _performer, _rewardAmount, _guild);
 
         if (_reputationAttestations != address(0)) {
-            try IReputationAttestations(_reputationAttestations).recordOutcome(
-                uint256(_missionId), _poster, _performer, true, uint256(_rewardAmount)
-            ) {
-                // Success
-            } catch {
+            try IReputationAttestations(_reputationAttestations)
+                .recordOutcome(
+                    uint256(_missionId), _poster, _performer, true, uint256(_rewardAmount)
+                ) {
+            // Success
+            }
+            catch {
                 emit ReputationUpdateFailed(_missionId);
             }
         }
@@ -223,7 +225,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      */
     function raiseDispute(bytes32 disputeHash) external {
         if (_state != MissionState.Accepted && _state != MissionState.Submitted) {
-            revert InvalidState();
+            revert InvalidState(_state);
         }
 
         if (msg.sender != _poster && msg.sender != _performer) {
@@ -231,7 +233,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         }
 
         if (_state == MissionState.Accepted && block.timestamp > _expiresAt) {
-            revert MissionExpired();
+            revert MissionExpired(block.timestamp, _expiresAt);
         }
 
         if (_disputeRaised) revert DisputeAlreadyRaised();
@@ -247,10 +249,10 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      * @dev Poster can reclaim if mission expired without being completed
      */
     function claimExpired() external onlyPoster {
-        if (block.timestamp <= _expiresAt) revert MissionNotExpired();
+        if (block.timestamp <= _expiresAt) revert MissionNotExpired(block.timestamp, _expiresAt);
 
         if (_state != MissionState.Open && _state != MissionState.Accepted) {
-            revert InvalidState();
+            revert InvalidState(_state);
         }
 
         _state = MissionState.Cancelled;
@@ -315,7 +317,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         if (msg.sender != _disputeResolver) revert NotDisputeResolver();
 
         // Must be in Disputed state
-        if (_state != MissionState.Disputed) revert InvalidState();
+        if (_state != MissionState.Disputed) revert InvalidState(_state);
 
         uint256 posterAmount = 0;
         uint256 performerAmount = 0;
@@ -334,7 +336,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
             // Cancelled: Poster gets refund
             posterAmount = _rewardAmount;
         } else {
-            revert InvalidState();
+            revert InvalidOutcome(outcome);
         }
 
         // Update state
@@ -354,11 +356,13 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         if (_reputationAttestations != address(0)) {
             // 2=PerformerWins, 3=Split -> Completed=true
             bool completed = (outcome == 2 || outcome == 3);
-            try IReputationAttestations(_reputationAttestations).recordOutcome(
-                uint256(_missionId), _poster, _performer, completed, performerAmount
-            ) {
-                // Success
-            } catch {
+            try IReputationAttestations(_reputationAttestations)
+                .recordOutcome(
+                    uint256(_missionId), _poster, _performer, completed, performerAmount
+                ) {
+            // Success
+            }
+            catch {
                 emit ReputationUpdateFailed(_missionId);
             }
         }

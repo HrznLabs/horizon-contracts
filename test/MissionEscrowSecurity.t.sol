@@ -71,7 +71,7 @@ contract MissionEscrowSecurity is Test {
 
         // 5. Poster tries to claim expired funds - SHOULD REVERT
         vm.prank(poster);
-        vm.expectRevert(IMissionEscrow.InvalidState.selector);
+        vm.expectRevert(abi.encodeWithSelector(IMissionEscrow.InvalidState.selector, IMissionEscrow.MissionState.Submitted));
         escrow.claimExpired();
 
         // 6. Assertions

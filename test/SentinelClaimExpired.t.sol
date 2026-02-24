@@ -61,7 +61,7 @@ contract SentinelClaimExpiredTest is Test {
 
         // Poster claims expired funds - SHOULD REVERT
         vm.prank(poster);
-        vm.expectRevert(IMissionEscrow.InvalidState.selector);
+        vm.expectRevert(abi.encodeWithSelector(IMissionEscrow.InvalidState.selector, IMissionEscrow.MissionState.Submitted));
         escrow.claimExpired();
 
         // Assertions
