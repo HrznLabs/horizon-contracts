@@ -148,9 +148,10 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert NotParty();
         }
 
-        // Must be in submitted state or already disputed
+        // Must be in accepted, submitted or already disputed
         if (
-            runtime.state != IMissionEscrow.MissionState.Submitted
+            runtime.state != IMissionEscrow.MissionState.Accepted
+                && runtime.state != IMissionEscrow.MissionState.Submitted
                 && runtime.state != IMissionEscrow.MissionState.Disputed
         ) {
             revert InvalidDisputeState();
@@ -159,6 +160,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         // Check no existing dispute for this escrow
         if (_escrowDispute[escrowAddress] != 0) {
             revert InvalidDisputeState();
+        }
+
+        // Raise dispute on escrow if not already raised
+        if (runtime.state != IMissionEscrow.MissionState.Disputed) {
+            IMissionEscrow(escrowAddress).raiseDispute(evidenceHash);
         }
 
         // Calculate DDR amount

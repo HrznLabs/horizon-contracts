@@ -54,7 +54,8 @@ contract DisputeAfterExpiryTest is Test {
         vm.warp(expiresAt + 1);
 
         // Performer tries to raise dispute (Griefing Attack) - SHOULD FAIL WITH FIX
-        vm.prank(performer);
+        // We simulate the call coming from the resolver, which is the only allowed caller
+        vm.prank(disputeResolver);
         vm.expectRevert(IMissionEscrow.MissionExpired.selector);
         escrow.raiseDispute(bytes32("grief"));
 
@@ -92,7 +93,8 @@ contract DisputeAfterExpiryTest is Test {
         vm.warp(expiresAt + 1);
 
         // Performer raises dispute - SHOULD SUCCEED (because proof was submitted)
-        vm.prank(performer);
+        // We simulate the call coming from the resolver
+        vm.prank(disputeResolver);
         escrow.raiseDispute(bytes32("valid dispute"));
 
         // Verify state is Disputed
