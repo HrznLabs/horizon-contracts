@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-echo "Installing foundryup..."
+echo "📦 Installing foundryup..."
 
 BASE_DIR="${XDG_CONFIG_HOME:-$HOME}"
 FOUNDRY_DIR="${FOUNDRY_DIR:-"$BASE_DIR/.foundry"}"
@@ -38,7 +38,7 @@ case $SHELL in
     PREF_SHELL=ash
     ;;
 *)
-    echo "foundryup: could not detect shell, manually add ${FOUNDRY_BIN_DIR} to your PATH."
+    echo "❌ foundryup: could not detect shell, manually add ${FOUNDRY_BIN_DIR} to your PATH."
     exit 1
 esac
 
@@ -55,10 +55,10 @@ fi
 
 # Warn MacOS users that they may need to manually install libusb via Homebrew:
 if [[ "$OSTYPE" =~ ^darwin ]] && [[ ! -f /usr/local/opt/libusb/lib/libusb-1.0.0.dylib ]] && [[ ! -f /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib ]]; then
-    echo && echo "warning: libusb not found. You may need to install it manually on MacOS via Homebrew (brew install libusb)."
+    echo && echo "⚠️  warning: libusb not found. You may need to install it manually on MacOS via Homebrew (brew install libusb)."
 fi
 
 echo
-echo "Detected your preferred shell is $PREF_SHELL and added foundryup to PATH."
-echo "Run 'source $PROFILE' or start a new terminal session to use foundryup."
-echo "Then, simply run 'foundryup' to install Foundry."
+echo "✨ Detected your preferred shell is $PREF_SHELL and added foundryup to PATH."
+echo "🚀 Run 'source $PROFILE' or start a new terminal session to use foundryup."
+echo "🔨 Then, simply run 'foundryup' to install Foundry."
