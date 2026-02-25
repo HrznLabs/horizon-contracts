@@ -184,30 +184,23 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     function approveCompletion() external onlyPoster inState(MissionState.Submitted) {
         _state = MissionState.Completed;
 
-        // Cache storage variables to stack
-        uint256 rewardAmount = uint256(_rewardAmount);
-        address paymentRouter = _paymentRouter;
-        uint256 missionId = uint256(_missionId);
-        address performer = _performer;
-        address reputationAttestations = _reputationAttestations;
-
         // Transfer USDC to PaymentRouter for distribution
-        IERC20(_usdc).safeTransfer(paymentRouter, rewardAmount);
+        IERC20(_usdc).safeTransfer(_paymentRouter, _rewardAmount);
 
         // Settle payment through router
-        IPaymentRouter(paymentRouter).settlePayment(missionId, performer, rewardAmount, _guild);
+        IPaymentRouter(_paymentRouter).settlePayment(_missionId, _performer, _rewardAmount, _guild);
 
-        if (reputationAttestations != address(0)) {
-            try IReputationAttestations(reputationAttestations).recordOutcome(
-                missionId, _poster, performer, true, rewardAmount
+        if (_reputationAttestations != address(0)) {
+            try IReputationAttestations(_reputationAttestations).recordOutcome(
+                uint256(_missionId), _poster, _performer, true, uint256(_rewardAmount)
             ) {
                 // Success
             } catch {
-                emit ReputationUpdateFailed(missionId);
+                emit ReputationUpdateFailed(_missionId);
             }
         }
 
-        emit MissionCompleted(missionId);
+        emit MissionCompleted(_missionId);
     }
 
     /**
@@ -326,21 +319,20 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
         uint256 posterAmount = 0;
         uint256 performerAmount = 0;
-        uint256 rewardAmount = uint256(_rewardAmount);
 
         if (outcome == 1) {
             // PosterWins: Poster gets full refund
-            posterAmount = rewardAmount;
+            posterAmount = _rewardAmount;
         } else if (outcome == 2) {
             // PerformerWins: Performer gets full reward (through PaymentRouter)
-            performerAmount = rewardAmount;
+            performerAmount = _rewardAmount;
         } else if (outcome == 3) {
             // Split: Distribute based on splitPercentage
-            performerAmount = (rewardAmount * splitPercentage) / 10_000;
-            posterAmount = rewardAmount - performerAmount;
+            performerAmount = (uint256(_rewardAmount) * splitPercentage) / 10_000;
+            posterAmount = uint256(_rewardAmount) - performerAmount;
         } else if (outcome == 4) {
             // Cancelled: Poster gets refund
-            posterAmount = rewardAmount;
+            posterAmount = _rewardAmount;
         } else {
             revert InvalidState();
         }
@@ -348,34 +340,29 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         // Update state
         _state = MissionState.Completed;
 
-        // Cache storage variables
-        uint256 missionId = uint256(_missionId);
-        address reputationAttestations = _reputationAttestations;
-
         // Transfer funds
         if (posterAmount > 0) {
             IERC20(_usdc).safeTransfer(_poster, posterAmount);
         }
         if (performerAmount > 0) {
-            address paymentRouter = _paymentRouter;
             // Transfer to PaymentRouter for fee distribution
-            IERC20(_usdc).safeTransfer(paymentRouter, performerAmount);
-            IPaymentRouter(paymentRouter)
-                .settlePayment(missionId, _performer, performerAmount, _guild);
+            IERC20(_usdc).safeTransfer(_paymentRouter, performerAmount);
+            IPaymentRouter(_paymentRouter)
+                .settlePayment(_missionId, _performer, performerAmount, _guild);
         }
 
-        if (reputationAttestations != address(0)) {
+        if (_reputationAttestations != address(0)) {
             // 2=PerformerWins, 3=Split -> Completed=true
             bool completed = (outcome == 2 || outcome == 3);
-            try IReputationAttestations(reputationAttestations).recordOutcome(
-                missionId, _poster, _performer, completed, performerAmount
+            try IReputationAttestations(_reputationAttestations).recordOutcome(
+                uint256(_missionId), _poster, _performer, completed, performerAmount
             ) {
                 // Success
             } catch {
-                emit ReputationUpdateFailed(missionId);
+                emit ReputationUpdateFailed(_missionId);
             }
         }
 
-        emit DisputeSettled(missionId, outcome, posterAmount, performerAmount);
+        emit DisputeSettled(_missionId, outcome, posterAmount, performerAmount);
     }
 }
