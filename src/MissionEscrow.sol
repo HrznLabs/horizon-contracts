@@ -184,23 +184,33 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     function approveCompletion() external onlyPoster inState(MissionState.Submitted) {
         _state = MissionState.Completed;
 
+        // Cache storage variables to stack to save SLOADs
+        uint96 rewardAmount = _rewardAmount;
+        address paymentRouter = _paymentRouter;
+        address usdc = _usdc;
+        uint96 missionId = _missionId;
+        address performer = _performer;
+        address guild = _guild;
+        address reputationAttestations = _reputationAttestations;
+        address poster = _poster;
+
         // Transfer USDC to PaymentRouter for distribution
-        IERC20(_usdc).safeTransfer(_paymentRouter, _rewardAmount);
+        IERC20(usdc).safeTransfer(paymentRouter, rewardAmount);
 
         // Settle payment through router
-        IPaymentRouter(_paymentRouter).settlePayment(_missionId, _performer, _rewardAmount, _guild);
+        IPaymentRouter(paymentRouter).settlePayment(missionId, performer, rewardAmount, guild);
 
-        if (_reputationAttestations != address(0)) {
-            try IReputationAttestations(_reputationAttestations).recordOutcome(
-                uint256(_missionId), _poster, _performer, true, uint256(_rewardAmount)
+        if (reputationAttestations != address(0)) {
+            try IReputationAttestations(reputationAttestations).recordOutcome(
+                uint256(missionId), poster, performer, true, uint256(rewardAmount)
             ) {
                 // Success
             } catch {
-                emit ReputationUpdateFailed(_missionId);
+                emit ReputationUpdateFailed(missionId);
             }
         }
 
-        emit MissionCompleted(_missionId);
+        emit MissionCompleted(missionId);
     }
 
     /**
@@ -309,28 +319,40 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      * @param splitPercentage For Split outcome, performer's share in basis points (0-10000)
      */
     function settleDispute(uint8 outcome, uint256 splitPercentage) external {
+        // Cache dispute resolver to save SLOAD
+        address disputeResolver = _disputeResolver;
         // Only dispute resolver can settle
-        if (msg.sender != _disputeResolver) revert NotDisputeResolver();
+        if (msg.sender != disputeResolver) revert NotDisputeResolver();
 
         // Must be in Disputed state
         if (_state != MissionState.Disputed) revert InvalidState();
+
+        // Cache storage variables to stack to save SLOADs
+        uint96 rewardAmount = _rewardAmount;
+        address usdc = _usdc;
+        address poster = _poster;
+        address paymentRouter = _paymentRouter;
+        uint96 missionId = _missionId;
+        address performer = _performer;
+        address guild = _guild;
+        address reputationAttestations = _reputationAttestations;
 
         uint256 posterAmount = 0;
         uint256 performerAmount = 0;
 
         if (outcome == 1) {
             // PosterWins: Poster gets full refund
-            posterAmount = _rewardAmount;
+            posterAmount = rewardAmount;
         } else if (outcome == 2) {
             // PerformerWins: Performer gets full reward (through PaymentRouter)
-            performerAmount = _rewardAmount;
+            performerAmount = rewardAmount;
         } else if (outcome == 3) {
             // Split: Distribute based on splitPercentage
-            performerAmount = (uint256(_rewardAmount) * splitPercentage) / 10_000;
-            posterAmount = uint256(_rewardAmount) - performerAmount;
+            performerAmount = (uint256(rewardAmount) * splitPercentage) / 10_000;
+            posterAmount = uint256(rewardAmount) - performerAmount;
         } else if (outcome == 4) {
             // Cancelled: Poster gets refund
-            posterAmount = _rewardAmount;
+            posterAmount = rewardAmount;
         } else {
             revert InvalidState();
         }
@@ -340,27 +362,27 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
         // Transfer funds
         if (posterAmount > 0) {
-            IERC20(_usdc).safeTransfer(_poster, posterAmount);
+            IERC20(usdc).safeTransfer(poster, posterAmount);
         }
         if (performerAmount > 0) {
             // Transfer to PaymentRouter for fee distribution
-            IERC20(_usdc).safeTransfer(_paymentRouter, performerAmount);
-            IPaymentRouter(_paymentRouter)
-                .settlePayment(_missionId, _performer, performerAmount, _guild);
+            IERC20(usdc).safeTransfer(paymentRouter, performerAmount);
+            IPaymentRouter(paymentRouter)
+                .settlePayment(missionId, performer, performerAmount, guild);
         }
 
-        if (_reputationAttestations != address(0)) {
+        if (reputationAttestations != address(0)) {
             // 2=PerformerWins, 3=Split -> Completed=true
             bool completed = (outcome == 2 || outcome == 3);
-            try IReputationAttestations(_reputationAttestations).recordOutcome(
-                uint256(_missionId), _poster, _performer, completed, performerAmount
+            try IReputationAttestations(reputationAttestations).recordOutcome(
+                uint256(missionId), poster, performer, completed, performerAmount
             ) {
                 // Success
             } catch {
-                emit ReputationUpdateFailed(_missionId);
+                emit ReputationUpdateFailed(missionId);
             }
         }
 
-        emit DisputeSettled(_missionId, outcome, posterAmount, performerAmount);
+        emit DisputeSettled(missionId, outcome, posterAmount, performerAmount);
     }
 }
