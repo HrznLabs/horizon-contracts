@@ -63,7 +63,8 @@ contract DisputeFeeBypass is Test {
         escrow.acceptMission();
 
         // 3. Performer raises dispute (simulating bad faith or just greedy)
-        vm.prank(performer);
+        // Since raiseDispute is now restricted to resolver, we prank as resolver
+        vm.prank(disputeResolver);
         escrow.raiseDispute(bytes32("dispute"));
 
         // 4. Resolver settles in favor of Performer (Outcome 2)
@@ -102,7 +103,8 @@ contract DisputeFeeBypass is Test {
         escrow.acceptMission();
 
         // 3. Performer raises dispute
-        vm.prank(performer);
+        // Since raiseDispute is now restricted to resolver, we prank as resolver
+        vm.prank(disputeResolver);
         escrow.raiseDispute(bytes32("dispute"));
 
         // 4. Resolver settles with SPLIT (Outcome 3)

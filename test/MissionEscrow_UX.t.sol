@@ -64,8 +64,8 @@ contract MissionEscrowUXTest is Test {
         // 3. Random user tries to raise dispute
         vm.prank(randomUser);
 
-        // EXPECTED BEHAVIOR: Reverts with NotParty
-        vm.expectRevert(IMissionEscrow.NotParty.selector);
+        // EXPECTED BEHAVIOR: Reverts with NotDisputeResolver (since raiseDispute is restricted)
+        vm.expectRevert(IMissionEscrow.NotDisputeResolver.selector);
         IMissionEscrow(escrow).raiseDispute(keccak256("evidence"));
     }
 }
