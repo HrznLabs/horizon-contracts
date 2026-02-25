@@ -16,7 +16,6 @@ docs/
 
 # IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 
