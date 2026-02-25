@@ -84,11 +84,8 @@ contract DisputeResolverDeadlock is Test {
         vm.prank(performer);
         escrow.submitProof(keccak256("proof"));
 
-        // 4. Performer raises dispute (in Escrow)
-        vm.prank(performer);
-        escrow.raiseDispute(keccak256("dispute_evidence"));
-
-        // 5. Performer creates dispute (in Resolver) paying DDR
+        // 4. Performer creates dispute (in Resolver) paying DDR
+        // This will automatically call escrow.raiseDispute()
         vm.startPrank(performer);
         uint256 disputeId = resolver.createDispute(escrowAddress, missionId, keccak256("evidence"));
         vm.stopPrank();
