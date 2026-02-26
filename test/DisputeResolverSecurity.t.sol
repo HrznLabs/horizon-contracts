@@ -39,13 +39,14 @@ contract DisputeResolverSecurity is Test {
         paymentRouter =
             new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury);
 
-        // Deploy DisputeResolver
-        disputeResolverContract = new DisputeResolver(
-            address(usdc), resolversDAO, protocolDAO, protocolTreasury, resolverTreasury
-        );
-
         // Deploy MissionFactory
         factory = new MissionFactory(address(usdc), address(paymentRouter));
+
+        // Deploy DisputeResolver
+        disputeResolverContract = new DisputeResolver(
+            address(usdc), address(factory), resolversDAO, protocolDAO, protocolTreasury, resolverTreasury
+        );
+
         factory.setDisputeResolver(address(disputeResolverContract));
         vm.stopPrank();
 
