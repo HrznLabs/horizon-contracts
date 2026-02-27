@@ -315,17 +315,98 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
     ) external onlyRole(MINTER_ROLE) returns (uint256[] memory tokenIds) {
         require(recipients.length == proofHashes.length, "Length mismatch");
 
+        // Cache storage pointer
+        AchievementTypeStorage storage achievementType = _achievementTypes[typeId];
+
+        // Validate type
+        if (achievementType.typeId == 0) revert AchievementTypeNotFound();
+        if (!achievementType.isActive) revert AchievementTypeInactive();
+
+        // Cache stack variables
+        uint64 maxSupply = achievementType.maxSupply;
+        bool isSoulbound = achievementType.isSoulbound;
+        uint256 currentSupply = achievementType.currentSupply;
+        uint256 tokenIdCounter = _tokenIdCounter;
+
         tokenIds = new uint256[](recipients.length);
 
         for (uint256 i = 0; i < recipients.length; i++) {
+            address to = recipients[i];
+            if (to == address(0)) revert InvalidRecipient();
+
             // Skip if already has achievement (for soulbound)
-            if (_achievementTypes[typeId].isSoulbound && _userHasAchievement[typeId][recipients[i]])
-            {
+            if (isSoulbound && _userHasAchievement[typeId][to]) {
                 continue;
             }
 
-            tokenIds[i] = _mintAchievementInternal(recipients[i], typeId, proofHashes[i]);
+            // Check max supply
+            if (maxSupply > 0 && currentSupply >= maxSupply) {
+                revert MaxSupplyReached();
+            }
+
+            // Increment local counters
+            tokenIdCounter++;
+            currentSupply++;
+            uint256 tokenId = tokenIdCounter;
+
+            // Store result
+            tokenIds[i] = tokenId;
+
+            // Create achievement data
+            // Write to storage
+            _achievements[tokenId] = AchievementStorage({
+                originalOwner: to,
+                mintedAt: uint64(block.timestamp),
+                typeId: uint32(typeId),
+                proofHash: proofHashes[i]
+            });
+
+            // Track user achievement
+            _userHasAchievement[typeId][to] = true;
+            _userAchievementToken[to][typeId] = tokenId;
+
+            // Mint NFT
+            _safeMint(to, tokenId);
+
+            emit AchievementMinted(tokenId, typeId, to, proofHashes[i]);
         }
+
+        // Write back counters to storage once
+        _tokenIdCounter = tokenIdCounter;
+        achievementType.currentSupply = uint64(currentSupply);
+    }
+
+    // =============================================================================
+    // INTERNAL FUNCTIONS
+    // =============================================================================
+
+    function _mintAchievementInternal(address to, uint256 typeId, bytes32 proofHash)
+        internal
+        returns (uint256 tokenId)
+    {
+        AchievementTypeStorage storage achievementType = _achievementTypes[typeId];
+
+        // Increment counters
+        _tokenIdCounter++;
+        tokenId = _tokenIdCounter;
+        achievementType.currentSupply++;
+
+        // Create achievement data
+        _achievements[tokenId] = AchievementStorage({
+            originalOwner: to,
+            mintedAt: uint64(block.timestamp),
+            typeId: uint32(typeId),
+            proofHash: proofHash
+        });
+
+        // Track user achievement
+        _userHasAchievement[typeId][to] = true;
+        _userAchievementToken[to][typeId] = tokenId;
+
+        // Mint NFT
+        _safeMint(to, tokenId);
+
+        emit AchievementMinted(tokenId, typeId, to, proofHash);
     }
 
     // =============================================================================
@@ -404,39 +485,6 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
      */
     function totalAchievementTypes() external view returns (uint256) {
         return _typeIdCounter;
-    }
-
-    // =============================================================================
-    // INTERNAL FUNCTIONS
-    // =============================================================================
-
-    function _mintAchievementInternal(address to, uint256 typeId, bytes32 proofHash)
-        internal
-        returns (uint256 tokenId)
-    {
-        AchievementTypeStorage storage achievementType = _achievementTypes[typeId];
-
-        // Increment counters
-        _tokenIdCounter++;
-        tokenId = _tokenIdCounter;
-        achievementType.currentSupply++;
-
-        // Create achievement data
-        _achievements[tokenId] = AchievementStorage({
-            originalOwner: to,
-            mintedAt: uint64(block.timestamp),
-            typeId: uint32(typeId),
-            proofHash: proofHash
-        });
-
-        // Track user achievement
-        _userHasAchievement[typeId][to] = true;
-        _userAchievementToken[to][typeId] = tokenId;
-
-        // Mint NFT
-        _safeMint(to, tokenId);
-
-        emit AchievementMinted(tokenId, typeId, to, proofHash);
     }
 
     // =============================================================================
