@@ -60,7 +60,7 @@ interface IMissionEscrow {
     // ERRORS
     // =============================================================================
 
-    error InvalidState();
+    error InvalidState(MissionState current);
     error NotPoster();
     error NotPerformer();
     error NotParty();

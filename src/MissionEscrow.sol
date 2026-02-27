@@ -85,7 +85,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     }
 
     modifier inState(MissionState state) {
-        if (_state != state) revert InvalidState();
+        if (_state != state) revert InvalidState(_state);
         _;
     }
 
@@ -235,7 +235,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         if (msg.sender != _disputeResolver) revert NotDisputeResolver();
 
         if (_state != MissionState.Accepted && _state != MissionState.Submitted) {
-            revert InvalidState();
+            revert InvalidState(_state);
         }
 
         if (_state == MissionState.Accepted && block.timestamp > _expiresAt) {
@@ -258,7 +258,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         if (block.timestamp <= _expiresAt) revert MissionNotExpired();
 
         if (_state != MissionState.Open && _state != MissionState.Accepted) {
-            revert InvalidState();
+            revert InvalidState(_state);
         }
 
         _state = MissionState.Cancelled;
@@ -325,7 +325,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         if (msg.sender != disputeResolver) revert NotDisputeResolver();
 
         // Must be in Disputed state
-        if (_state != MissionState.Disputed) revert InvalidState();
+        if (_state != MissionState.Disputed) revert InvalidState(_state);
 
         // Cache storage variables to stack to save SLOADs
         uint96 rewardAmount = _rewardAmount;
@@ -354,7 +354,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
             // Cancelled: Poster gets refund
             posterAmount = rewardAmount;
         } else {
-            revert InvalidState();
+            revert InvalidState(_state);
         }
 
         // Update state
