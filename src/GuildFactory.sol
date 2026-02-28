@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { GuildDAO } from "./GuildDAO.sol";
 
 /**
@@ -10,7 +11,7 @@ import { GuildDAO } from "./GuildDAO.sol";
  * @notice Factory for deploying GuildDAO clones
  * @dev Uses minimal proxy pattern (EIP-1167) for gas-efficient deployment
  */
-contract GuildFactory is Ownable {
+contract GuildFactory is Ownable, ReentrancyGuard {
     using Clones for address;
 
     // =============================================================================
@@ -67,6 +68,7 @@ contract GuildFactory is Ownable {
      */
     function createGuild(string calldata name, address treasury, uint16 guildFeeBps)
         external
+        nonReentrant
         returns (uint256 guildId, address guild)
     {
         if (bytes(name).length == 0 || bytes(name).length > 100) {
