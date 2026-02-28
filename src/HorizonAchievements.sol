@@ -157,6 +157,7 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
     error SoulboundTransferNotAllowed();
     error InvalidRecipient();
     error NotOriginalOwner();
+    error ReentrancyDetected();
 
     // =============================================================================
     // CONSTRUCTOR
@@ -315,16 +316,73 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
     ) external onlyRole(MINTER_ROLE) returns (uint256[] memory tokenIds) {
         require(recipients.length == proofHashes.length, "Length mismatch");
 
+        uint256 packedConfig; // [0..63] maxSupply, [64..127] originalCurrentSupply, [128] isSoulbound
+        uint64 currentSupply;
+
+        {
+            AchievementTypeStorage storage achievementType = _achievementTypes[typeId];
+            if (achievementType.typeId == 0) revert AchievementTypeNotFound();
+            if (!achievementType.isActive) revert AchievementTypeInactive();
+
+            packedConfig = uint256(achievementType.maxSupply)
+                | (uint256(achievementType.currentSupply) << 64)
+                | ((achievementType.isSoulbound ? 1 : 0) << 128);
+            currentSupply = achievementType.currentSupply;
+        }
+
+        uint256 startTokenId = _tokenIdCounter;
+        uint256 nextTokenId = startTokenId;
+
         tokenIds = new uint256[](recipients.length);
 
         for (uint256 i = 0; i < recipients.length; i++) {
+            address to = recipients[i];
+
             // Skip if already has achievement (for soulbound)
-            if (_achievementTypes[typeId].isSoulbound && _userHasAchievement[typeId][recipients[i]])
-            {
+            // isSoulbound is bit 128
+            if (((packedConfig >> 128) & 1) == 1 && _userHasAchievement[typeId][to]) {
                 continue;
             }
 
-            tokenIds[i] = _mintAchievementInternal(recipients[i], typeId, proofHashes[i]);
+            // Check max supply
+            // maxSupply is bits 0-63
+            uint64 maxSupply = uint64(packedConfig);
+            if (maxSupply > 0 && currentSupply >= maxSupply) {
+                revert MaxSupplyReached();
+            }
+
+            nextTokenId++;
+            uint256 tokenId = nextTokenId;
+            currentSupply++;
+
+            _achievements[tokenId] = AchievementStorage({
+                originalOwner: to,
+                mintedAt: uint64(block.timestamp),
+                typeId: uint32(typeId),
+                proofHash: proofHashes[i]
+            });
+
+            _userHasAchievement[typeId][to] = true;
+            _userAchievementToken[to][typeId] = tokenId;
+
+            _safeMint(to, tokenId);
+
+            emit AchievementMinted(tokenId, typeId, to, proofHashes[i]);
+
+            tokenIds[i] = tokenId;
+        }
+
+        if (nextTokenId > startTokenId) {
+            // Check for reentrancy
+            // originalCurrentSupply is bits 64-127
+            uint64 originalCurrentSupply = uint64(packedConfig >> 64);
+            if (_achievementTypes[typeId].currentSupply != originalCurrentSupply) {
+                revert ReentrancyDetected();
+            }
+            if (_tokenIdCounter != startTokenId) revert ReentrancyDetected();
+
+            _achievementTypes[typeId].currentSupply = currentSupply;
+            _tokenIdCounter = nextTokenId;
         }
     }
 
