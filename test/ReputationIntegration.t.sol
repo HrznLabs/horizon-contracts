@@ -144,13 +144,7 @@ contract ReputationIntegrationTest is Test {
 }
 
 contract MockReputationReverter {
-    function recordOutcome(
-        uint256,
-        address,
-        address,
-        bool,
-        uint256
-    ) external pure {
+    function recordOutcome(uint256, address, address, bool, uint256) external pure {
         revert("DoS Attempt");
     }
 }
