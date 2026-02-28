@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./interfaces/IDisputeResolver.sol";
 import "./interfaces/IMissionEscrow.sol";
+import "./interfaces/IMissionFactory.sol";
 
 /**
  * @title DisputeResolver
@@ -39,6 +40,9 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
 
     /// @notice USDC token for payments
     IERC20 public immutable usdc;
+
+    /// @notice MissionFactory address for validation
+    address public immutable missionFactory;
 
     /// @notice ResolversDAO address (can assign resolvers)
     address public resolversDAO;
@@ -86,17 +90,25 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
     mapping(uint256 => uint256) private _splitPercentages;
 
     // =============================================================================
+    // ERRORS
+    // =============================================================================
+
+    error InvalidEscrow();
+
+    // =============================================================================
     // CONSTRUCTOR
     // =============================================================================
 
     constructor(
         address _usdc,
+        address _missionFactory,
         address _resolversDAO,
         address _protocolDAO,
         address _protocolTreasury,
         address _resolverTreasury
     ) Ownable(msg.sender) {
         usdc = IERC20(_usdc);
+        missionFactory = _missionFactory;
         resolversDAO = _resolversDAO;
         protocolDAO = _protocolDAO;
         protocolTreasury = _protocolTreasury;
@@ -138,6 +150,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         nonReentrant
         returns (uint256 disputeId)
     {
+        // Verify escrow address is valid
+        if (IMissionFactory(missionFactory).getMission(missionId) != escrowAddress) {
+            revert InvalidEscrow();
+        }
+
         // Verify escrow exists and is in disputed state
         IMissionEscrow escrow = IMissionEscrow(escrowAddress);
         IMissionEscrow.MissionParams memory params = escrow.getParams();
@@ -542,4 +559,3 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         );
     }
 }
-
