@@ -45,6 +45,7 @@ contract DisputeResolverDeadlock is Test {
             address(usdc), address(factory), resolversDAO, protocolDAO, protocolTreasury, resolverTreasury
         );
 
+        // Set DisputeResolver in Factory
         factory.setDisputeResolver(address(resolver));
 
         // Setup Router to allow Factory

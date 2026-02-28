@@ -90,6 +90,12 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
     mapping(uint256 => uint256) private _splitPercentages;
 
     // =============================================================================
+    // ERRORS
+    // =============================================================================
+
+    error InvalidEscrow();
+
+    // =============================================================================
     // CONSTRUCTOR
     // =============================================================================
 
@@ -144,11 +150,9 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         nonReentrant
         returns (uint256 disputeId)
     {
-        // Verify escrow is valid
-        if (missionFactory != address(0)) {
-            if (IMissionFactory(missionFactory).getMission(missionId) != escrowAddress) {
-                revert InvalidEscrow();
-            }
+        // Verify escrow address is valid
+        if (IMissionFactory(missionFactory).getMission(missionId) != escrowAddress) {
+            revert InvalidEscrow();
         }
 
         // Verify escrow exists and is in disputed state
@@ -555,4 +559,3 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         );
     }
 }
-
