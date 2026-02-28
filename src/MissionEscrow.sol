@@ -201,11 +201,11 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         IPaymentRouter(paymentRouter).settlePayment(missionId, performer, rewardAmount, guild);
 
         if (reputationAttestations != address(0)) {
-            try IReputationAttestations(reputationAttestations).recordOutcome(
-                uint256(missionId), poster, performer, true, uint256(rewardAmount)
-            ) {
-                // Success
-            } catch {
+            try IReputationAttestations(reputationAttestations)
+                .recordOutcome(uint256(missionId), poster, performer, true, uint256(rewardAmount)) {
+            // Success
+            }
+            catch {
                 emit ReputationUpdateFailed(missionId);
             }
         }
@@ -374,11 +374,11 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         if (reputationAttestations != address(0)) {
             // 2=PerformerWins, 3=Split -> Completed=true
             bool completed = (outcome == 2 || outcome == 3);
-            try IReputationAttestations(reputationAttestations).recordOutcome(
-                uint256(missionId), poster, performer, completed, performerAmount
-            ) {
-                // Success
-            } catch {
+            try IReputationAttestations(reputationAttestations)
+                .recordOutcome(uint256(missionId), poster, performer, completed, performerAmount) {
+            // Success
+            }
+            catch {
                 emit ReputationUpdateFailed(missionId);
             }
         }

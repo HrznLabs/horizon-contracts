@@ -35,13 +35,13 @@ Horizon Protocol enables trustless, escrow-backed task coordination with USDC pa
 
 | Contract | Address | Verified |
 |----------|---------|----------|
-| PaymentRouter | [`0x94fb7908257ec36f701d2605b51eefed4326ddf5`](https://sepolia.basescan.org/address/0x94fb7908257ec36f701d2605b51eefed4326ddf5#code) | [✅](https://sepolia.basescan.org/address/0x94fb7908257ec36f701d2605b51eefed4326ddf5#code) |
-| MissionFactory | [`0xee9234954b134c39c17a75482da78e46b16f466c`](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c#code) | [✅](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c#code) |
-| MissionEscrow (Implementation) | [`0x873Ea710B6b289b0e9D6867B1630066e9721B5c9`](https://sepolia.basescan.org/address/0x873Ea710B6b289b0e9D6867B1630066e9721B5c9#code) | [✅](https://sepolia.basescan.org/address/0x873Ea710B6b289b0e9D6867B1630066e9721B5c9#code) |
-| GuildFactory | [`0xfeae3538a4a1801e47b6d16104aa8586edb55f00`](https://sepolia.basescan.org/address/0xfeae3538a4a1801e47b6d16104aa8586edb55f00#code) | [✅](https://sepolia.basescan.org/address/0xfeae3538a4a1801e47b6d16104aa8586edb55f00#code) |
-| ReputationAttestations | [`0xedae9682a0fb6fb3c18d6865461f67db7d748002`](https://sepolia.basescan.org/address/0xedae9682a0fb6fb3c18d6865461f67db7d748002#code) | [✅](https://sepolia.basescan.org/address/0xedae9682a0fb6fb3c18d6865461f67db7d748002#code) |
-| DisputeResolver | [`0xb00ac4278129928aecc72541b0bcd69d94c1691e`](https://sepolia.basescan.org/address/0xb00ac4278129928aecc72541b0bcd69d94c1691e#code) | [✅](https://sepolia.basescan.org/address/0xb00ac4278129928aecc72541b0bcd69d94c1691e#code) |
-| HorizonAchievements | [`0x568e0e3102bfa1f4045d3f62559c0f9823b469bc`](https://sepolia.basescan.org/address/0x568e0e3102bfa1f4045d3f62559c0f9823b469bc#code) | [✅](https://sepolia.basescan.org/address/0x568e0e3102bfa1f4045d3f62559c0f9823b469bc#code) |
+| [PaymentRouter](./src/PaymentRouter.sol) | [`0x94fb7908257ec36f701d2605b51eefed4326ddf5`](https://sepolia.basescan.org/address/0x94fb7908257ec36f701d2605b51eefed4326ddf5#code) | [✅](https://sepolia.basescan.org/address/0x94fb7908257ec36f701d2605b51eefed4326ddf5#code) |
+| [MissionFactory](./src/MissionFactory.sol) | [`0xee9234954b134c39c17a75482da78e46b16f466c`](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c#code) | [✅](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c#code) |
+| [MissionEscrow (Implementation)](./src/MissionEscrow.sol) | [`0x873Ea710B6b289b0e9D6867B1630066e9721B5c9`](https://sepolia.basescan.org/address/0x873Ea710B6b289b0e9D6867B1630066e9721B5c9#code) | [✅](https://sepolia.basescan.org/address/0x873Ea710B6b289b0e9D6867B1630066e9721B5c9#code) |
+| [GuildFactory](./src/GuildFactory.sol) | [`0xfeae3538a4a1801e47b6d16104aa8586edb55f00`](https://sepolia.basescan.org/address/0xfeae3538a4a1801e47b6d16104aa8586edb55f00#code) | [✅](https://sepolia.basescan.org/address/0xfeae3538a4a1801e47b6d16104aa8586edb55f00#code) |
+| [ReputationAttestations](./src/ReputationAttestations.sol) | [`0xedae9682a0fb6fb3c18d6865461f67db7d748002`](https://sepolia.basescan.org/address/0xedae9682a0fb6fb3c18d6865461f67db7d748002#code) | [✅](https://sepolia.basescan.org/address/0xedae9682a0fb6fb3c18d6865461f67db7d748002#code) |
+| [DisputeResolver](./src/DisputeResolver.sol) | [`0xb00ac4278129928aecc72541b0bcd69d94c1691e`](https://sepolia.basescan.org/address/0xb00ac4278129928aecc72541b0bcd69d94c1691e#code) | [✅](https://sepolia.basescan.org/address/0xb00ac4278129928aecc72541b0bcd69d94c1691e#code) |
+| [HorizonAchievements](./src/HorizonAchievements.sol) | [`0x568e0e3102bfa1f4045d3f62559c0f9823b469bc`](https://sepolia.basescan.org/address/0x568e0e3102bfa1f4045d3f62559c0f9823b469bc#code) | [✅](https://sepolia.basescan.org/address/0x568e0e3102bfa1f4045d3f62559c0f9823b469bc#code) |
 
 **Base Sepolia USDC:** [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e#code)
 
@@ -84,7 +84,7 @@ sequenceDiagram
 
 ### Core Contracts
 
-#### `MissionFactory.sol`
+#### [`MissionFactory.sol`](./src/MissionFactory.sol)
 Factory for deploying `MissionEscrow` clones using EIP-1167 minimal proxies.
 
 ```solidity
@@ -97,7 +97,7 @@ function createMission(
 ) external returns (uint256 missionId);
 ```
 
-#### `MissionEscrow.sol`
+#### [`MissionEscrow.sol`](./src/MissionEscrow.sol)
 Individual escrow contract for each mission with full lifecycle management.
 
 **States:** `Open` → `Accepted` → `Submitted` → `Completed`/`Cancelled`/`Disputed`
@@ -111,7 +111,7 @@ function raiseDispute(bytes32 disputeHash) external;  // Raise dispute
 function claimExpired() external;            // Claim expired mission funds
 ```
 
-#### `PaymentRouter.sol`
+#### [`PaymentRouter.sol`](./src/PaymentRouter.sol)
 Routes payments with configurable fee splits.
 
 **Fee Structure:**
@@ -124,7 +124,7 @@ Routes payments with configurable fee splits.
 | Guild Fee | 0-15% (variable) | Guild Treasury |
 | Performer | 90% - guildFee | Performer |
 
-#### `DisputeResolver.sol`
+#### [`DisputeResolver.sol`](./src/DisputeResolver.sol)
 Handles mission disputes with economic incentives.
 
 **Mechanisms:**
@@ -139,7 +139,7 @@ Handles mission disputes with economic incentives.
 
 ### Governance Contracts
 
-#### `GuildDAO.sol`
+#### [`GuildDAO.sol`](./src/GuildDAO.sol)
 Guild governance with role-based access control.
 
 **Roles:**
@@ -147,12 +147,12 @@ Guild governance with role-based access control.
 - `OFFICER_ROLE` - Member management
 - `CURATOR_ROLE` - Mission board curation
 
-#### `GuildFactory.sol`
+#### [`GuildFactory.sol`](./src/GuildFactory.sol)
 Factory for deploying `GuildDAO` clones.
 
 ### Supporting Contracts
 
-#### `ReputationAttestations.sol`
+#### [`ReputationAttestations.sol`](./src/ReputationAttestations.sol)
 On-chain reputation and rating storage.
 
 ```solidity
@@ -166,7 +166,7 @@ function submitRating(
 function getAverageRating(address user) external view returns (uint256 average, uint256 count);
 ```
 
-#### `HorizonAchievements.sol`
+#### [`HorizonAchievements.sol`](./src/HorizonAchievements.sol)
 ERC-721 achievements with soulbound support.
 
 **Categories:**
@@ -263,9 +263,9 @@ forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --verify
 
 All contracts implement well-defined interfaces for integration:
 
-- `IMissionEscrow.sol` - Mission lifecycle interface
-- `IPaymentRouter.sol` - Payment routing interface
-- `IDisputeResolver.sol` - Dispute resolution interface
+- [`IMissionEscrow.sol`](./src/interfaces/IMissionEscrow.sol) - Mission lifecycle interface
+- [`IPaymentRouter.sol`](./src/interfaces/IPaymentRouter.sol) - Payment routing interface
+- [`IDisputeResolver.sol`](./src/interfaces/IDisputeResolver.sol) - Dispute resolution interface
 
 ## 🔒 Security
 
