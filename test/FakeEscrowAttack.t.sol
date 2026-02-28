@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import { Test, console } from "forge-std/Test.sol";
 import { MissionFactory } from "../src/MissionFactory.sol";
 import { MissionEscrow } from "../src/MissionEscrow.sol";
+import { IDisputeResolver } from "../src/interfaces/IDisputeResolver.sol";
 import { PaymentRouter } from "../src/PaymentRouter.sol";
 import { DisputeResolver } from "../src/DisputeResolver.sol";
 import { IMissionEscrow } from "../src/interfaces/IMissionEscrow.sol";
@@ -106,7 +107,7 @@ contract FakeEscrowAttack is Test {
 
         // 3. Attacker raises dispute linked to REAL missionId (1) but FAKE escrow
         // EXPECT REVERT
-        vm.expectRevert(DisputeResolver.InvalidEscrow.selector);
+        vm.expectRevert(IDisputeResolver.InvalidEscrow.selector);
         resolver.createDispute(address(fakeEscrow), missionId, keccak256("fake_evidence"));
         vm.stopPrank();
 
