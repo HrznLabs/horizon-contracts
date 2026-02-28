@@ -26,6 +26,6 @@
 **Learning:** Command line tools are often purely utilitarian. Adding visual cues (emojis) to `make help` or CLI outputs improves scannability and adds a touch of delight for developers.
 **Action:** When creating CLI help text, use icons to categorize commands and improve visual hierarchy.
 
-## 2026-02-26 - Documentation is Part of the UI
-**Learning:** Developers often scan READMEs looking for the contract implementation. By deep-linking contract names directly to their source files, we reduce friction and make the codebase more explorable. This is a subtle but powerful DX improvement.
-**Action:** When documenting architecture or deployed addresses, always link to the source code.
+## 2026-02-27 - Contextual State Errors
+**Learning:** Generic `InvalidState` errors in smart contracts are a black box for frontend developers, forcing them to guess why a transaction failed. Returning `InvalidState(CurrentState)` provides immediate context, allowing the UI to explain *why* an action is blocked (e.g., "Mission is already Submitted" vs "Mission is Expired").
+**Action:** Always include the current state as a parameter in state-related custom errors.
