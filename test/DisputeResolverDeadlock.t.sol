@@ -37,13 +37,15 @@ contract DisputeResolverDeadlock is Test {
         paymentRouter =
             new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury);
 
-        // Deploy DisputeResolver
-        resolver = new DisputeResolver(
-            address(usdc), resolversDAO, protocolDAO, protocolTreasury, resolverTreasury
-        );
-
         // Deploy MissionFactory
         factory = new MissionFactory(address(usdc), address(paymentRouter));
+
+        // Deploy DisputeResolver
+        resolver = new DisputeResolver(
+            address(usdc), address(factory), resolversDAO, protocolDAO, protocolTreasury, resolverTreasury
+        );
+
+        // Set DisputeResolver in Factory
         factory.setDisputeResolver(address(resolver));
 
         // Setup Router to allow Factory
