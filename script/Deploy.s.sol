@@ -74,6 +74,7 @@ contract DeployScript is Script {
         console.log("5. Deploying DisputeResolver...");
         DisputeResolver disputeResolver = new DisputeResolver(
             USDC_BASE_SEPOLIA,
+            address(missionFactory), // MissionFactory
             JOLLYV_ETH, // ResolversDAO
             JOLLYV_ETH, // ProtocolDAO
             JOLLYV_ETH, // Protocol treasury
