@@ -100,6 +100,7 @@ interface IDisputeResolver {
     error ResolverAlreadyAssigned();
     error EvidenceAlreadySubmitted();
     error InvalidOutcome();
+    error InvalidEscrow();
 
     // =============================================================================
     // FUNCTIONS
