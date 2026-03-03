@@ -44,7 +44,12 @@ contract DisputeResolverSecurity is Test {
 
         // Deploy DisputeResolver
         disputeResolverContract = new DisputeResolver(
-            address(usdc), address(factory), resolversDAO, protocolDAO, protocolTreasury, resolverTreasury
+            address(usdc),
+            address(factory),
+            resolversDAO,
+            protocolDAO,
+            protocolTreasury,
+            resolverTreasury
         );
 
         factory.setDisputeResolver(address(disputeResolverContract));

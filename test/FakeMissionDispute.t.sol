@@ -46,15 +46,34 @@ contract FakeMissionEscrow is IMissionEscrow {
     }
 
     // Boilerplate for interface compliance
-    function initialize(uint96, address, uint96, uint64, address, bytes32, bytes32, address, address, address, address) external {}
-    function acceptMission() external {}
-    function submitProof(bytes32) external {}
-    function approveCompletion() external {}
-    function cancelMission() external {}
-    function claimExpired() external {}
-    function settleDispute(uint8, uint256) external {}
-    function getMissionId() external view returns (uint256) { return 1; }
-    function getDisputeResolver() external view returns (address) { return disputeResolver; }
+    function initialize(
+        uint96,
+        address,
+        uint96,
+        uint64,
+        address,
+        bytes32,
+        bytes32,
+        address,
+        address,
+        address,
+        address
+    ) external { }
+    function acceptMission() external { }
+    function submitProof(bytes32) external { }
+    function approveCompletion() external { }
+    function cancelMission() external { }
+    function claimExpired() external { }
+    function settleDispute(uint8, uint256) external { }
+
+    function getMissionId() external view returns (uint256) {
+        return 1;
+    }
+
+    function getDisputeResolver() external view returns (address) {
+        return disputeResolver;
+    }
+
     function getParticipants() external view returns (address, address, MissionState) {
         return (poster, performer, MissionState.Accepted);
     }
@@ -108,11 +127,7 @@ contract FakeMissionDisputeTest is Test {
 
         // Expect Revert: InvalidEscrow
         vm.expectRevert(IDisputeResolver.InvalidEscrow.selector);
-        disputeResolver.createDispute(
-            address(fakeEscrow),
-            999,
-            keccak256("fake_evidence")
-        );
+        disputeResolver.createDispute(address(fakeEscrow), 999, keccak256("fake_evidence"));
 
         vm.stopPrank();
     }
