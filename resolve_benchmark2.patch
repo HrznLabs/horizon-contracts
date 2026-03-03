@@ -1,0 +1,12 @@
+--- src/DisputeResolver.sol
++++ src/DisputeResolver.sol
+@@ -216,7 +216,9 @@
+     {
+         Dispute storage dispute = _disputes[disputeId];
+
+-        if (msg.sender != dispute.resolver) {
++        address resolver = dispute.resolver;
++
++        if (msg.sender != resolver) {
+             revert NotResolver();
+         }

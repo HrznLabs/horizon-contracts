@@ -1,0 +1,22 @@
+--- src/MissionEscrow.sol
++++ src/MissionEscrow.sol
+@@ -231,16 +231,16 @@
+         if (_state != MissionState.Disputed) revert InvalidState(_state);
+
+         // Cache storage variables to stack to save SLOADs
+-        uint96 rewardAmount = _rewardAmount;
+         address usdc = _usdc;
+         address poster = _poster;
+         address paymentRouter = _paymentRouter;
+         uint96 missionId = _missionId;
+         address performer = _performer;
+         address guild = _guild;
+         address reputationAttestations = _reputationAttestations;
+
+         uint256 posterAmount = 0;
+         uint256 performerAmount = 0;
+
++        uint96 rewardAmount = _rewardAmount;
+         if (outcome == 1) {
+             // PosterWins: Poster gets full refund
+             posterAmount = rewardAmount;
