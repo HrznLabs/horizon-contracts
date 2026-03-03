@@ -42,7 +42,12 @@ contract DisputeResolverDeadlock is Test {
 
         // Deploy DisputeResolver
         resolver = new DisputeResolver(
-            address(usdc), address(factory), resolversDAO, protocolDAO, protocolTreasury, resolverTreasury
+            address(usdc),
+            address(factory),
+            resolversDAO,
+            protocolDAO,
+            protocolTreasury,
+            resolverTreasury
         );
 
         // Set DisputeResolver in Factory
