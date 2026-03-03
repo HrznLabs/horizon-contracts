@@ -32,21 +32,40 @@ contract FakeEscrow is IMissionEscrow {
         return runtime;
     }
 
-    function raiseDispute(bytes32) external {}
+    function raiseDispute(bytes32) external { }
 
     // Implement other interface functions as stubs
-    function initialize(uint96, address, uint96, uint64, address, bytes32, bytes32, address, address, address, address) external {}
-    function acceptMission() external {}
-    function submitProof(bytes32) external {}
-    function approveCompletion() external {}
-    function cancelMission() external {}
-    function claimExpired() external {}
-    function getMissionId() external view returns (uint256) { return 0; }
-    function getDisputeResolver() external view returns (address) { return address(0); }
+    function initialize(
+        uint96,
+        address,
+        uint96,
+        uint64,
+        address,
+        bytes32,
+        bytes32,
+        address,
+        address,
+        address,
+        address
+    ) external { }
+    function acceptMission() external { }
+    function submitProof(bytes32) external { }
+    function approveCompletion() external { }
+    function cancelMission() external { }
+    function claimExpired() external { }
+
+    function getMissionId() external view returns (uint256) {
+        return 0;
+    }
+
+    function getDisputeResolver() external view returns (address) {
+        return address(0);
+    }
+
     function getParticipants() external view returns (address, address, MissionState) {
         return (params.poster, runtime.performer, runtime.state);
     }
-    function settleDispute(uint8, uint256) external {}
+    function settleDispute(uint8, uint256) external { }
 }
 
 contract FakeEscrowAttack is Test {
@@ -71,12 +90,18 @@ contract FakeEscrowAttack is Test {
     function setUp() public {
         vm.startPrank(owner);
         usdc = new MockERC20("USDC", "USDC", 6);
-        paymentRouter = new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury);
+        paymentRouter =
+            new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury);
 
         factory = new MissionFactory(address(usdc), address(paymentRouter));
 
         resolver = new DisputeResolver(
-            address(usdc), address(factory), resolversDAO, protocolDAO, protocolTreasury, resolverTreasury
+            address(usdc),
+            address(factory),
+            resolversDAO,
+            protocolDAO,
+            protocolTreasury,
+            resolverTreasury
         );
 
         factory.setDisputeResolver(address(resolver));
@@ -96,7 +121,9 @@ contract FakeEscrowAttack is Test {
     function test_FakeEscrowAttack() public {
         // 1. Poster creates a REAL mission (ID 1)
         vm.prank(poster);
-        uint256 missionId = factory.createMission(REWARD_AMOUNT, block.timestamp + 1 days, address(0), bytes32(0), bytes32(0));
+        uint256 missionId = factory.createMission(
+            REWARD_AMOUNT, block.timestamp + 1 days, address(0), bytes32(0), bytes32(0)
+        );
 
         // 2. Attacker deploys FakeEscrow
         vm.startPrank(attacker);

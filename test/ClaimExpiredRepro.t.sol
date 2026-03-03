@@ -64,7 +64,11 @@ contract ClaimExpiredRepro is Test {
 
         // 5. Poster claims expired funds - SHOULD REVERT
         vm.prank(poster);
-        vm.expectRevert(abi.encodeWithSelector(IMissionEscrow.InvalidState.selector, IMissionEscrow.MissionState.Disputed));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IMissionEscrow.InvalidState.selector, IMissionEscrow.MissionState.Disputed
+            )
+        );
         escrow.claimExpired();
 
         // 6. Assertions

@@ -132,23 +132,21 @@ contract ReputationAttestations is Ownable {
         if (isPoster && ratee != performer) revert InvalidCounterparty();
         if (isPerformer && ratee != poster) revert InvalidCounterparty();
 
-        // Cache storage pointer to save gas on redundant SLOADs
-        PackedRating storage rating = _ratings[missionId][msg.sender][ratee];
-
         // Check if already rated
-        if (rating.score != 0) {
+        if (_ratings[missionId][msg.sender][ratee].score != 0) {
             revert AlreadyRated();
         }
 
-        // Store rating directly to avoid memory-to-storage copy overhead
-        rating.score = score;
-        rating.timestamp = uint64(block.timestamp);
-        rating.commentHash = commentHash;
+        // Store rating
+        _ratings[missionId][msg.sender][ratee] = PackedRating({
+            score: score, timestamp: uint64(block.timestamp), commentHash: commentHash
+        });
 
-        // Update ratee's statistics using storage pointer
-        RatingStats storage stats = _ratingStats[ratee];
+        // Update ratee's statistics
+        RatingStats memory stats = _ratingStats[ratee];
         stats.count++;
         stats.sum += score;
+        _ratingStats[ratee] = stats;
 
         emit RatingSubmitted(missionId, msg.sender, ratee, score, commentHash);
     }
@@ -262,4 +260,3 @@ contract ReputationAttestations is Ownable {
         authorizedContracts[_contract] = false;
     }
 }
-
