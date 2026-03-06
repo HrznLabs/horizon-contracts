@@ -328,11 +328,11 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         if (_state != MissionState.Disputed) revert InvalidState(_state);
 
         // Cache storage variables to stack to save SLOADs
-        uint96 rewardAmount = _rewardAmount;
+        uint256 rewardAmount = uint256(_rewardAmount);
         address usdc = _usdc;
         address poster = _poster;
         address paymentRouter = _paymentRouter;
-        uint96 missionId = _missionId;
+        uint256 missionId = uint256(_missionId);
         address performer = _performer;
         address guild = _guild;
         address reputationAttestations = _reputationAttestations;
@@ -348,13 +348,13 @@ contract MissionEscrow is Initializable, IMissionEscrow {
             performerAmount = rewardAmount;
         } else if (outcome == 3) {
             // Split: Distribute based on splitPercentage
-            performerAmount = (uint256(rewardAmount) * splitPercentage) / 10_000;
-            posterAmount = uint256(rewardAmount) - performerAmount;
+            performerAmount = (rewardAmount * splitPercentage) / 10_000;
+            posterAmount = rewardAmount - performerAmount;
         } else if (outcome == 4) {
             // Cancelled: Poster gets refund
             posterAmount = rewardAmount;
         } else {
-            revert InvalidState(_state);
+            revert InvalidState(MissionState.Disputed);
         }
 
         // Update state
