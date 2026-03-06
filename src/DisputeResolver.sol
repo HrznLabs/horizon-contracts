@@ -504,8 +504,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
 
         // First, settle the escrow reward distribution
         IMissionEscrow escrow = IMissionEscrow(dispute.escrowAddress);
+
+        // Cache dispute outcome to save SLOAD operations in subsequent conditionals
+        DisputeOutcome outcome = dispute.outcome;
         uint256 splitBps = _splitPercentages[disputeId];
-        escrow.settleDispute(uint8(dispute.outcome), splitBps);
+        escrow.settleDispute(uint8(outcome), splitBps);
 
         // Now handle DDR distributions
         uint256 posterDDR = _ddrDeposits[disputeId][dispute.poster];
@@ -520,17 +523,17 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         uint256 posterPayout = 0;
         uint256 performerPayout = 0;
 
-        if (dispute.outcome == DisputeOutcome.PosterWins) {
+        if (outcome == DisputeOutcome.PosterWins) {
             // Poster wins: gets remaining DDR
             posterPayout = remainingDDR;
-        } else if (dispute.outcome == DisputeOutcome.PerformerWins) {
+        } else if (outcome == DisputeOutcome.PerformerWins) {
             // Performer wins: gets remaining DDR
             performerPayout = remainingDDR;
-        } else if (dispute.outcome == DisputeOutcome.Split) {
+        } else if (outcome == DisputeOutcome.Split) {
             // Split: DDR returned proportionally
             posterPayout = (remainingDDR * (10_000 - splitBps)) / 10_000;
             performerPayout = (remainingDDR * splitBps) / 10_000;
-        } else if (dispute.outcome == DisputeOutcome.Cancelled) {
+        } else if (outcome == DisputeOutcome.Cancelled) {
             // Cancelled: DDR returned proportionally to what each deposited
             if (totalDDR > 0) {
                 posterPayout = (remainingDDR * posterDDR) / totalDDR;
@@ -553,7 +556,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         emit DisputeFinalized(
-            disputeId, dispute.outcome, posterPayout, performerPayout, resolverFee, protocolFee
+            disputeId, outcome, posterPayout, performerPayout, resolverFee, protocolFee
         );
     }
 }
