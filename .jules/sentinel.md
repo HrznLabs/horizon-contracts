@@ -46,3 +46,7 @@
 **Vulnerability:** `raiseDispute` allowed a performer to dispute a mission after it had expired, even if they hadn't submitted any work, blocking the poster from reclaiming funds.
 **Learning:** Time-based state transitions (like expiration) must be enforced on all actions that can alter the state, especially those that can lock funds or prevent other valid transitions.
 **Prevention:** Ensure that "cleanup" actions (like `claimExpired`) are not blocked by actions that should be invalid after the deadline (like raising a dispute without submission).
+## 2025-06-18 - [Privilege Retention in DAO]
+**Vulnerability:** The `GuildDAO.removeMember` function marked a member as removed (`isMember = false`) but failed to explicitly revoke assigned access control roles like `ADMIN_ROLE`, `OFFICER_ROLE`, or `CURATOR_ROLE`. This allowed an ousted member to retain their administrative privileges.
+**Learning:** Removing a user from a system's membership list does not automatically revoke their associated role-based access control (RBAC) permissions unless explicitly programmed to do so.
+**Prevention:** When implementing member removal or suspension logic, explicitly check for and revoke any associated roles or privileges granted to that user.
