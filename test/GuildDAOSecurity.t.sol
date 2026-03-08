@@ -26,19 +26,20 @@ contract GuildDAOSecurityTest is Test {
         vm.stopPrank();
     }
 
-    function test_OfficerCanRemoveAdmin() public {
+    function test_OfficerCannotRemoveAdmin() public {
         assertTrue(guild.isAdmin(admin));
         assertTrue(guild.isMember(admin));
 
-        // Officer removes admin
+        // Officer tries to remove admin
         vm.prank(officer);
+        vm.expectRevert(GuildDAO.CannotRemoveAdmin.selector);
         guild.removeMember(admin);
 
-        assertFalse(guild.isMember(admin));
+        assertTrue(guild.isMember(admin));
 
-        // Admin should no longer have the role
-        assertFalse(guild.isAdmin(admin));
-        assertFalse(guild.isOfficer(admin));
-        assertFalse(guild.isCurator(admin));
+        // Admin should still have the role
+        assertTrue(guild.isAdmin(admin));
+        assertTrue(guild.isOfficer(admin));
+        assertTrue(guild.isCurator(admin));
     }
 }

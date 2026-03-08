@@ -81,6 +81,7 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     error AlreadyMember();
     error NotMember();
     error InvalidFee();
+    error CannotRemoveAdmin();
 
     // =============================================================================
     // INITIALIZATION
@@ -147,6 +148,7 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      */
     function removeMember(address member) external onlyRole(OFFICER_ROLE) {
         if (!_members[member].isMember) revert NotMember();
+        if (hasRole(DEFAULT_ADMIN_ROLE, member)) revert CannotRemoveAdmin();
 
         _members[member].isMember = false;
         _members[member].leftAt = uint64(block.timestamp);
