@@ -19,7 +19,7 @@ contract PaymentRouterAuthRepro is Test {
     function setUp() public {
         vm.startPrank(owner);
         usdc = new MockERC20("USD Coin", "USDC", 6);
-        router = new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury);
+        router = new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury, owner);
         vm.stopPrank();
 
         // Fund the router (simulate stuck funds or accidental transfer)
@@ -40,6 +40,7 @@ contract PaymentRouterAuthRepro is Test {
         router.settlePayment(
             12_345, // fake missionId
             attacker,
+            address(usdc), // payment token
             1000e6, // Amount to drain
             address(0) // No guild
         );
