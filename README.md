@@ -1,3 +1,12 @@
+> **Note: Reference-Only Repository**
+>
+> This is a **reference-only mirror** of the Horizon Protocol smart contracts.
+> Active development happens in the [main monorepo](https://github.com/HrznLabs/horizon).
+> This repo contains the v2.2 core contracts only. M5 token economics contracts
+> are in the monorepo at `packages/contracts/`.
+>
+> **Do not submit PRs here** — contribute to the monorepo instead.
+
 # Horizon Protocol Smart Contracts
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -185,6 +194,8 @@ function hasAchievement(address user, uint256 typeId) external view returns (boo
 ## 🚀 Getting Started
 
 ### Prerequisites
+
+> For the latest contracts including M5 token economics, clone the [main monorepo](https://github.com/HrznLabs/horizon) instead.
 
 - [Foundry](https://book.getfoundry.sh/getting-started/installation)
 - [Node.js](https://nodejs.org/) (for scripts)
