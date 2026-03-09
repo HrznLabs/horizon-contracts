@@ -32,6 +32,7 @@ interface IMissionEscrow {
         address guild;
         bytes32 metadataHash;
         bytes32 locationHash;
+        uint256 minReputation;  // Minimum reputation score to accept (0 = no restriction)
     }
 
     struct MissionRuntime {
@@ -50,9 +51,7 @@ interface IMissionEscrow {
     event MissionCompleted(uint256 indexed id);
     event MissionCancelled(uint256 indexed id);
     event MissionDisputed(uint256 indexed id, address indexed by, bytes32 disputeHash);
-    event DisputeSettled(
-        uint256 indexed id, uint8 outcome, uint256 posterAmount, uint256 performerAmount
-    );
+    event DisputeSettled(uint256 indexed id, uint8 outcome, uint256 posterAmount, uint256 performerAmount);
 
     // =============================================================================
     // ERRORS
@@ -61,29 +60,32 @@ interface IMissionEscrow {
     error InvalidState();
     error NotPoster();
     error NotPerformer();
-    error NotParty();
     error NotDisputeResolver();
-    error NotParty();
     error MissionExpired();
     error MissionNotExpired();
     error AlreadyAccepted();
     error DisputeAlreadyRaised();
+    error Paused();
+    error InsufficientReputation(uint256 actual, uint256 required);
 
     // =============================================================================
     // FUNCTIONS
     // =============================================================================
 
     function initialize(
-        uint96 missionId,
+        uint256 missionId,
         address poster,
-        uint96 rewardAmount,
-        uint64 expiresAt,
+        uint256 rewardAmount,
+        uint256 expiresAt,
         address guild,
         bytes32 metadataHash,
         bytes32 locationHash,
         address paymentRouter,
-        address usdc,
-        address disputeResolver
+        address paymentToken,
+        address disputeResolver,
+        address pauseRegistryAddr,
+        uint256 minReputation,
+        address reputationOracle
     ) external;
 
     function acceptMission() external;
@@ -92,7 +94,7 @@ interface IMissionEscrow {
     function cancelMission() external;
     function raiseDispute(bytes32 disputeHash) external;
     function claimExpired() external;
-
+    
     /// @notice Settle escrow based on dispute outcome (called by DisputeResolver)
     /// @param outcome 0=None, 1=PosterWins, 2=PerformerWins, 3=Split, 4=Cancelled
     /// @param splitPercentage For Split outcome, performer's share in basis points (0-10000)
@@ -101,5 +103,6 @@ interface IMissionEscrow {
     function getParams() external view returns (MissionParams memory);
     function getRuntime() external view returns (MissionRuntime memory);
     function getMissionId() external view returns (uint256);
-    function getDisputeResolver() external view returns (address);
 }
+
+

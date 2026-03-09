@@ -24,10 +24,10 @@ contract DisputeAfterExpiryTest is Test {
     function setUp() public {
         vm.startPrank(owner);
         usdc = new MockERC20("USDC", "USDC", 6);
-        paymentRouter = new PaymentRouter(address(usdc), address(5), address(6), address(7));
-        factory = new MissionFactory(address(usdc), address(paymentRouter));
+        paymentRouter = new PaymentRouter(address(usdc), address(5), address(6), address(7), owner);
+        factory = new MissionFactory(address(paymentRouter));
         factory.setDisputeResolver(disputeResolver);
-        factory.transferOwnership(owner);
+        paymentRouter.setMissionFactory(address(factory));
         vm.stopPrank();
 
         usdc.mint(poster, 1000e6);
@@ -40,7 +40,7 @@ contract DisputeAfterExpiryTest is Test {
         vm.startPrank(poster);
         uint256 expiresAt = block.timestamp + 1 days;
         uint256 missionId =
-            factory.createMission(REWARD_AMOUNT, expiresAt, address(0), bytes32(0), bytes32(0));
+            factory.createMission(address(usdc), REWARD_AMOUNT, expiresAt, address(0), bytes32(0), bytes32(0));
         vm.stopPrank();
 
         address escrowAddress = factory.missions(missionId);
@@ -74,7 +74,7 @@ contract DisputeAfterExpiryTest is Test {
         vm.startPrank(poster);
         uint256 expiresAt = block.timestamp + 1 days;
         uint256 missionId =
-            factory.createMission(REWARD_AMOUNT, expiresAt, address(0), bytes32(0), bytes32(0));
+            factory.createMission(address(usdc), REWARD_AMOUNT, expiresAt, address(0), bytes32(0), bytes32(0));
         vm.stopPrank();
 
         address escrowAddress = factory.missions(missionId);

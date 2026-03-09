@@ -13,19 +13,19 @@ interface IDisputeResolver {
 
     enum DisputeState {
         None,
-        Pending, // Dispute raised, awaiting resolver assignment
-        Investigating, // Resolver assigned, collecting evidence
-        Resolved, // Resolution reached
-        Appealed, // Resolution appealed to DAO
-        Finalized // Final resolution, funds distributed
+        Pending,        // Dispute raised, awaiting resolver assignment
+        Investigating,  // Resolver assigned, collecting evidence
+        Resolved,       // Resolution reached
+        Appealed,       // Resolution appealed to DAO
+        Finalized       // Final resolution, funds distributed
     }
 
     enum DisputeOutcome {
         None,
-        PosterWins, // Performer failed to deliver
-        PerformerWins, // Performer completed correctly
-        Split, // Partial fault on both sides
-        Cancelled // Dispute withdrawn or voided
+        PosterWins,     // Performer failed to deliver
+        PerformerWins,  // Performer completed correctly
+        Split,          // Partial fault on both sides
+        Cancelled       // Dispute withdrawn or voided
     }
 
     // =============================================================================
@@ -38,15 +38,15 @@ interface IDisputeResolver {
         uint256 missionId;
         address poster;
         address performer;
-        address initiator; // Who raised the dispute
+        address initiator;          // Who raised the dispute
         DisputeState state;
         DisputeOutcome outcome;
-        address resolver; // Assigned resolver
-        uint256 ddrAmount; // DDR deposited
-        uint256 lppAmount; // LPP penalty amount
+        address resolver;           // Assigned resolver
+        uint256 ddrAmount;          // DDR deposited
+        uint256 lppAmount;          // LPP penalty amount
         bytes32 posterEvidenceHash;
         bytes32 performerEvidenceHash;
-        bytes32 resolutionHash; // Hash of resolution details
+        bytes32 resolutionHash;     // Hash of resolution details
         uint256 createdAt;
         uint256 resolvedAt;
         uint256 appealDeadline;
@@ -64,17 +64,27 @@ interface IDisputeResolver {
         uint256 ddrAmount
     );
 
-    event ResolverAssigned(uint256 indexed disputeId, address indexed resolver);
+    event ResolverAssigned(
+        uint256 indexed disputeId,
+        address indexed resolver
+    );
 
     event EvidenceSubmitted(
-        uint256 indexed disputeId, address indexed submitter, bytes32 evidenceHash
+        uint256 indexed disputeId,
+        address indexed submitter,
+        bytes32 evidenceHash
     );
 
     event DisputeResolved(
-        uint256 indexed disputeId, DisputeOutcome outcome, bytes32 resolutionHash
+        uint256 indexed disputeId,
+        DisputeOutcome outcome,
+        bytes32 resolutionHash
     );
 
-    event DisputeAppealed(uint256 indexed disputeId, address indexed appellant);
+    event DisputeAppealed(
+        uint256 indexed disputeId,
+        address indexed appellant
+    );
 
     event DisputeFinalized(
         uint256 indexed disputeId,
@@ -83,6 +93,22 @@ interface IDisputeResolver {
         uint256 performerPayout,
         uint256 resolverFee,
         uint256 protocolFee
+    );
+
+    event DDRTimeoutForfeiture(
+        uint256 indexed disputeId,
+        address indexed forfeiter,
+        address indexed depositor
+    );
+
+    event ResolverInactionTimeout(
+        uint256 indexed disputeId,
+        address indexed resolver
+    );
+
+    event GuildDDRTimeoutSet(
+        address indexed guild,
+        uint256 timeout
     );
 
     // =============================================================================
@@ -100,15 +126,21 @@ interface IDisputeResolver {
     error ResolverAlreadyAssigned();
     error EvidenceAlreadySubmitted();
     error InvalidOutcome();
+    error TimeoutNotReached();
+    error DDRDeadlinePassed();
+    error NotDepositor();
+    error InvalidTimeout();
 
     // =============================================================================
     // FUNCTIONS
     // =============================================================================
 
     /// @notice Create a new dispute for a mission
-    function createDispute(address escrowAddress, uint256 missionId, bytes32 evidenceHash)
-        external
-        returns (uint256 disputeId);
+    function createDispute(
+        address escrowAddress,
+        uint256 missionId,
+        bytes32 evidenceHash
+    ) external returns (uint256 disputeId);
 
     /// @notice Assign a resolver to a dispute (called by ResolversDAO)
     function assignResolver(uint256 disputeId, address resolver) external;
@@ -144,5 +176,11 @@ interface IDisputeResolver {
     function getDDRRate() external view returns (uint256);
     function getLPPRate() external view returns (uint256);
     function getAppealPeriod() external view returns (uint256);
+
+    /// @notice Claim DDR timeout when other party fails to deposit
+    function claimDDRTimeout(uint256 disputeId) external;
+
+    /// @notice Claim resolver inaction timeout 
+    function claimResolverTimeout(uint256 disputeId) external;
 }
 
