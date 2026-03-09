@@ -153,6 +153,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      */
     function acceptMission() external inState(MissionState.Open) notExpired {
         if (_performer != address(0)) revert AlreadyAccepted();
+        if (msg.sender == _poster) revert CannotAcceptOwnMission();
 
         _performer = msg.sender;
         _state = MissionState.Accepted;

@@ -68,6 +68,7 @@ interface IMissionEscrow {
     error MissionExpired();
     error MissionNotExpired();
     error AlreadyAccepted();
+    error CannotAcceptOwnMission();
     error DisputeAlreadyRaised();
 
     // =============================================================================
