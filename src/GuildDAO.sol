@@ -81,6 +81,7 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     error AlreadyMember();
     error NotMember();
     error InvalidFee();
+    error CannotRemoveAdmin();
 
     // =============================================================================
     // INITIALIZATION
@@ -134,7 +135,8 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     function _addMember(address member) internal {
         if (_members[member].isMember) revert AlreadyMember();
 
-        _members[member] = GuildMember({ isMember: true, joinedAt: uint64(block.timestamp), leftAt: 0 });
+        _members[member] =
+            GuildMember({ isMember: true, joinedAt: uint64(block.timestamp), leftAt: 0 });
 
         memberCount++;
         emit GuildMemberAdded(address(this), member);
@@ -146,11 +148,19 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      */
     function removeMember(address member) external onlyRole(OFFICER_ROLE) {
         if (!_members[member].isMember) revert NotMember();
+        if (hasRole(DEFAULT_ADMIN_ROLE, member)) revert CannotRemoveAdmin();
 
         _members[member].isMember = false;
         _members[member].leftAt = uint64(block.timestamp);
 
         memberCount--;
+
+        // Revoke all roles
+        if (hasRole(DEFAULT_ADMIN_ROLE, member)) _revokeRole(DEFAULT_ADMIN_ROLE, member);
+        if (hasRole(ADMIN_ROLE, member)) _revokeRole(ADMIN_ROLE, member);
+        if (hasRole(OFFICER_ROLE, member)) _revokeRole(OFFICER_ROLE, member);
+        if (hasRole(CURATOR_ROLE, member)) _revokeRole(CURATOR_ROLE, member);
+
         emit GuildMemberRemoved(address(this), member);
     }
 

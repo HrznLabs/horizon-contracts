@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./interfaces/IDisputeResolver.sol";
 import "./interfaces/IMissionEscrow.sol";
+import "./interfaces/IMissionFactory.sol";
 
 /**
  * @title DisputeResolver
@@ -39,6 +40,9 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
 
     /// @notice USDC token for payments
     IERC20 public immutable usdc;
+
+    /// @notice MissionFactory address for validation
+    address public immutable missionFactory;
 
     /// @notice ResolversDAO address (can assign resolvers)
     address public resolversDAO;
@@ -86,17 +90,23 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
     mapping(uint256 => uint256) private _splitPercentages;
 
     // =============================================================================
+    // ERRORS
+    // =============================================================================
+
+    // =============================================================================
     // CONSTRUCTOR
     // =============================================================================
 
     constructor(
         address _usdc,
+        address _missionFactory,
         address _resolversDAO,
         address _protocolDAO,
         address _protocolTreasury,
         address _resolverTreasury
     ) Ownable(msg.sender) {
         usdc = IERC20(_usdc);
+        missionFactory = _missionFactory;
         resolversDAO = _resolversDAO;
         protocolDAO = _protocolDAO;
         protocolTreasury = _protocolTreasury;
@@ -138,6 +148,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         nonReentrant
         returns (uint256 disputeId)
     {
+        // Verify escrow address is valid
+        if (IMissionFactory(missionFactory).getMission(missionId) != escrowAddress) {
+            revert InvalidEscrow();
+        }
+
         // Verify escrow exists and is in disputed state
         IMissionEscrow escrow = IMissionEscrow(escrowAddress);
         IMissionEscrow.MissionParams memory params = escrow.getParams();
@@ -148,9 +163,10 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert NotParty();
         }
 
-        // Must be in submitted state or already disputed
+        // Must be in accepted, submitted or disputed state
         if (
-            runtime.state != IMissionEscrow.MissionState.Submitted
+            runtime.state != IMissionEscrow.MissionState.Accepted
+                && runtime.state != IMissionEscrow.MissionState.Submitted
                 && runtime.state != IMissionEscrow.MissionState.Disputed
         ) {
             revert InvalidDisputeState();
@@ -197,6 +213,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         // Track dispute
         _missionDisputes[missionId].push(disputeId);
         _escrowDispute[escrowAddress] = disputeId;
+
+        // Ensure escrow is locked by calling raiseDispute
+        if (!runtime.disputeRaised) {
+            IMissionEscrow(escrowAddress).raiseDispute(evidenceHash);
+        }
 
         emit DisputeCreated(disputeId, escrowAddress, missionId, msg.sender, ddrAmount);
     }
@@ -483,8 +504,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
 
         // First, settle the escrow reward distribution
         IMissionEscrow escrow = IMissionEscrow(dispute.escrowAddress);
+
+        // Cache dispute outcome to save SLOAD operations in subsequent conditionals
+        DisputeOutcome outcome = dispute.outcome;
         uint256 splitBps = _splitPercentages[disputeId];
-        escrow.settleDispute(uint8(dispute.outcome), splitBps);
+        escrow.settleDispute(uint8(outcome), splitBps);
 
         // Now handle DDR distributions
         uint256 posterDDR = _ddrDeposits[disputeId][dispute.poster];
@@ -499,17 +523,17 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         uint256 posterPayout = 0;
         uint256 performerPayout = 0;
 
-        if (dispute.outcome == DisputeOutcome.PosterWins) {
+        if (outcome == DisputeOutcome.PosterWins) {
             // Poster wins: gets remaining DDR
             posterPayout = remainingDDR;
-        } else if (dispute.outcome == DisputeOutcome.PerformerWins) {
+        } else if (outcome == DisputeOutcome.PerformerWins) {
             // Performer wins: gets remaining DDR
             performerPayout = remainingDDR;
-        } else if (dispute.outcome == DisputeOutcome.Split) {
+        } else if (outcome == DisputeOutcome.Split) {
             // Split: DDR returned proportionally
             posterPayout = (remainingDDR * (10_000 - splitBps)) / 10_000;
             performerPayout = (remainingDDR * splitBps) / 10_000;
-        } else if (dispute.outcome == DisputeOutcome.Cancelled) {
+        } else if (outcome == DisputeOutcome.Cancelled) {
             // Cancelled: DDR returned proportionally to what each deposited
             if (totalDDR > 0) {
                 posterPayout = (remainingDDR * posterDDR) / totalDDR;
@@ -532,8 +556,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         emit DisputeFinalized(
-            disputeId, dispute.outcome, posterPayout, performerPayout, resolverFee, protocolFee
+            disputeId, outcome, posterPayout, performerPayout, resolverFee, protocolFee
         );
     }
 }
-

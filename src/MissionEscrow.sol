@@ -6,6 +6,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { IMissionEscrow } from "./interfaces/IMissionEscrow.sol";
 import { IPaymentRouter } from "./interfaces/IPaymentRouter.sol";
+import { IReputationAttestations } from "./interfaces/IReputationAttestations.sol";
 
 /**
  * @title MissionEscrow
@@ -56,7 +57,9 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     uint64 private _createdAt; // 8
     // 4 bytes gap
 
-    // Slot 6 Removed
+    // Slot 6: ReputationAttestations
+    address private _reputationAttestations; // 20
+    // 12 bytes gap
 
     // Slot 7: MetadataHash
     bytes32 private _metadataHash; // 32
@@ -82,7 +85,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     }
 
     modifier inState(MissionState state) {
-        if (_state != state) revert InvalidState();
+        if (_state != state) revert InvalidState(_state);
         _;
     }
 
@@ -114,7 +117,8 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         bytes32 locationHash,
         address paymentRouter,
         address usdc,
-        address disputeResolver
+        address disputeResolver,
+        address reputationAttestations
     ) external initializer {
         _missionId = missionId;
         _poster = poster;
@@ -129,6 +133,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
         _usdc = usdc;
         _disputeResolver = disputeResolver;
+        _reputationAttestations = reputationAttestations;
         // _performer is 0
 
         _createdAt = uint64(block.timestamp);
@@ -148,6 +153,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      */
     function acceptMission() external inState(MissionState.Open) notExpired {
         if (_performer != address(0)) revert AlreadyAccepted();
+        if (msg.sender == _poster) revert CannotAcceptOwnMission();
 
         _performer = msg.sender;
         _state = MissionState.Accepted;
@@ -179,13 +185,33 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     function approveCompletion() external onlyPoster inState(MissionState.Submitted) {
         _state = MissionState.Completed;
 
+        // Cache storage variables to stack to save SLOADs
+        uint96 rewardAmount = _rewardAmount;
+        address paymentRouter = _paymentRouter;
+        address usdc = _usdc;
+        uint96 missionId = _missionId;
+        address performer = _performer;
+        address guild = _guild;
+        address reputationAttestations = _reputationAttestations;
+        address poster = _poster;
+
         // Transfer USDC to PaymentRouter for distribution
-        IERC20(_usdc).safeTransfer(_paymentRouter, _rewardAmount);
+        IERC20(usdc).safeTransfer(paymentRouter, rewardAmount);
 
         // Settle payment through router
-        IPaymentRouter(_paymentRouter).settlePayment(_missionId, _performer, _rewardAmount, _guild);
+        IPaymentRouter(paymentRouter).settlePayment(missionId, performer, rewardAmount, guild);
 
-        emit MissionCompleted(_missionId);
+        if (reputationAttestations != address(0)) {
+            try IReputationAttestations(reputationAttestations)
+                .recordOutcome(uint256(missionId), poster, performer, true, uint256(rewardAmount)) {
+            // Success
+            }
+            catch {
+                emit ReputationUpdateFailed(missionId);
+            }
+        }
+
+        emit MissionCompleted(missionId);
     }
 
     /**
@@ -204,15 +230,13 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     /**
      * @notice Raise a dispute
      * @param disputeHash IPFS hash of dispute evidence
-     * @dev Can be called by poster or performer after acceptance
+     * @dev Can only be called by DisputeResolver to ensure DDR is paid
      */
     function raiseDispute(bytes32 disputeHash) external {
-        if (_state != MissionState.Accepted && _state != MissionState.Submitted) {
-            revert InvalidState();
-        }
+        if (msg.sender != _disputeResolver) revert NotDisputeResolver();
 
-        if (msg.sender != _poster && msg.sender != _performer) {
-            revert NotParty();
+        if (_state != MissionState.Accepted && _state != MissionState.Submitted) {
+            revert InvalidState(_state);
         }
 
         if (_state == MissionState.Accepted && block.timestamp > _expiresAt) {
@@ -235,7 +259,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         if (block.timestamp <= _expiresAt) revert MissionNotExpired();
 
         if (_state != MissionState.Open && _state != MissionState.Accepted) {
-            revert InvalidState();
+            revert InvalidState(_state);
         }
 
         _state = MissionState.Cancelled;
@@ -277,6 +301,14 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         return _disputeResolver;
     }
 
+    function getParticipants()
+        external
+        view
+        returns (address poster, address performer, MissionState state)
+    {
+        return (_poster, _performer, _state);
+    }
+
     // =============================================================================
     // DISPUTE SETTLEMENT
     // =============================================================================
@@ -288,30 +320,42 @@ contract MissionEscrow is Initializable, IMissionEscrow {
      * @param splitPercentage For Split outcome, performer's share in basis points (0-10000)
      */
     function settleDispute(uint8 outcome, uint256 splitPercentage) external {
+        // Cache dispute resolver to save SLOAD
+        address disputeResolver = _disputeResolver;
         // Only dispute resolver can settle
-        if (msg.sender != _disputeResolver) revert NotDisputeResolver();
+        if (msg.sender != disputeResolver) revert NotDisputeResolver();
 
         // Must be in Disputed state
-        if (_state != MissionState.Disputed) revert InvalidState();
+        if (_state != MissionState.Disputed) revert InvalidState(_state);
+
+        // Cache storage variables to stack to save SLOADs
+        uint256 rewardAmount = uint256(_rewardAmount);
+        address usdc = _usdc;
+        address poster = _poster;
+        address paymentRouter = _paymentRouter;
+        uint256 missionId = uint256(_missionId);
+        address performer = _performer;
+        address guild = _guild;
+        address reputationAttestations = _reputationAttestations;
 
         uint256 posterAmount = 0;
         uint256 performerAmount = 0;
 
         if (outcome == 1) {
             // PosterWins: Poster gets full refund
-            posterAmount = _rewardAmount;
+            posterAmount = rewardAmount;
         } else if (outcome == 2) {
             // PerformerWins: Performer gets full reward (through PaymentRouter)
-            performerAmount = _rewardAmount;
+            performerAmount = rewardAmount;
         } else if (outcome == 3) {
             // Split: Distribute based on splitPercentage
-            performerAmount = (uint256(_rewardAmount) * splitPercentage) / 10_000;
-            posterAmount = uint256(_rewardAmount) - performerAmount;
+            performerAmount = (rewardAmount * splitPercentage) / 10_000;
+            posterAmount = rewardAmount - performerAmount;
         } else if (outcome == 4) {
             // Cancelled: Poster gets refund
-            posterAmount = _rewardAmount;
+            posterAmount = rewardAmount;
         } else {
-            revert InvalidState();
+            revert InvalidState(MissionState.Disputed);
         }
 
         // Update state
@@ -319,15 +363,27 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
         // Transfer funds
         if (posterAmount > 0) {
-            IERC20(_usdc).safeTransfer(_poster, posterAmount);
+            IERC20(usdc).safeTransfer(poster, posterAmount);
         }
         if (performerAmount > 0) {
             // Transfer to PaymentRouter for fee distribution
-            IERC20(_usdc).safeTransfer(_paymentRouter, performerAmount);
-            IPaymentRouter(_paymentRouter)
-                .settlePayment(_missionId, _performer, performerAmount, _guild);
+            IERC20(usdc).safeTransfer(paymentRouter, performerAmount);
+            IPaymentRouter(paymentRouter)
+                .settlePayment(missionId, performer, performerAmount, guild);
         }
 
-        emit DisputeSettled(_missionId, outcome, posterAmount, performerAmount);
+        if (reputationAttestations != address(0)) {
+            // 2=PerformerWins, 3=Split -> Completed=true
+            bool completed = (outcome == 2 || outcome == 3);
+            try IReputationAttestations(reputationAttestations)
+                .recordOutcome(uint256(missionId), poster, performer, completed, performerAmount) {
+            // Success
+            }
+            catch {
+                emit ReputationUpdateFailed(missionId);
+            }
+        }
+
+        emit DisputeSettled(missionId, outcome, posterAmount, performerAmount);
     }
 }

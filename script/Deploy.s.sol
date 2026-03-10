@@ -74,6 +74,7 @@ contract DeployScript is Script {
         console.log("5. Deploying DisputeResolver...");
         DisputeResolver disputeResolver = new DisputeResolver(
             USDC_BASE_SEPOLIA,
+            address(missionFactory), // MissionFactory
             JOLLYV_ETH, // ResolversDAO
             JOLLYV_ETH, // ProtocolDAO
             JOLLYV_ETH, // Protocol treasury
@@ -101,6 +102,9 @@ contract DeployScript is Script {
 
         missionFactory.setDisputeResolver(address(disputeResolver));
         console.log("   MissionFactory.setDisputeResolver done");
+
+        missionFactory.setReputationAttestations(address(reputationAttestations));
+        console.log("   MissionFactory.setReputationAttestations done");
 
         // 8. Transfer ownership to jollyv.eth
         console.log("");

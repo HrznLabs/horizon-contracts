@@ -39,13 +39,19 @@ contract DisputeResolverSecurity is Test {
         paymentRouter =
             new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury);
 
-        // Deploy DisputeResolver
-        disputeResolverContract = new DisputeResolver(
-            address(usdc), resolversDAO, protocolDAO, protocolTreasury, resolverTreasury
-        );
-
         // Deploy MissionFactory
         factory = new MissionFactory(address(usdc), address(paymentRouter));
+
+        // Deploy DisputeResolver
+        disputeResolverContract = new DisputeResolver(
+            address(usdc),
+            address(factory),
+            resolversDAO,
+            protocolDAO,
+            protocolTreasury,
+            resolverTreasury
+        );
+
         factory.setDisputeResolver(address(disputeResolverContract));
         vm.stopPrank();
 
@@ -82,11 +88,7 @@ contract DisputeResolverSecurity is Test {
         vm.prank(performer);
         escrow.submitProof(keccak256("proof"));
 
-        // 4. Poster raises dispute on Escrow first
-        vm.prank(poster);
-        escrow.raiseDispute(keccak256("evidence"));
-
-        // Then create dispute on Resolver
+        // 4. Poster creates dispute on Resolver
         vm.prank(poster);
         uint256 disputeId =
             disputeResolverContract.createDispute(escrowAddress, missionId, keccak256("evidence"));

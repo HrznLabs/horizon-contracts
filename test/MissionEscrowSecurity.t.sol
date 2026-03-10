@@ -44,6 +44,21 @@ contract MissionEscrowSecurity is Test {
         usdc.approve(address(factory), 1000e6);
     }
 
+    function test_RevertWhen_PosterAcceptsOwnMission() public {
+        vm.startPrank(poster);
+        uint256 expiresAt = block.timestamp + 1 days;
+
+        uint256 missionId =
+            factory.createMission(REWARD_AMOUNT, expiresAt, address(0), bytes32(0), bytes32(0));
+
+        address escrowAddress = factory.missions(missionId);
+        MissionEscrow escrow = MissionEscrow(escrowAddress);
+
+        vm.expectRevert(IMissionEscrow.CannotAcceptOwnMission.selector);
+        escrow.acceptMission();
+        vm.stopPrank();
+    }
+
     function test_PosterCannotStealFundsAfterSubmission() public {
         // 1. Poster creates a mission that expires in 1 day
         vm.startPrank(poster);
@@ -71,7 +86,11 @@ contract MissionEscrowSecurity is Test {
 
         // 5. Poster tries to claim expired funds - SHOULD REVERT
         vm.prank(poster);
-        vm.expectRevert(IMissionEscrow.InvalidState.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IMissionEscrow.InvalidState.selector, IMissionEscrow.MissionState.Submitted
+            )
+        );
         escrow.claimExpired();
 
         // 6. Assertions

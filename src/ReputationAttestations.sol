@@ -113,40 +113,42 @@ contract ReputationAttestations is Ownable {
         IMissionEscrow mission = IMissionEscrow(escrow);
 
         // Check if mission is completed
-        IMissionEscrow.MissionRuntime memory runtime = mission.getRuntime();
-        if (runtime.state != IMissionEscrow.MissionState.Completed) {
+        // Optimized: getParticipants() returns only necessary fields to save gas
+        // compared to fetching full runtime and params structs.
+        (address poster, address performer, IMissionEscrow.MissionState state) =
+            mission.getParticipants();
+
+        if (state != IMissionEscrow.MissionState.Completed) {
             revert MissionNotCompleted();
         }
 
         // Check if rater is a participant
-        IMissionEscrow.MissionParams memory params = mission.getParams();
-
-        bool isPoster = msg.sender == params.poster;
-        bool isPerformer = msg.sender == runtime.performer;
+        bool isPoster = msg.sender == poster;
+        bool isPerformer = msg.sender == performer;
 
         if (!isPoster && !isPerformer) revert NotParticipant();
 
         // Check if ratee is the counterparty
-        if (isPoster && ratee != runtime.performer) revert InvalidCounterparty();
-        if (isPerformer && ratee != params.poster) revert InvalidCounterparty();
+        if (isPoster && ratee != performer) revert InvalidCounterparty();
+        if (isPerformer && ratee != poster) revert InvalidCounterparty();
+
+        // Cache storage pointer to save gas on redundant SLOADs
+        PackedRating storage rating = _ratings[missionId][msg.sender][ratee];
 
         // Check if already rated
-        if (_ratings[missionId][msg.sender][ratee].score != 0) {
+        if (rating.score != 0) {
             revert AlreadyRated();
         }
 
-        // Store rating
-        _ratings[missionId][msg.sender][ratee] = PackedRating({
-            score: score,
-            timestamp: uint64(block.timestamp),
-            commentHash: commentHash
-        });
+        // Store rating directly to avoid memory-to-storage copy overhead
+        rating.score = score;
+        rating.timestamp = uint64(block.timestamp);
+        rating.commentHash = commentHash;
 
-        // Update ratee's statistics
-        RatingStats memory stats = _ratingStats[ratee];
+        // Update ratee's statistics using storage pointer
+        RatingStats storage stats = _ratingStats[ratee];
         stats.count++;
         stats.sum += score;
-        _ratingStats[ratee] = stats;
 
         emit RatingSubmitted(missionId, msg.sender, ratee, score, commentHash);
     }
@@ -187,11 +189,8 @@ contract ReputationAttestations is Ownable {
         returns (Rating memory)
     {
         PackedRating storage r = _ratings[missionId][rater][ratee];
-        return Rating({
-            score: r.score,
-            commentHash: r.commentHash,
-            timestamp: uint256(r.timestamp)
-        });
+        return
+            Rating({ score: r.score, commentHash: r.commentHash, timestamp: uint256(r.timestamp) });
     }
 
     /**
