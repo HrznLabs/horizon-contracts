@@ -54,11 +54,13 @@ interface IMissionEscrow {
         uint256 indexed id, uint8 outcome, uint256 posterAmount, uint256 performerAmount
     );
 
+    event ReputationUpdateFailed(uint256 indexed id);
+
     // =============================================================================
     // ERRORS
     // =============================================================================
 
-    error InvalidState();
+    error InvalidState(MissionState current);
     error NotPoster();
     error NotPerformer();
     error NotParty();
@@ -67,6 +69,7 @@ interface IMissionEscrow {
     error MissionExpired();
     error MissionNotExpired();
     error AlreadyAccepted();
+    error CannotAcceptOwnMission();
     error DisputeAlreadyRaised();
 
     // =============================================================================
@@ -83,7 +86,8 @@ interface IMissionEscrow {
         bytes32 locationHash,
         address paymentRouter,
         address usdc,
-        address disputeResolver
+        address disputeResolver,
+        address reputationAttestations
     ) external;
 
     function acceptMission() external;
@@ -102,4 +106,8 @@ interface IMissionEscrow {
     function getRuntime() external view returns (MissionRuntime memory);
     function getMissionId() external view returns (uint256);
     function getDisputeResolver() external view returns (address);
+    function getParticipants()
+        external
+        view
+        returns (address poster, address performer, MissionState state);
 }
