@@ -27,8 +27,8 @@ contract ClaimExpiredRepro is Test {
         vm.startPrank(owner);
         usdc = new MockERC20("USDC", "USDC", 6);
         paymentRouter =
-            new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury);
-        factory = new MissionFactory(address(usdc), address(paymentRouter));
+            new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury, owner);
+        factory = new MissionFactory(address(paymentRouter));
         factory.setDisputeResolver(disputeResolver);
         paymentRouter.setMissionFactory(address(factory));
         vm.stopPrank();
@@ -43,7 +43,7 @@ contract ClaimExpiredRepro is Test {
         vm.startPrank(poster);
         uint256 expiresAt = block.timestamp + 1 days;
         uint256 missionId =
-            factory.createMission(REWARD_AMOUNT, expiresAt, address(0), bytes32(0), bytes32(0));
+            factory.createMission(address(usdc), REWARD_AMOUNT, expiresAt, address(0), bytes32(0), bytes32(0));
         vm.stopPrank();
 
         address escrowAddress = factory.missions(missionId);

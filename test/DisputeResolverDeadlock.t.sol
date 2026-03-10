@@ -35,7 +35,7 @@ contract DisputeResolverDeadlock is Test {
 
         // Deploy PaymentRouter
         paymentRouter =
-            new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury);
+            new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury, owner);
 
         // Deploy DisputeResolver
         resolver = new DisputeResolver(
@@ -43,7 +43,7 @@ contract DisputeResolverDeadlock is Test {
         );
 
         // Deploy MissionFactory
-        factory = new MissionFactory(address(usdc), address(paymentRouter));
+        factory = new MissionFactory(address(paymentRouter));
         factory.setDisputeResolver(address(resolver));
 
         // Setup Router to allow Factory
@@ -70,7 +70,7 @@ contract DisputeResolverDeadlock is Test {
         vm.startPrank(poster);
         uint256 expiresAt = block.timestamp + 1 days;
         uint256 missionId =
-            factory.createMission(REWARD_AMOUNT, expiresAt, address(0), bytes32(0), bytes32(0));
+            factory.createMission(address(usdc), REWARD_AMOUNT, expiresAt, address(0), bytes32(0), bytes32(0));
         vm.stopPrank();
 
         address escrowAddress = factory.missions(missionId);

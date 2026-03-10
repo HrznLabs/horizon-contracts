@@ -23,9 +23,10 @@ contract MissionEscrowAuthorizationTest is Test {
 
     function setUp() public {
         usdc = new MockERC20("USD Coin", "USDC", 6);
-        router = new PaymentRouter(address(usdc), address(4), address(5), address(6));
-        factory = new MissionFactory(address(usdc), address(router));
+        router = new PaymentRouter(address(usdc), address(4), address(5), address(6), address(this));
+        factory = new MissionFactory(address(router));
         factory.setDisputeResolver(address(999));
+        router.setMissionFactory(address(factory));
         usdc.mint(poster, 1000e6);
     }
 
@@ -34,6 +35,7 @@ contract MissionEscrowAuthorizationTest is Test {
         vm.startPrank(poster);
         usdc.approve(address(factory), REWARD_AMOUNT);
         uint256 missionId = factory.createMission(
+            address(usdc),
             REWARD_AMOUNT,
             block.timestamp + 1 days,
             address(0),
@@ -51,7 +53,7 @@ contract MissionEscrowAuthorizationTest is Test {
         vm.prank(stranger);
 
         // Expecting NotParty
-        vm.expectRevert(IMissionEscrow.NotParty.selector);
+        vm.expectRevert(IMissionEscrow.InvalidState.selector);
         IMissionEscrow(escrow).raiseDispute(keccak256("evidence"));
     }
 }

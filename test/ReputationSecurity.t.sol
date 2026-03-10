@@ -31,8 +31,8 @@ contract ReputationSecurity is Test {
 
         // Deploy dependencies
         usdc = new MockERC20("USD Coin", "USDC", 6);
-        router = new PaymentRouter(address(usdc), address(4), address(5), address(6));
-        factory = new MissionFactory(address(usdc), address(router));
+        router = new PaymentRouter(address(usdc), address(4), address(5), address(6), owner);
+        factory = new MissionFactory(address(router));
         factory.setDisputeResolver(address(888));
         router.setMissionFactory(address(factory));
 
@@ -59,7 +59,7 @@ contract ReputationSecurity is Test {
         vm.startPrank(poster);
         usdc.approve(address(factory), REWARD_AMOUNT);
         uint256 missionId = factory.createMission(
-            REWARD_AMOUNT, block.timestamp + 1 days, address(0), METADATA_HASH, LOCATION_HASH
+            address(usdc), REWARD_AMOUNT, block.timestamp + 1 days, address(0), METADATA_HASH, LOCATION_HASH
         );
         vm.stopPrank();
 
