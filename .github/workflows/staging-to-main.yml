@@ -1,0 +1,54 @@
+name: Merge staging to main
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  merge-to-main:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for existing PR
+        id: check-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXISTING_PR=$(gh pr list --base main --head staging --state open --json number --jq '.[0].number' || echo "")
+          echo "existing_pr=$EXISTING_PR" >> $GITHUB_OUTPUT
+
+      - name: Create PR from staging to main
+        if: steps.check-pr.outputs.existing_pr == ''
+        id: create-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_URL=$(gh pr create --base main --head staging \
+            --title "chore: merge staging to main" \
+            --body "Automated PR to merge staging into main.")
+          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Set PR number
+        id: pr-number
+        run: |
+          if [ -n "${{ steps.check-pr.outputs.existing_pr }}" ]; then
+            echo "number=${{ steps.check-pr.outputs.existing_pr }}" >> $GITHUB_OUTPUT
+          else
+            echo "number=${{ steps.create-pr.outputs.pr_number }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Merge PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr merge ${{ steps.pr-number.outputs.number }} --merge --auto
