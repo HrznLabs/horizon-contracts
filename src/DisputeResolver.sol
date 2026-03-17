@@ -260,8 +260,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
     {
         Dispute storage dispute = _disputes[disputeId];
 
+        // Cache state to save SLOAD
+        DisputeState state = dispute.state;
+
         // Only pending or investigating state
-        if (dispute.state != DisputeState.Pending && dispute.state != DisputeState.Investigating) {
+        if (state != DisputeState.Pending && state != DisputeState.Investigating) {
             revert InvalidDisputeState();
         }
 
