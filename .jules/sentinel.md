@@ -50,3 +50,13 @@
 **Vulnerability:** The `GuildDAO.removeMember` function marked a member as removed (`isMember = false`) but failed to explicitly revoke assigned access control roles like `ADMIN_ROLE`, `OFFICER_ROLE`, or `CURATOR_ROLE`. This allowed an ousted member to retain their administrative privileges.
 **Learning:** Removing a user from a system's membership list does not automatically revoke their associated role-based access control (RBAC) permissions unless explicitly programmed to do so.
 **Prevention:** When implementing member removal or suspension logic, explicitly check for and revoke any associated roles or privileges granted to that user.
+
+## 2024-05-24 - Duplicate Error Definition
+**Vulnerability:** A minor compilation error in the `IMissionEscrow` interface, where `NotParty` error is defined twice.
+**Learning:** Found a syntax error related to a duplicate error definition (`NotParty`) when compiling the project with `forge`. The error occurred on line 68 in `IMissionEscrow.sol`. However, tests in `MissionEscrow_Authorization.t.sol` expected a different revert.
+**Prevention:** Ensured the duplicate `NotParty` error was removed, and that `test_RaiseDispute_RevertMessage()` in `test/MissionEscrow_Authorization.t.sol` correctly asserts the expected error (`NotDisputeResolver()`) when a non-DisputeResolver attempts to call `raiseDispute()`.
+
+## 2024-05-24 - Dispute Resolver Split/Cancel Deadlock
+**Vulnerability:** The `resolveDispute` function in `DisputeResolver.sol` enforced that for `Split` or `Cancelled` outcomes, *both* the poster and the performer must have deposited their DDR. This means if one party is totally unresponsive, a resolver cannot issue a `Split` or `Cancelled` outcome, leading to a deadlock.
+**Learning:** Found a strict DDR deposit check for `Split`/`Cancelled` outcomes that required both parties to have deposited DDR, which blocks dispute resolution if one party just refuses to participate.
+**Prevention:** Changed the logic in `resolveDispute` to only require that *at least one* party has deposited DDR for `Split` and `Cancelled` outcomes. This allows resolvers to still resolve a dispute if one party goes missing.
