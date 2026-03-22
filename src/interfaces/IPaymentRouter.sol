@@ -79,7 +79,7 @@ interface IPaymentRouter {
     /// @notice Get fee split (backward compatible)
     function getFeeSplit(uint256 rewardAmount, bool hasGuild)
         external
-        view
+        pure
         returns (FeeSplit memory);
 
     /// @notice Get fixed fee configuration
@@ -89,5 +89,5 @@ interface IPaymentRouter {
         returns (uint16 protocolFeeBps, uint16 labsFeeBps, uint16 resolverFeeBps);
 
     /// @notice Get guild's default fee
-    function getGuildFeeBps(address guild) external view returns (uint16);
+    function getGuildFeeBps(address guild) external pure returns (uint16);
 }
