@@ -253,7 +253,7 @@ contract PaymentRouter is Ownable, ReentrancyGuard, IPaymentRouter {
      */
     function getFeeSplit(uint256 rewardAmount, bool hasGuild)
         external
-        view
+        pure
         returns (FeeSplit memory split)
     {
         address guild = hasGuild ? address(1) : address(0);
@@ -290,7 +290,7 @@ contract PaymentRouter is Ownable, ReentrancyGuard, IPaymentRouter {
      * @notice Get guild's default fee (can be overridden per-mission)
      * @dev Guilds should store their fee tiers in their DAO contract
      */
-    function getGuildFeeBps(address guild) public view returns (uint16) {
+    function getGuildFeeBps(address guild) public pure returns (uint16) {
         // Default implementation - guilds can override via their DAO
         // In practice, this would query the GuildDAO contract
         (guild); // Silence unused variable warning
