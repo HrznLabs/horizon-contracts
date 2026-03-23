@@ -50,8 +50,8 @@ contract MissionEscrowAuthorizationTest is Test {
         // Stranger tries to raise dispute
         vm.prank(stranger);
 
-        // Expecting NotParty
-        vm.expectRevert(IMissionEscrow.NotParty.selector);
+        // Expecting NotDisputeResolver
+        vm.expectRevert(IMissionEscrow.NotDisputeResolver.selector);
         IMissionEscrow(escrow).raiseDispute(keccak256("evidence"));
     }
 }

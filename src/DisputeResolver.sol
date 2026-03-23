@@ -177,15 +177,17 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert InvalidDisputeState();
         }
 
-        // Calculate DDR amount
-        uint256 ddrAmount = (params.rewardAmount * DDR_RATE_BPS) / 10_000;
-
-        // Transfer DDR from initiator
-        usdc.safeTransferFrom(msg.sender, address(this), ddrAmount);
-
         // Create dispute
         _disputeIdCounter++;
         disputeId = _disputeIdCounter;
+
+        uint256 rewardAmount = params.rewardAmount;
+
+        // Calculate DDR amount
+        uint256 ddrAmount = (rewardAmount * DDR_RATE_BPS) / 10_000;
+
+        // Transfer DDR from initiator
+        usdc.safeTransferFrom(msg.sender, address(this), ddrAmount);
 
         _disputes[disputeId] = Dispute({
             disputeId: disputeId,
@@ -198,7 +200,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             outcome: DisputeOutcome.None,
             resolver: address(0),
             ddrAmount: ddrAmount,
-            lppAmount: (params.rewardAmount * LPP_RATE_BPS) / 10_000,
+            lppAmount: (rewardAmount * LPP_RATE_BPS) / 10_000,
             posterEvidenceHash: msg.sender == params.poster ? evidenceHash : bytes32(0),
             performerEvidenceHash: msg.sender == runtime.performer ? evidenceHash : bytes32(0),
             resolutionHash: bytes32(0),
