@@ -331,12 +331,7 @@ contract MissionEscrow is Initializable, IMissionEscrow {
         // Cache storage variables to stack to save SLOADs
         uint256 rewardAmount = uint256(_rewardAmount);
         address usdc = _usdc;
-        address poster = _poster;
-        address paymentRouter = _paymentRouter;
         uint256 missionId = uint256(_missionId);
-        address performer = _performer;
-        address guild = _guild;
-        address reputationAttestations = _reputationAttestations;
 
         uint256 posterAmount = 0;
         uint256 performerAmount = 0;
@@ -363,20 +358,24 @@ contract MissionEscrow is Initializable, IMissionEscrow {
 
         // Transfer funds
         if (posterAmount > 0) {
-            IERC20(usdc).safeTransfer(poster, posterAmount);
+            IERC20(usdc).safeTransfer(_poster, posterAmount);
         }
         if (performerAmount > 0) {
             // Transfer to PaymentRouter for fee distribution
+            address paymentRouter = _paymentRouter;
             IERC20(usdc).safeTransfer(paymentRouter, performerAmount);
             IPaymentRouter(paymentRouter)
-                .settlePayment(missionId, performer, performerAmount, guild);
+                .settlePayment(missionId, _performer, performerAmount, _guild);
         }
 
+        address reputationAttestations = _reputationAttestations;
         if (reputationAttestations != address(0)) {
             // 2=PerformerWins, 3=Split -> Completed=true
             bool completed = (outcome == 2 || outcome == 3);
             try IReputationAttestations(reputationAttestations)
-                .recordOutcome(uint256(missionId), poster, performer, completed, performerAmount) {
+                .recordOutcome(
+                    uint256(missionId), _poster, _performer, completed, performerAmount
+                ) {
             // Success
             }
             catch {
