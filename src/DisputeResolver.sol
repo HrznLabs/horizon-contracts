@@ -511,8 +511,10 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         escrow.settleDispute(uint8(outcome), splitBps);
 
         // Now handle DDR distributions
-        uint256 posterDDR = _ddrDeposits[disputeId][dispute.poster];
-        uint256 performerDDR = _ddrDeposits[disputeId][dispute.performer];
+        address poster = dispute.poster;
+        address performer = dispute.performer;
+        uint256 posterDDR = _ddrDeposits[disputeId][poster];
+        uint256 performerDDR = _ddrDeposits[disputeId][performer];
         uint256 totalDDR = posterDDR + performerDDR;
 
         // Calculate fees from DDR pool
@@ -543,10 +545,10 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
 
         // Transfer DDR payouts
         if (posterPayout > 0) {
-            usdc.safeTransfer(dispute.poster, posterPayout);
+            usdc.safeTransfer(poster, posterPayout);
         }
         if (performerPayout > 0) {
-            usdc.safeTransfer(dispute.performer, performerPayout);
+            usdc.safeTransfer(performer, performerPayout);
         }
         if (resolverFee > 0) {
             usdc.safeTransfer(resolverTreasury, resolverFee);
