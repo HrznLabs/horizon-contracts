@@ -324,7 +324,7 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
 
         // Cache stack variables
         uint64 maxSupply = achievementType.maxSupply;
-        bool isSoulbound = achievementType.isSoulbound;
+        bool _isSoulbound = achievementType.isSoulbound;
         uint256 currentSupply = achievementType.currentSupply;
         uint256 tokenIdCounter = _tokenIdCounter;
 
@@ -335,7 +335,7 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
             if (to == address(0)) revert InvalidRecipient();
 
             // Skip if already has achievement (for soulbound)
-            if (isSoulbound && _userHasAchievement[typeId][to]) {
+            if (_isSoulbound && _userHasAchievement[typeId][to]) {
                 continue;
             }
 
