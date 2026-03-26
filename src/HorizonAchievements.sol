@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title HorizonAchievements
@@ -21,7 +22,13 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  * - AchievementMinted: When a new achievement is minted
  * - AchievementTypeCreated: When a new achievement type is registered
  */
-contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, AccessControl {
+contract HorizonAchievements is
+    ERC721,
+    ERC721URIStorage,
+    ERC721Enumerable,
+    AccessControl,
+    ReentrancyGuard
+{
     using Strings for uint256;
 
     // =============================================================================
@@ -251,6 +258,7 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
      */
     function mintAchievement(address to, uint256 typeId, bytes32 proofHash)
         external
+        nonReentrant
         onlyRole(MINTER_ROLE)
         returns (uint256 tokenId)
     {
@@ -312,7 +320,7 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
         address[] calldata recipients,
         uint256 typeId,
         bytes32[] calldata proofHashes
-    ) external onlyRole(MINTER_ROLE) returns (uint256[] memory tokenIds) {
+    ) external nonReentrant onlyRole(MINTER_ROLE) returns (uint256[] memory tokenIds) {
         require(recipients.length == proofHashes.length, "Length mismatch");
 
         // Cache storage pointer
