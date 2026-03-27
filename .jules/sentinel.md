@@ -50,3 +50,7 @@
 **Vulnerability:** The `GuildDAO.removeMember` function marked a member as removed (`isMember = false`) but failed to explicitly revoke assigned access control roles like `ADMIN_ROLE`, `OFFICER_ROLE`, or `CURATOR_ROLE`. This allowed an ousted member to retain their administrative privileges.
 **Learning:** Removing a user from a system's membership list does not automatically revoke their associated role-based access control (RBAC) permissions unless explicitly programmed to do so.
 **Prevention:** When implementing member removal or suspension logic, explicitly check for and revoke any associated roles or privileges granted to that user.
+## 2025-06-18 - [Privilege Escalation via Missing Role Check]
+**Vulnerability:** The `GuildDAO.removeMember` function checked if a member had the `DEFAULT_ADMIN_ROLE` to prevent their removal, but failed to check if they had the `ADMIN_ROLE`. This allowed users with the `OFFICER_ROLE` to remove `ADMIN_ROLE` members, leading to a privilege inversion where lower-tier roles could oust higher-tier ones.
+**Learning:** When using hierarchical role-based access control (RBAC), privilege boundaries must be strictly enforced. Checking only the absolute highest role (`DEFAULT_ADMIN_ROLE`) is insufficient if intermediate administrative roles (`ADMIN_ROLE`) also need protection from lower-tier roles.
+**Prevention:** Always enumerate all roles that should be protected against removal or modification by lower-tier roles, or implement a strict role hierarchy index to compare caller vs target privileges.

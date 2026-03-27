@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, console} from "forge-std/Test.sol";
-import {MissionFactory} from "../src/MissionFactory.sol";
-import {MissionEscrow} from "../src/MissionEscrow.sol";
-import {PaymentRouter} from "../src/PaymentRouter.sol";
-import {IMissionEscrow} from "../src/interfaces/IMissionEscrow.sol";
-import {MockERC20} from "./mocks/MockERC20.sol";
+import { Test, console } from "forge-std/Test.sol";
+import { MissionFactory } from "../src/MissionFactory.sol";
+import { MissionEscrow } from "../src/MissionEscrow.sol";
+import { PaymentRouter } from "../src/PaymentRouter.sol";
+import { IMissionEscrow } from "../src/interfaces/IMissionEscrow.sol";
+import { MockERC20 } from "./mocks/MockERC20.sol";
 
 contract MissionEscrowAuthorizationTest is Test {
     MissionFactory public factory;
@@ -34,11 +34,7 @@ contract MissionEscrowAuthorizationTest is Test {
         vm.startPrank(poster);
         usdc.approve(address(factory), REWARD_AMOUNT);
         uint256 missionId = factory.createMission(
-            REWARD_AMOUNT,
-            block.timestamp + 1 days,
-            address(0),
-            METADATA_HASH,
-            LOCATION_HASH
+            REWARD_AMOUNT, block.timestamp + 1 days, address(0), METADATA_HASH, LOCATION_HASH
         );
         vm.stopPrank();
 
@@ -50,8 +46,8 @@ contract MissionEscrowAuthorizationTest is Test {
         // Stranger tries to raise dispute
         vm.prank(stranger);
 
-        // Expecting NotParty
-        vm.expectRevert(IMissionEscrow.NotParty.selector);
+        // Expecting NotDisputeResolver (since it routes through DisputeResolver now)
+        vm.expectRevert(IMissionEscrow.NotDisputeResolver.selector);
         IMissionEscrow(escrow).raiseDispute(keccak256("evidence"));
     }
 }
