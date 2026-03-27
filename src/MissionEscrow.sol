@@ -235,11 +235,12 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     function raiseDispute(bytes32 disputeHash) external {
         if (msg.sender != _disputeResolver) revert NotDisputeResolver();
 
-        if (_state != MissionState.Accepted && _state != MissionState.Submitted) {
-            revert InvalidState(_state);
+        MissionState currentState = _state;
+        if (currentState != MissionState.Accepted && currentState != MissionState.Submitted) {
+            revert InvalidState(currentState);
         }
 
-        if (_state == MissionState.Accepted && block.timestamp > _expiresAt) {
+        if (currentState == MissionState.Accepted && block.timestamp > _expiresAt) {
             revert MissionExpired();
         }
 
@@ -258,8 +259,9 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     function claimExpired() external onlyPoster {
         if (block.timestamp <= _expiresAt) revert MissionNotExpired();
 
-        if (_state != MissionState.Open && _state != MissionState.Accepted) {
-            revert InvalidState(_state);
+        MissionState currentState = _state;
+        if (currentState != MissionState.Open && currentState != MissionState.Accepted) {
+            revert InvalidState(currentState);
         }
 
         _state = MissionState.Cancelled;
