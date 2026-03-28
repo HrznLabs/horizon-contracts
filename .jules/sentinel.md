@@ -50,3 +50,8 @@
 **Vulnerability:** The `GuildDAO.removeMember` function marked a member as removed (`isMember = false`) but failed to explicitly revoke assigned access control roles like `ADMIN_ROLE`, `OFFICER_ROLE`, or `CURATOR_ROLE`. This allowed an ousted member to retain their administrative privileges.
 **Learning:** Removing a user from a system's membership list does not automatically revoke their associated role-based access control (RBAC) permissions unless explicitly programmed to do so.
 **Prevention:** When implementing member removal or suspension logic, explicitly check for and revoke any associated roles or privileges granted to that user.
+
+## 2026-03-28 - [Privilege Retention in DAO]
+**Vulnerability:** The `GuildDAO.removeMember` function marked a member as removed (`isMember = false`) but failed to explicitly revoke assigned access control roles like `ADMIN_ROLE`, `OFFICER_ROLE`, or `CURATOR_ROLE`. This allowed an ousted member to retain their administrative privileges.
+**Learning:** Removing a user from a system's membership list does not automatically revoke their associated role-based access control (RBAC) permissions unless explicitly programmed to do so.
+**Prevention:** When implementing member removal or suspension logic, explicitly check for and revoke any associated roles or privileges granted to that user.
