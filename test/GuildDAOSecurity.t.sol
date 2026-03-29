@@ -42,4 +42,27 @@ contract GuildDAOSecurityTest is Test {
         assertTrue(guild.isOfficer(admin));
         assertTrue(guild.isCurator(admin));
     }
+
+    function test_OfficerCannotRemoveNormalAdmin() public {
+        address normalAdmin = address(4);
+
+        vm.startPrank(admin);
+        guild.addMember(normalAdmin);
+        // We assume granting ADMIN_ROLE does not automatically grant DEFAULT_ADMIN_ROLE
+        guild.grantRole(guild.ADMIN_ROLE(), normalAdmin);
+        vm.stopPrank();
+
+        assertTrue(guild.isAdmin(normalAdmin));
+        assertTrue(guild.isMember(normalAdmin));
+
+        // Officer tries to remove normal admin
+        vm.prank(officer);
+        vm.expectRevert(GuildDAO.CannotRemoveAdmin.selector);
+        guild.removeMember(normalAdmin);
+
+        assertTrue(guild.isMember(normalAdmin));
+
+        // Normal admin should still have the role
+        assertTrue(guild.isAdmin(normalAdmin));
+    }
 }
