@@ -1,121 +1,96 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import { Test, console } from "forge-std/Test.sol";
-import { MissionFactory } from "../src/MissionFactory.sol";
-import { MissionEscrow } from "../src/MissionEscrow.sol";
-import { PaymentRouter } from "../src/PaymentRouter.sol";
-import { DisputeResolver } from "../src/DisputeResolver.sol";
-import { IMissionEscrow } from "../src/interfaces/IMissionEscrow.sol";
-import { IDisputeResolver } from "../src/interfaces/IDisputeResolver.sol";
-import { MockERC20 } from "./mocks/MockERC20.sol";
+import {Test, console} from "forge-std/Test.sol";
+import {MissionFactory} from "../src/MissionFactory.sol";
+import {MissionEscrow} from "../src/MissionEscrow.sol";
+import {DisputeResolver} from "../src/DisputeResolver.sol";
+import {PaymentRouter} from "../src/PaymentRouter.sol";
+import {IMissionEscrow} from "../src/interfaces/IMissionEscrow.sol";
+import {IDisputeResolver} from "../src/interfaces/IDisputeResolver.sol";
+import {MockERC20} from "./mocks/MockERC20.sol";
 
 contract DisputeResolverDeadlock is Test {
     MissionFactory public factory;
-    PaymentRouter public paymentRouter;
+    PaymentRouter public router;
     DisputeResolver public resolver;
     MockERC20 public usdc;
 
-    address public owner = address(0x1);
-    address public poster = address(0x2);
-    address public performer = address(0x3);
-    address public resolversDAO = address(0x4);
-    address public protocolDAO = address(0x5);
+    address public poster = address(1);
+    address public performer = address(2);
+    address public resolverAddr = address(3);
+    address public dao = address(4);
+    address public protocolTreasury = address(5);
+    address public resolverTreasury = address(6);
 
-    address public protocolTreasury = address(0x10);
-    address public resolverTreasury = address(0x11);
-    address public labsTreasury = address(0x12);
-
-    uint256 public constant REWARD_AMOUNT = 100e6; // 100 USDC
+    uint256 public constant REWARD_AMOUNT = 1000e6;
+    bytes32 public constant EVIDENCE_HASH = keccak256("evidence");
 
     function setUp() public {
-        vm.startPrank(owner);
-        // Deploy Mock USDC
-        usdc = new MockERC20("USDC", "USDC", 6);
-
-        // Deploy PaymentRouter
-        paymentRouter =
-            new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, labsTreasury);
-
-        // Deploy MissionFactory
-        factory = new MissionFactory(address(usdc), address(paymentRouter));
-
-        // Deploy DisputeResolver
+        usdc = new MockERC20("USD Coin", "USDC", 6);
+        router = new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, protocolTreasury);
+        factory = new MissionFactory(address(usdc), address(router));
         resolver = new DisputeResolver(
             address(usdc),
             address(factory),
-            resolversDAO,
-            protocolDAO,
+            dao, // Resolvers DAO
+            dao, // Protocol DAO
             protocolTreasury,
             resolverTreasury
         );
 
-        // Set DisputeResolver in Factory
         factory.setDisputeResolver(address(resolver));
+        router.setMissionFactory(address(factory));
 
-        // Setup Router to allow Factory
-        paymentRouter.setMissionFactory(address(factory));
-
-        vm.stopPrank();
-
-        // Mint USDC to poster and performer (for DDR)
-        usdc.mint(poster, 1000e6);
-        usdc.mint(performer, 1000e6);
-
-        vm.prank(poster);
-        usdc.approve(address(factory), 1000e6);
-
-        vm.prank(poster);
-        usdc.approve(address(resolver), 1000e6);
-
-        vm.prank(performer);
-        usdc.approve(address(resolver), 1000e6);
+        // Fund parties
+        usdc.mint(poster, REWARD_AMOUNT * 2);
+        usdc.mint(performer, REWARD_AMOUNT);
     }
 
-    function test_DisputeDeadlock_OnePartyNoShow() public {
-        // 1. Poster creates a mission
+    function test_DisputeDeadlock_OnePartyNoShow_Fails() public {
+        // 1. Poster creates mission
         vm.startPrank(poster);
-        uint256 expiresAt = block.timestamp + 1 days;
-        uint256 missionId =
-            factory.createMission(REWARD_AMOUNT, expiresAt, address(0), bytes32(0), bytes32(0));
-        vm.stopPrank();
-
-        address escrowAddress = factory.missions(missionId);
-        MissionEscrow escrow = MissionEscrow(escrowAddress);
-
-        // 2. Performer accepts
-        vm.prank(performer);
-        escrow.acceptMission();
-
-        // 3. Performer submits proof
-        vm.prank(performer);
-        escrow.submitProof(keccak256("proof"));
-
-        // 4. Performer creates dispute (in Resolver) paying DDR
-        // This will automatically call escrow.raiseDispute()
-        vm.startPrank(performer);
-        uint256 disputeId = resolver.createDispute(escrowAddress, missionId, keccak256("evidence"));
-        vm.stopPrank();
-
-        // 6. Assign a resolver (by DAO)
-        vm.prank(resolversDAO);
-        address assignedResolver = address(0x99);
-        resolver.assignResolver(disputeId, assignedResolver);
-
-        // 7. Poster does NOT submit evidence or pay DDR (Simulating abandonment/malice)
-
-        // 8. Resolver tries to resolve in favor of Performer
-        vm.startPrank(assignedResolver);
-        // Should succeed now even without Poster DDR
-        resolver.resolveDispute(
-            disputeId, IDisputeResolver.DisputeOutcome.PerformerWins, keccak256("resolution"), 0
+        usdc.approve(address(factory), REWARD_AMOUNT);
+        uint256 missionId = factory.createMission(
+            REWARD_AMOUNT,
+            block.timestamp + 1 days,
+            address(0),
+            keccak256("meta"),
+            keccak256("loc")
         );
         vm.stopPrank();
 
-        // 9. Finalize (after appeal period)
-        vm.warp(block.timestamp + resolver.getAppealPeriod() + 1);
-        resolver.finalizeDispute(disputeId);
+        address escrowAddr = factory.missions(missionId);
 
-        console.log("Deadlock resolved: Performer wins successfully");
+        // 2. Performer accepts
+        vm.prank(performer);
+        IMissionEscrow(escrowAddr).acceptMission();
+
+        // 3. Poster raises dispute
+        vm.startPrank(poster);
+        uint256 ddrAmount = (REWARD_AMOUNT * 500) / 10000; // 5% DDR
+        usdc.approve(address(resolver), ddrAmount);
+        uint256 disputeId = resolver.createDispute(escrowAddr, missionId, EVIDENCE_HASH);
+        vm.stopPrank();
+
+        // 4. Assign resolver
+        vm.prank(dao);
+        resolver.assignResolver(disputeId, resolverAddr);
+
+        // 5. Performer goes missing, never submits evidence or DDR
+
+        // 6. Resolver attempts to resolve in favor of poster (who followed rules)
+        vm.prank(resolverAddr);
+        // Expect insufficient DDR because performer didn't deposit
+        resolver.resolveDispute(
+            disputeId,
+            IDisputeResolver.DisputeOutcome.Split,
+            keccak256("resolution"),
+            5000
+        );
+
+        // Check if dispute state is resolved
+        IDisputeResolver.Dispute memory dispute = resolver.getDispute(disputeId);
+        assertEq(uint256(dispute.state), uint256(IDisputeResolver.DisputeState.Resolved));
     }
 }

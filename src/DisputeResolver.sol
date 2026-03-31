@@ -329,16 +329,18 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
 
         // DDR Enforcement: The WINNER must have deposited DDR before resolution
         // This prevents deadlock if one party refuses to participate
+        // Note: For Split or Cancelled, we no longer strictly require both parties
+        // to have deposited. Only require that AT LEAST ONE party deposited
+        // to prevent total deadlock when one party is unresponsive.
         if (outcome == DisputeOutcome.PosterWins) {
             if (_ddrDeposits[disputeId][dispute.poster] == 0) revert InsufficientDDR();
         } else if (outcome == DisputeOutcome.PerformerWins) {
             if (_ddrDeposits[disputeId][dispute.performer] == 0) revert InsufficientDDR();
         } else {
-            // For Split or Cancelled, require both parties to have deposited
-            // This ensures mutual participation for complex outcomes
+            // For Split or Cancelled, at least one party must have deposited
             if (
                 _ddrDeposits[disputeId][dispute.poster] == 0
-                    || _ddrDeposits[disputeId][dispute.performer] == 0
+                    && _ddrDeposits[disputeId][dispute.performer] == 0
             ) {
                 revert InsufficientDDR();
             }
