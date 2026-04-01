@@ -60,3 +60,8 @@
 **Vulnerability:** The `resolveDispute` function in `DisputeResolver.sol` enforced that for `Split` or `Cancelled` outcomes, *both* the poster and the performer must have deposited their DDR. This means if one party is totally unresponsive, a resolver cannot issue a `Split` or `Cancelled` outcome, leading to a deadlock.
 **Learning:** Found a strict DDR deposit check for `Split`/`Cancelled` outcomes that required both parties to have deposited DDR, which blocks dispute resolution if one party just refuses to participate.
 **Prevention:** Changed the logic in `resolveDispute` to only require that *at least one* party has deposited DDR for `Split` and `Cancelled` outcomes. This allows resolvers to still resolve a dispute if one party goes missing.
+
+## 2025-06-19 - [DDR Stealing in Dispute Split Outcomes]
+**Vulnerability:** In `DisputeResolver.sol`'s `_distributeFunds` function, the `remainingDDR` for `Split` outcomes was distributed using the `splitPercentage` (which was intended only for the escrow reward distribution), rather than proportionally based on what each party originally deposited. This allowed a party who did not deposit DDR to steal a portion of the other party's DDR.
+**Learning:** Deposit/collateral pools must be calculated independently from reward/payout pools, especially when participation is not uniformly enforced (e.g. if one party fails to deposit). Reusing variables like `splitPercentage` for unrelated pools creates critical value leaks.
+**Prevention:** Always distribute returned collateral proportionally to the initial deposits (`(total * deposit) / totalDeposits`), never based on the outcome of a separate reward logic.

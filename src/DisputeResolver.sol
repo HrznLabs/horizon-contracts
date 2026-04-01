@@ -534,12 +534,8 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         } else if (outcome == DisputeOutcome.PerformerWins) {
             // Performer wins: gets remaining DDR
             performerPayout = remainingDDR;
-        } else if (outcome == DisputeOutcome.Split) {
-            // Split: DDR returned proportionally
-            posterPayout = (remainingDDR * (10_000 - splitBps)) / 10_000;
-            performerPayout = (remainingDDR * splitBps) / 10_000;
-        } else if (outcome == DisputeOutcome.Cancelled) {
-            // Cancelled: DDR returned proportionally to what each deposited
+        } else if (outcome == DisputeOutcome.Split || outcome == DisputeOutcome.Cancelled) {
+            // Split or Cancelled: DDR returned proportionally to what each deposited
             if (totalDDR > 0) {
                 posterPayout = (remainingDDR * posterDDR) / totalDDR;
                 performerPayout = (remainingDDR * performerDDR) / totalDDR;
