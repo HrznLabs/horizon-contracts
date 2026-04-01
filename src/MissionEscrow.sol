@@ -235,11 +235,14 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     function raiseDispute(bytes32 disputeHash) external {
         if (msg.sender != _disputeResolver) revert NotDisputeResolver();
 
-        if (_state != MissionState.Accepted && _state != MissionState.Submitted) {
-            revert InvalidState(_state);
+        // ⚡ Bolt: Cache `_state` in memory to avoid multiple redundant SLOAD operations
+        // Saves ~200 gas by reducing storage reads in subsequent conditional checks
+        MissionState currentState = _state;
+        if (currentState != MissionState.Accepted && currentState != MissionState.Submitted) {
+            revert InvalidState(currentState);
         }
 
-        if (_state == MissionState.Accepted && block.timestamp > _expiresAt) {
+        if (currentState == MissionState.Accepted && block.timestamp > _expiresAt) {
             revert MissionExpired();
         }
 
@@ -258,8 +261,11 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     function claimExpired() external onlyPoster {
         if (block.timestamp <= _expiresAt) revert MissionNotExpired();
 
-        if (_state != MissionState.Open && _state != MissionState.Accepted) {
-            revert InvalidState(_state);
+        // ⚡ Bolt: Cache `_state` in memory to avoid multiple redundant SLOAD operations
+        // Saves ~100 gas by replacing a second storage read with a cheaper stack read
+        MissionState currentState = _state;
+        if (currentState != MissionState.Open && currentState != MissionState.Accepted) {
+            revert InvalidState(currentState);
         }
 
         _state = MissionState.Cancelled;
