@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, console} from "forge-std/Test.sol";
-import {MissionFactory} from "../src/MissionFactory.sol";
-import {MissionEscrow} from "../src/MissionEscrow.sol";
-import {DisputeResolver} from "../src/DisputeResolver.sol";
-import {PaymentRouter} from "../src/PaymentRouter.sol";
-import {IMissionEscrow} from "../src/interfaces/IMissionEscrow.sol";
-import {IDisputeResolver} from "../src/interfaces/IDisputeResolver.sol";
-import {MockERC20} from "./mocks/MockERC20.sol";
+import { Test, console } from "forge-std/Test.sol";
+import { MissionFactory } from "../src/MissionFactory.sol";
+import { MissionEscrow } from "../src/MissionEscrow.sol";
+import { DisputeResolver } from "../src/DisputeResolver.sol";
+import { PaymentRouter } from "../src/PaymentRouter.sol";
+import { IMissionEscrow } from "../src/interfaces/IMissionEscrow.sol";
+import { IDisputeResolver } from "../src/interfaces/IDisputeResolver.sol";
+import { MockERC20 } from "./mocks/MockERC20.sol";
 
 contract DisputeResolverDeadlock is Test {
     MissionFactory public factory;
@@ -28,7 +28,8 @@ contract DisputeResolverDeadlock is Test {
 
     function setUp() public {
         usdc = new MockERC20("USD Coin", "USDC", 6);
-        router = new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, protocolTreasury);
+        router =
+            new PaymentRouter(address(usdc), protocolTreasury, resolverTreasury, protocolTreasury);
         factory = new MissionFactory(address(usdc), address(router));
         resolver = new DisputeResolver(
             address(usdc),
@@ -52,11 +53,7 @@ contract DisputeResolverDeadlock is Test {
         vm.startPrank(poster);
         usdc.approve(address(factory), REWARD_AMOUNT);
         uint256 missionId = factory.createMission(
-            REWARD_AMOUNT,
-            block.timestamp + 1 days,
-            address(0),
-            keccak256("meta"),
-            keccak256("loc")
+            REWARD_AMOUNT, block.timestamp + 1 days, address(0), keccak256("meta"), keccak256("loc")
         );
         vm.stopPrank();
 
@@ -68,7 +65,7 @@ contract DisputeResolverDeadlock is Test {
 
         // 3. Poster raises dispute
         vm.startPrank(poster);
-        uint256 ddrAmount = (REWARD_AMOUNT * 500) / 10000; // 5% DDR
+        uint256 ddrAmount = (REWARD_AMOUNT * 500) / 10_000; // 5% DDR
         usdc.approve(address(resolver), ddrAmount);
         uint256 disputeId = resolver.createDispute(escrowAddr, missionId, EVIDENCE_HASH);
         vm.stopPrank();
@@ -83,10 +80,7 @@ contract DisputeResolverDeadlock is Test {
         vm.prank(resolverAddr);
         // Expect insufficient DDR because performer didn't deposit
         resolver.resolveDispute(
-            disputeId,
-            IDisputeResolver.DisputeOutcome.Split,
-            keccak256("resolution"),
-            5000
+            disputeId, IDisputeResolver.DisputeOutcome.Split, keccak256("resolution"), 5000
         );
 
         // Check if dispute state is resolved
