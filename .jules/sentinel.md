@@ -60,3 +60,8 @@
 **Vulnerability:** The `resolveDispute` function in `DisputeResolver.sol` enforced that for `Split` or `Cancelled` outcomes, *both* the poster and the performer must have deposited their DDR. This means if one party is totally unresponsive, a resolver cannot issue a `Split` or `Cancelled` outcome, leading to a deadlock.
 **Learning:** Found a strict DDR deposit check for `Split`/`Cancelled` outcomes that required both parties to have deposited DDR, which blocks dispute resolution if one party just refuses to participate.
 **Prevention:** Changed the logic in `resolveDispute` to only require that *at least one* party has deposited DDR for `Split` and `Cancelled` outcomes. This allows resolvers to still resolve a dispute if one party goes missing.
+
+## 2024-05-27 - Missing Validation in Override Resolution
+**Vulnerability:** The `overrideResolution` function in `DisputeResolver` failed to validate the `splitPercentage` parameter when the new outcome was `DisputeOutcome.Split`. This allowed the DAO to set an invalid split percentage (e.g., > 10,000 basis points), which would cause `_distributeFunds` to revert due to an underflow during DDR calculation (`10_000 - splitBps`), effectively bricking the finalization of the dispute.
+**Learning:** Functions that override state (like admin or DAO overrides) often bypass the validation checks present in the standard user flow (like `resolveDispute`). All critical parameters must be validated at every entry point where they are set.
+**Prevention:** Always replicate necessary boundary checks (e.g., `splitPercentage <= 10_000`) in override functions, or better yet, abstract the validation logic into a shared internal function to ensure consistency across all state transition paths.

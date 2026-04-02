@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MockUSDC is ERC20 {
     constructor() ERC20("Mock USDC", "USDC") {
-        _mint(msg.sender, 1000000 * 10**6);
+        _mint(msg.sender, 1_000_000 * 10 ** 6);
     }
 }
 
@@ -27,6 +27,18 @@ contract SentinelMissionFactoryDeployTest is Test {
         vm.prank(address(0xbad));
         // We expect it to revert with "Initializable: contract is already initialized"
         vm.expectRevert();
-        impl.initialize(1, address(0xbad), 100e6, 1, address(0), bytes32(0), bytes32(0), address(0x2), address(usdc), address(0x3), address(0));
+        impl.initialize(
+            1,
+            address(0xbad),
+            100e6,
+            1,
+            address(0),
+            bytes32(0),
+            bytes32(0),
+            address(0x2),
+            address(usdc),
+            address(0x3),
+            address(0)
+        );
     }
 }
