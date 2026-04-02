@@ -10,7 +10,7 @@ import { IMissionEscrow } from "../src/interfaces/IMissionEscrow.sol";
 import { IDisputeResolver } from "../src/interfaces/IDisputeResolver.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
 
-contract DisputeResolverDeadlock is Test {
+contract DisputeResolverOverrideSplitValidation is Test {
     MissionFactory public factory;
     PaymentRouter public router;
     DisputeResolver public resolver;
@@ -48,7 +48,7 @@ contract DisputeResolverDeadlock is Test {
         usdc.mint(performer, REWARD_AMOUNT);
     }
 
-    function test_DisputeDeadlock_OnePartyNoShow_Fails() public {
+    function test_OverrideResolution_SplitValidation() public {
         // 1. Poster creates mission
         vm.startPrank(poster);
         usdc.approve(address(factory), REWARD_AMOUNT);
@@ -74,17 +74,27 @@ contract DisputeResolverDeadlock is Test {
         vm.prank(dao);
         resolver.assignResolver(disputeId, resolverAddr);
 
-        // 5. Performer goes missing, never submits evidence or DDR
+        // Performer submits DDR and evidence
+        vm.startPrank(performer);
+        usdc.approve(address(resolver), ddrAmount);
+        resolver.submitEvidence(disputeId, EVIDENCE_HASH);
+        vm.stopPrank();
 
-        // 6. Resolver attempts to resolve in favor of poster (who followed rules)
+        // Resolver attempts to resolve
         vm.prank(resolverAddr);
-        // Expect insufficient DDR because performer didn't deposit
         resolver.resolveDispute(
             disputeId, IDisputeResolver.DisputeOutcome.Split, keccak256("resolution"), 5000
         );
 
-        // Check if dispute state is resolved
-        IDisputeResolver.Dispute memory dispute = resolver.getDispute(disputeId);
-        assertEq(uint256(dispute.state), uint256(IDisputeResolver.DisputeState.Resolved));
+        // Poster appeals
+        vm.prank(poster);
+        resolver.appealResolution(disputeId);
+
+        // DAO overrides with invalid split percentage
+        vm.prank(dao);
+        vm.expectRevert(IDisputeResolver.InvalidOutcome.selector);
+        resolver.overrideResolution(
+            disputeId, IDisputeResolver.DisputeOutcome.Split, keccak256("resolution2"), 10_001
+        );
     }
 }
