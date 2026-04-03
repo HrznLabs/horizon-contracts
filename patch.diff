@@ -1,0 +1,11 @@
+--- src/DisputeResolver.sol
++++ src/DisputeResolver.sol
+@@ -261,7 +261,8 @@
+         Dispute storage dispute = _disputes[disputeId];
+
+         // Only pending or investigating state
+-        if (dispute.state != DisputeState.Pending && dispute.state != DisputeState.Investigating) {
++        DisputeState state = dispute.state;
++        if (state != DisputeState.Pending && state != DisputeState.Investigating) {
+             revert InvalidDisputeState();
+         }
