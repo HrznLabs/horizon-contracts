@@ -260,8 +260,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
     {
         Dispute storage dispute = _disputes[disputeId];
 
+        // ⚡ Bolt: Cache `dispute.state` in memory to avoid multiple redundant SLOAD operations
+        // Saves gas by replacing a second storage read with a cheaper stack read
+        DisputeState currentState = dispute.state;
         // Only pending or investigating state
-        if (dispute.state != DisputeState.Pending && dispute.state != DisputeState.Investigating) {
+        if (currentState != DisputeState.Pending && currentState != DisputeState.Investigating) {
             revert InvalidDisputeState();
         }
 
