@@ -430,6 +430,10 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert InvalidOutcome();
         }
 
+        if (newOutcome == DisputeOutcome.Split && splitPercentage > 10_000) {
+            revert InvalidOutcome();
+        }
+
         dispute.outcome = newOutcome;
         dispute.resolutionHash = resolutionHash;
         dispute.state = DisputeState.Finalized;
