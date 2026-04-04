@@ -155,19 +155,29 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
 
         // Verify escrow exists and is in disputed state
         IMissionEscrow escrow = IMissionEscrow(escrowAddress);
-        IMissionEscrow.MissionParams memory params = escrow.getParams();
-        IMissionEscrow.MissionRuntime memory runtime = escrow.getRuntime();
+
+        // ⚡ Bolt Optimization: Use `getDisputeDetails()` instead of multiple external calls
+        // (`getParams()` and `getRuntime()`). This reduces cross-contract data transfer
+        // by returning only the exactly required 5 fields instead of two large structs,
+        // successfully saving gas during execution.
+        (
+            address poster,
+            address performer,
+            IMissionEscrow.MissionState state,
+            uint256 rewardAmount,
+            bool disputeRaised
+        ) = escrow.getDisputeDetails();
 
         // Only poster or performer can raise dispute
-        if (msg.sender != params.poster && msg.sender != runtime.performer) {
+        if (msg.sender != poster && msg.sender != performer) {
             revert NotParty();
         }
 
         // Must be in accepted, submitted or disputed state
         if (
-            runtime.state != IMissionEscrow.MissionState.Accepted
-                && runtime.state != IMissionEscrow.MissionState.Submitted
-                && runtime.state != IMissionEscrow.MissionState.Disputed
+            state != IMissionEscrow.MissionState.Accepted
+                && state != IMissionEscrow.MissionState.Submitted
+                && state != IMissionEscrow.MissionState.Disputed
         ) {
             revert InvalidDisputeState();
         }
@@ -178,7 +188,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         // Calculate DDR amount
-        uint256 ddrAmount = (params.rewardAmount * DDR_RATE_BPS) / 10_000;
+        uint256 ddrAmount = (rewardAmount * DDR_RATE_BPS) / 10_000;
 
         // Transfer DDR from initiator
         usdc.safeTransferFrom(msg.sender, address(this), ddrAmount);
@@ -191,16 +201,16 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             disputeId: disputeId,
             escrowAddress: escrowAddress,
             missionId: missionId,
-            poster: params.poster,
-            performer: runtime.performer,
+            poster: poster,
+            performer: performer,
             initiator: msg.sender,
             state: DisputeState.Pending,
             outcome: DisputeOutcome.None,
             resolver: address(0),
             ddrAmount: ddrAmount,
-            lppAmount: (params.rewardAmount * LPP_RATE_BPS) / 10_000,
-            posterEvidenceHash: msg.sender == params.poster ? evidenceHash : bytes32(0),
-            performerEvidenceHash: msg.sender == runtime.performer ? evidenceHash : bytes32(0),
+            lppAmount: (rewardAmount * LPP_RATE_BPS) / 10_000,
+            posterEvidenceHash: msg.sender == poster ? evidenceHash : bytes32(0),
+            performerEvidenceHash: msg.sender == performer ? evidenceHash : bytes32(0),
             resolutionHash: bytes32(0),
             createdAt: block.timestamp,
             resolvedAt: 0,
@@ -215,8 +225,8 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         _escrowDispute[escrowAddress] = disputeId;
 
         // Ensure escrow is locked by calling raiseDispute
-        if (!runtime.disputeRaised) {
-            IMissionEscrow(escrowAddress).raiseDispute(evidenceHash);
+        if (!disputeRaised) {
+            escrow.raiseDispute(evidenceHash);
         }
 
         emit DisputeCreated(disputeId, escrowAddress, missionId, msg.sender, ddrAmount);

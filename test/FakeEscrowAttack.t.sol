@@ -65,6 +65,27 @@ contract FakeEscrow is IMissionEscrow {
     function getParticipants() external view returns (address, address, MissionState) {
         return (params.poster, runtime.performer, runtime.state);
     }
+
+    function getDisputeDetails()
+        external
+        view
+        returns (
+            address poster,
+            address performer,
+            MissionState state,
+            uint256 rewardAmount,
+            bool disputeRaised
+        )
+    {
+        return (
+            params.poster,
+            runtime.performer,
+            runtime.state,
+            params.rewardAmount,
+            runtime.disputeRaised
+        );
+    }
+
     function settleDispute(uint8, uint256) external { }
 }
 
