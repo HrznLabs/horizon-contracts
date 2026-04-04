@@ -109,4 +109,21 @@ interface IMissionEscrow {
         external
         view
         returns (address poster, address performer, MissionState state);
+
+    /**
+     * @notice Get specific fields needed for dispute resolution
+     * @dev ⚡ Bolt Optimization: Combines required fields from MissionParams
+     *      and MissionRuntime to prevent multiple expensive cross-contract
+     *      calls and reduce returned data size.
+     */
+    function getDisputeDetails()
+        external
+        view
+        returns (
+            address poster,
+            address performer,
+            MissionState state,
+            uint256 rewardAmount,
+            bool disputeRaised
+        );
 }
