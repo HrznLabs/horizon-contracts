@@ -77,6 +77,20 @@ contract FakeMissionEscrow is IMissionEscrow {
     function getParticipants() external view returns (address, address, MissionState) {
         return (poster, performer, MissionState.Accepted);
     }
+
+    function getDisputeDetails()
+        external
+        view
+        returns (
+            address p,
+            address perf,
+            MissionState s,
+            uint256 rewardAmount,
+            bool disputeRaised
+        )
+    {
+        return (poster, performer, MissionState.Accepted, 1000e6, false);
+    }
 }
 
 contract FakeMissionDisputeTest is Test {
