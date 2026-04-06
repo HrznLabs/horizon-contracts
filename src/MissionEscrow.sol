@@ -185,11 +185,13 @@ contract MissionEscrow is Initializable, IMissionEscrow {
     function approveCompletion() external onlyPoster inState(MissionState.Submitted) {
         _state = MissionState.Completed;
 
-        // Cache storage variables to stack to save SLOADs
-        uint96 rewardAmount = _rewardAmount;
+        // ⚡ Bolt Optimization: Cache storage variables to stack to save SLOADs.
+        // Explicitly cast packed variables (`uint96`) to `uint256` to eliminate EVM
+        // bitwise masking overhead during subsequent stack operations, saving gas.
+        uint256 rewardAmount = uint256(_rewardAmount);
         address paymentRouter = _paymentRouter;
         address usdc = _usdc;
-        uint96 missionId = _missionId;
+        uint256 missionId = uint256(_missionId);
         address performer = _performer;
         address guild = _guild;
         address reputationAttestations = _reputationAttestations;
