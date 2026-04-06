@@ -8,6 +8,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { IMissionEscrow } from "./interfaces/IMissionEscrow.sol";
 import { MissionEscrow } from "./MissionEscrow.sol";
+import { IGuildFactory } from "./interfaces/IGuildFactory.sol";
 
 /**
  * @title MissionFactory
@@ -39,6 +40,9 @@ contract MissionFactory is Ownable, ReentrancyGuard {
 
     /// @notice ReputationAttestations contract address
     address public reputationAttestations;
+
+    /// @notice GuildFactory contract address
+    address public guildFactory;
 
     /// @notice Current mission counter
     /// @dev Packed with disputeResolver (20 bytes + 12 bytes = 32 bytes)
@@ -77,6 +81,7 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     event PaymentRouterUpdated(address indexed newRouter);
     event DisputeResolverUpdated(address indexed resolver);
     event ReputationAttestationsUpdated(address indexed reputation);
+    event GuildFactoryUpdated(address indexed newFactory);
 
     // =============================================================================
     // ERRORS
@@ -88,6 +93,8 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     error InvalidDisputeResolver();
     error TransferFailed();
     error MissionNotFound();
+    error GuildFactoryNotSet();
+    error InvalidGuild();
 
     // =============================================================================
     // CONSTRUCTOR
@@ -139,6 +146,12 @@ contract MissionFactory is Ownable, ReentrancyGuard {
 
         // Validate dispute resolver
         if (disputeResolver == address(0)) revert InvalidDisputeResolver();
+
+        // Validate guild if provided
+        if (guild != address(0)) {
+            if (guildFactory == address(0)) revert GuildFactoryNotSet();
+            if (!IGuildFactory(guildFactory).isValidGuild(guild)) revert InvalidGuild();
+        }
 
         // Increment mission counter
         // Safe cast: missionCount is uint96, so missionId fits in uint96
@@ -261,6 +274,15 @@ contract MissionFactory is Ownable, ReentrancyGuard {
         // Allow setting to 0 to disable
         reputationAttestations = _reputationAttestations;
         emit ReputationAttestationsUpdated(_reputationAttestations);
+    }
+
+    /**
+     * @notice Update the guild factory address
+     * @param _guildFactory New guild factory address
+     */
+    function setGuildFactory(address _guildFactory) external onlyOwner {
+        guildFactory = _guildFactory;
+        emit GuildFactoryUpdated(_guildFactory);
     }
 }
 
