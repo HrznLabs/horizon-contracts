@@ -6,10 +6,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { IPaymentRouter } from "./interfaces/IPaymentRouter.sol";
-
-interface IMissionFactory {
-    function missions(uint256 missionId) external view returns (address);
-}
+import { IMissionFactory } from "./interfaces/IMissionFactory.sol";
 
 /**
  * @title PaymentRouter
@@ -97,7 +94,7 @@ contract PaymentRouter is Ownable, ReentrancyGuard, IPaymentRouter {
         if (missionFactory == address(0)) {
             revert OnlyMissionEscrow();
         }
-        if (msg.sender != IMissionFactory(missionFactory).missions(missionId)) {
+        if (msg.sender != IMissionFactory(missionFactory).getMission(missionId)) {
             revert OnlyMissionEscrow();
         }
         _;
