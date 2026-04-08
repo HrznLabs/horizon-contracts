@@ -144,8 +144,11 @@ contract MissionFactory is Ownable, ReentrancyGuard {
             revert InvalidDuration(duration, MIN_DURATION, MAX_DURATION);
         }
 
+        // ⚡ Bolt Optimization: Cache state variable to save an SLOAD
+        address _disputeResolver = disputeResolver;
+
         // Validate dispute resolver
-        if (disputeResolver == address(0)) revert InvalidDisputeResolver();
+        if (_disputeResolver == address(0)) revert InvalidDisputeResolver();
 
         // Validate guild if provided
         if (guild != address(0)) {
@@ -176,7 +179,7 @@ contract MissionFactory is Ownable, ReentrancyGuard {
                 locationHash,
                 paymentRouter,
                 address(usdc),
-                disputeResolver,
+                _disputeResolver,
                 reputationAttestations
             );
 
