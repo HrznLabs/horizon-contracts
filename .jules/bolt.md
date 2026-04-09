@@ -8,3 +8,6 @@
 ## $(date +%Y-%m-%d) - Explicit Casting of Packed Storage Variables When Caching
 **Learning:** In Solidity, caching packed storage variables (like `uint96`) into local stack memory variables without explicitly casting them to `uint256` incurs hidden EVM gas overhead. The EVM performs continuous bitwise masking operations every time those variables are referenced in subsequent operations or arithmetic.
 **Action:** When caching smaller packed storage variables to stack variables, immediately and explicitly cast them to `uint256` (e.g., `uint256 rewardAmount = uint256(_rewardAmount);`) to avoid repetitive EVM bitwise masking overhead and demonstrably save gas.
+## 2024-04-10 - Use Storage Pointers for Redundant Mapping Lookups
+**Learning:** Accessing a struct via a mapping lookup multiple times (e.g. `_members[member]`) inside a function like `removeMember` wastes gas due to multiple KECCAK256 operations for the storage slot evaluation.
+**Action:** Declare a local storage pointer (e.g. `GuildMember storage m = _members[member];`) to cache the mapping reference. This avoids redundant mapping lookups and significantly reduces gas consumption.

@@ -147,13 +147,17 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @param member Address to remove
      */
     function removeMember(address member) external onlyRole(OFFICER_ROLE) {
-        if (!_members[member].isMember) revert NotMember();
+        // ⚡ Bolt Optimization: Use a storage pointer to avoid redundant mapping lookups
+        // This saves gas by replacing multiple keystrokes hashing and mapping slot evaluations with a single memory reference.
+        GuildMember storage m = _members[member];
+
+        if (!m.isMember) revert NotMember();
         if (hasRole(DEFAULT_ADMIN_ROLE, member) || hasRole(ADMIN_ROLE, member)) {
             revert CannotRemoveAdmin();
         }
 
-        _members[member].isMember = false;
-        _members[member].leftAt = uint64(block.timestamp);
+        m.isMember = false;
+        m.leftAt = uint64(block.timestamp);
 
         memberCount--;
 
