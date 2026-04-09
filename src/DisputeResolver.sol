@@ -336,7 +336,9 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert InvalidOutcome();
         }
 
-        if (outcome == DisputeOutcome.Split && splitPercentage > 10_000) {
+        // Prevent DDR bypass by ensuring Split is strictly > 0 and < 100%
+        if (outcome == DisputeOutcome.Split && (splitPercentage == 0 || splitPercentage >= 10_000))
+        {
             revert InvalidOutcome();
         }
 
@@ -443,7 +445,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert InvalidOutcome();
         }
 
-        if (newOutcome == DisputeOutcome.Split && splitPercentage > 10_000) {
+        // Prevent DDR bypass by ensuring Split is strictly > 0 and < 100%
+        if (
+            newOutcome == DisputeOutcome.Split
+                && (splitPercentage == 0 || splitPercentage >= 10_000)
+        ) {
             revert InvalidOutcome();
         }
 

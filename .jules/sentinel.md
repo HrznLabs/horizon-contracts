@@ -75,3 +75,7 @@
 **Vulnerability:** The `MissionFactory.createMission` function accepted an arbitrary `guild` address without validating if it was a real, deployed guild. This allowed a poster to set themselves as the guild to receive the 3% guild fee as a rebate, evading the protocol fee structure.
 **Learning:** Contracts must explicitly validate external entities if those entities are used later in the lifecycle to receive privileged treatment or funds (like referral/guild fees in the `PaymentRouter`).
 **Prevention:** If an external system (like `PaymentRouter`) relies on a parameterized entity for fee distribution, ensure the originating contract (`MissionFactory`) strictly authenticates that entity against a trusted registry (like `GuildFactory`).
+## 2026-04-09 - Prevent DDR Bypass via Split Percentage
+**Vulnerability:** A resolver or DAO override could bypass the Dynamic Dispute Reserve (DDR) requirement for the winning party by setting `DisputeOutcome.Split` with a `splitPercentage` of 0 or 10,000, effectively awarding 100% of the funds to a party that never deposited DDR.
+**Learning:** Edge cases in enum/percentage logic (like 0% or 100% in a Split outcome) can be used to bypass critical security invariants (e.g., ensuring both parties put skin in the game) if not explicitly prevented.
+**Prevention:** Always validate that inputs logically align with the state/outcome they represent. For a 'Split' outcome, the percentage must be strictly greater than 0 and less than 100% (0 < splitPercentage < 10,000).
