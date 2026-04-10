@@ -145,10 +145,13 @@ contract ReputationAttestations is Ownable {
         rating.timestamp = uint64(block.timestamp);
         rating.commentHash = commentHash;
 
-        // Update ratee's statistics using storage pointer
-        RatingStats storage stats = _ratingStats[ratee];
+        // ⚡ Bolt Optimization: Use memory struct to batch storage reads and writes.
+        // Reading the packed struct to memory and writing it back saves gas
+        // by avoiding multiple separate SLOADs and SSTOREs on the same slot.
+        RatingStats memory stats = _ratingStats[ratee];
         stats.count++;
         stats.sum += score;
+        _ratingStats[ratee] = stats;
 
         emit RatingSubmitted(missionId, msg.sender, ratee, score, commentHash);
     }
