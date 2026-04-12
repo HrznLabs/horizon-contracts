@@ -121,7 +121,12 @@ contract DisputeResolverSecurity is Test {
 
         // 9. Attacker calls finalizeDispute - SHOULD REVERT
         vm.prank(attacker);
-        vm.expectRevert(IDisputeResolver.InvalidDisputeState.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDisputeResolver.InvalidDisputeState.selector,
+                IDisputeResolver.DisputeState.Appealed
+            )
+        );
         disputeResolverContract.finalizeDispute(disputeId);
 
         // 10. Verify state is still Appealed

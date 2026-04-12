@@ -89,7 +89,7 @@ interface IDisputeResolver {
     // ERRORS
     // =============================================================================
 
-    error InvalidDisputeState();
+    error InvalidDisputeState(DisputeState current);
     error NotParty();
     error NotResolver();
     error NotDAO();
