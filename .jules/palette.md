@@ -29,3 +29,7 @@
 ## 2026-02-27 - Contextual State Errors
 **Learning:** Generic `InvalidState` errors in smart contracts are a black box for frontend developers, forcing them to guess why a transaction failed. Returning `InvalidState(CurrentState)` provides immediate context, allowing the UI to explain *why* an action is blocked (e.g., "Mission is already Submitted" vs "Mission is Expired").
 **Action:** Always include the current state as a parameter in state-related custom errors.
+
+## 2026-02-28 - Contextual State Errors for Disputes
+**Learning:** Generic `InvalidDisputeState` errors without context make it hard to understand why a dispute action failed. Returning `InvalidDisputeState(DisputeState current)` provides immediate context, showing exactly which invalid state the dispute was in when the action was attempted.
+**Action:** Include the current dispute state parameter in the `InvalidDisputeState` error within `IDisputeResolver.sol`.

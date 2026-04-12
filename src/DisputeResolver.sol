@@ -179,12 +179,13 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
                 && state != IMissionEscrow.MissionState.Submitted
                 && state != IMissionEscrow.MissionState.Disputed
         ) {
-            revert InvalidDisputeState();
+            revert InvalidDisputeState(DisputeState.None);
         }
 
         // Check no existing dispute for this escrow
-        if (_escrowDispute[escrowAddress] != 0) {
-            revert InvalidDisputeState();
+        uint256 existingDisputeId = _escrowDispute[escrowAddress];
+        if (existingDisputeId != 0) {
+            revert InvalidDisputeState(_disputes[existingDisputeId].state);
         }
 
         // Calculate DDR amount
@@ -245,7 +246,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         Dispute storage dispute = _disputes[disputeId];
 
         if (dispute.state != DisputeState.Pending) {
-            revert InvalidDisputeState();
+            revert InvalidDisputeState(dispute.state);
         }
 
         if (dispute.resolver != address(0)) {
@@ -275,7 +276,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         DisputeState currentState = dispute.state;
         // Only pending or investigating state
         if (currentState != DisputeState.Pending && currentState != DisputeState.Investigating) {
-            revert InvalidDisputeState();
+            revert InvalidDisputeState(currentState);
         }
 
         // Only parties can submit evidence
@@ -329,7 +330,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         if (dispute.state != DisputeState.Investigating) {
-            revert InvalidDisputeState();
+            revert InvalidDisputeState(dispute.state);
         }
 
         if (outcome == DisputeOutcome.None) {
@@ -387,7 +388,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         if (dispute.state != DisputeState.Resolved) {
-            revert InvalidDisputeState();
+            revert InvalidDisputeState(dispute.state);
         }
 
         if (block.timestamp > dispute.appealDeadline) {
@@ -413,7 +414,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             }
         } else {
             // Appealed disputes are finalized by DAO override
-            revert InvalidDisputeState();
+            revert InvalidDisputeState(dispute.state);
         }
 
         dispute.state = DisputeState.Finalized;
@@ -438,7 +439,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         Dispute storage dispute = _disputes[disputeId];
 
         if (dispute.state != DisputeState.Appealed) {
-            revert InvalidDisputeState();
+            revert InvalidDisputeState(dispute.state);
         }
 
         if (newOutcome == DisputeOutcome.None) {
