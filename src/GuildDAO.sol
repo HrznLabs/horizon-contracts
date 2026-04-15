@@ -133,10 +133,13 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     }
 
     function _addMember(address member) internal {
-        if (_members[member].isMember) revert AlreadyMember();
+        // ⚡ Bolt Optimization: Use a storage pointer to avoid redundant mapping lookups
+        GuildMember storage m = _members[member];
+        if (m.isMember) revert AlreadyMember();
 
-        _members[member] =
-            GuildMember({ isMember: true, joinedAt: uint64(block.timestamp), leftAt: 0 });
+        m.isMember = true;
+        m.joinedAt = uint64(block.timestamp);
+        m.leftAt = 0;
 
         memberCount++;
         emit GuildMemberAdded(address(this), member);
