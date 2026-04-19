@@ -106,10 +106,13 @@ contract ReputationAttestations is Ownable {
         if (score < 1 || score > 5) revert InvalidScore();
         if (msg.sender == ratee) revert SelfRating();
 
-        // Validate mission and participation
-        if (missionFactory == address(0)) revert NotAuthorized();
+        // ⚡ Bolt Optimization: Cache state variable to memory to save SLOADs
+        address _missionFactory = missionFactory;
 
-        address escrow = IMissionFactory(missionFactory).getMission(missionId);
+        // Validate mission and participation
+        if (_missionFactory == address(0)) revert NotAuthorized();
+
+        address escrow = IMissionFactory(_missionFactory).getMission(missionId);
         IMissionEscrow mission = IMissionEscrow(escrow);
 
         // Check if mission is completed
@@ -171,8 +174,11 @@ contract ReputationAttestations is Ownable {
         bool completed,
         uint256 rewardAmount
     ) external {
-        if (missionFactory == address(0)) revert NotAuthorized();
-        if (msg.sender != IMissionFactory(missionFactory).getMission(missionId)) {
+        // ⚡ Bolt Optimization: Cache state variable to memory to save SLOADs
+        address _missionFactory = missionFactory;
+
+        if (_missionFactory == address(0)) revert NotAuthorized();
+        if (msg.sender != IMissionFactory(_missionFactory).getMission(missionId)) {
             revert NotAuthorized();
         }
 
