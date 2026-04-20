@@ -79,3 +79,8 @@
 **Vulnerability:** A resolver or DAO override could bypass the Dynamic Dispute Reserve (DDR) requirement for the winning party by setting `DisputeOutcome.Split` with a `splitPercentage` of 0 or 10,000, effectively awarding 100% of the funds to a party that never deposited DDR.
 **Learning:** Edge cases in enum/percentage logic (like 0% or 100% in a Split outcome) can be used to bypass critical security invariants (e.g., ensuring both parties put skin in the game) if not explicitly prevented.
 **Prevention:** Always validate that inputs logically align with the state/outcome they represent. For a 'Split' outcome, the percentage must be strictly greater than 0 and less than 100% (0 < splitPercentage < 10,000).
+
+## 2025-06-25 - [Bypass of DDR Verification in DAO Override]
+**Vulnerability:** The `overrideResolution` function in `DisputeResolver.sol` lacked the DDR deposit enforcement checks that were present in the standard `resolveDispute` flow. This allowed the protocol DAO to set an outcome (e.g., `PosterWins`) where the winner had never deposited DDR, effectively bypassing the protocol's rule and allowing the winner to steal the DDR deposited by the other party.
+**Learning:** Replicated logic for alternative paths (like an admin override or fallback function) must meticulously mirror all state assertions and protocol rules of the primary path. Omitting these checks in privileged functions introduces systemic failure points that can lead to value extraction.
+**Prevention:** Whenever creating alternative flows or "override" mechanisms that bypass the standard lifecycle, explicitly verify that all state assertions, invariant checks, and parameter validations from the standard flow are present and correctly applied in the alternative path.
