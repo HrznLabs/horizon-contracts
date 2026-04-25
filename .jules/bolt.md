@@ -17,3 +17,6 @@
 ## 2024-05-18 - [Mapping Pointer Optimization]
 **Learning:** In Solidity, assigning a struct from a mapping to a storage pointer (e.g., `GuildMember storage m = _members[member]`) rather than checking `if (_members[member].isMember)` and then re-assigning the whole struct, significantly saves gas by avoiding redundant hashing of the mapping key.
 **Action:** Always prefer using a storage pointer to update mappings when modifying struct fields, and add comments explaining the specific optimization rationale.
+## 2024-05-19 - [Cache struct field to avoid SLOADs]
+**Learning:** In Solidity, accessing a struct member multiple times via a storage pointer causes multiple `SLOAD` operations.
+**Action:** When a struct field stored in a mapping is accessed multiple times within a block of code, assign it to a local stack variable to batch read and save gas. For example, instead of doing `achievement.typeId` multiple times, cache `uint32 typeId = achievement.typeId;`.
