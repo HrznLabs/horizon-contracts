@@ -20,3 +20,7 @@
 ## 2024-05-19 - [Cache struct field to avoid SLOADs]
 **Learning:** In Solidity, accessing a struct member multiple times via a storage pointer causes multiple `SLOAD` operations.
 **Action:** When a struct field stored in a mapping is accessed multiple times within a block of code, assign it to a local stack variable to batch read and save gas. For example, instead of doing `achievement.typeId` multiple times, cache `uint32 typeId = achievement.typeId;`.
+
+## 2024-05-04 - Memory struct optimization de-optimization for small structs
+**Learning:** While copying tightly packed single-slot structs to `memory` before updating saves gas (batching SLOAD/SSTORE), applying this pattern to extremely small structs that fit in a single storage slot (like `GuildMember` which is 17 bytes: bool + uint64 + uint64) is a de-optimization if the struct isn't updating all its members or the Solidity compiler's optimizer already efficiently caches and batches single-slot updates when accessed via a storage pointer. Copying to memory just adds `MSTORE` overhead and increases gas usage.
+**Action:** Do not use the `memory` struct batching pattern for small structs that easily fit entirely within a single storage slot; just use a storage pointer.
