@@ -289,9 +289,15 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
 
         // Check if DDR already deposited by this party
         if (_ddrDeposits[disputeId][msg.sender] == 0) {
+            // ⚡ Bolt Optimization: Cache struct field to avoid SLOADs
+            // Caching `dispute.ddrAmount` inside this conditional block prevents
+            // unconditional SLOAD gas usage when not needed, while saving a redundant
+            // SLOAD when the deposit logic executes.
+            uint256 ddrAmount = dispute.ddrAmount;
+
             // Deposit DDR
-            usdc.safeTransferFrom(msg.sender, address(this), dispute.ddrAmount);
-            _ddrDeposits[disputeId][msg.sender] = dispute.ddrAmount;
+            usdc.safeTransferFrom(msg.sender, address(this), ddrAmount);
+            _ddrDeposits[disputeId][msg.sender] = ddrAmount;
         }
 
         // Store evidence hash
