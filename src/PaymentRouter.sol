@@ -91,10 +91,12 @@ contract PaymentRouter is Ownable, ReentrancyGuard, IPaymentRouter {
     // =============================================================================
 
     modifier onlyAuthorized(uint256 missionId) {
-        if (missionFactory == address(0)) {
+        // ⚡ Bolt Optimization: Cache state variable to save an SLOAD
+        address _missionFactory = missionFactory;
+        if (_missionFactory == address(0)) {
             revert OnlyMissionEscrow();
         }
-        if (msg.sender != IMissionFactory(missionFactory).getMission(missionId)) {
+        if (msg.sender != IMissionFactory(_missionFactory).getMission(missionId)) {
             revert OnlyMissionEscrow();
         }
         _;
