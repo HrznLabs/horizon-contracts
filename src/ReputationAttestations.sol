@@ -148,13 +148,14 @@ contract ReputationAttestations is Ownable {
         rating.timestamp = uint64(block.timestamp);
         rating.commentHash = commentHash;
 
-        // ⚡ Bolt Optimization: Use memory struct to batch storage reads and writes.
-        // Reading the packed struct to memory and writing it back saves gas
-        // by avoiding multiple separate SLOADs and SSTOREs on the same slot.
-        RatingStats memory stats = _ratingStats[ratee];
+        // ⚡ Bolt Optimization: Use a storage pointer for single-slot structs.
+        // While copying to memory can batch operations for multi-slot structs,
+        // applying this to small structs that fit in a single slot (like RatingStats)
+        // is a de-optimization since the optimizer handles single-slot updates efficiently,
+        // and memory copying only adds MSTORE overhead.
+        RatingStats storage stats = _ratingStats[ratee];
         stats.count++;
         stats.sum += score;
-        _ratingStats[ratee] = stats;
 
         emit RatingSubmitted(missionId, msg.sender, ratee, score, commentHash);
     }

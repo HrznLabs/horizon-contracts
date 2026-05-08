@@ -1,172 +1,202 @@
 No files changed, compilation skipped
 
-Ran 1 test for test/MissionEscrow_UX.t.sol:MissionEscrowUXTest
-[PASS] test_RevertWithNotParty_WhenRandomUserRaisesDispute() (gas: 496423)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.14ms (420.51µs CPU time)
-
-Ran 3 tests for test/PaymentRouterSecurity.t.sol:PaymentRouterSecurityTest
-[PASS] test_AuthorizedSettlement() (gas: 229800)
-[PASS] test_Exploit_UnauthorizedSettlement() (gas: 142419)
-[PASS] test_RevertWhen_MissionFactoryNotSet() (gas: 1330657)
-Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 2.59ms (1.16ms CPU time)
-
-Ran 2 tests for test/ReputationAttestations.t.sol:ReputationAttestationsTest
-[PASS] testSubmitMultipleRatings() (gas: 224307)
-[PASS] testSubmitRating() (gas: 151649)
-Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.01ms (609.41µs CPU time)
-
-Ran 1 test for test/ReputationSecurity.t.sol:ReputationSecurity
-[PASS] test_Exploit_ReputationBypass_Fixed() (gas: 985126)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 5.10ms (2.13ms CPU time)
-
-Ran 2 tests for test/ReputationIntegration.t.sol:ReputationIntegrationTest
-[PASS] test_DoNotBlockPayment_WhenReputationReverts() (gas: 813825)
-[PASS] test_MissionOutcomeRecorded_WhenMissionCompleted() (gas: 633167)
-Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 4.27ms (2.87ms CPU time)
-
 Ran 1 test for test/ClaimExpiredRepro.t.sol:ClaimExpiredRepro
-[PASS] test_PosterCannotClaimExpiredWhileDisputed() (gas: 502783)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.95ms (567.36µs CPU time)
+[PASS] test_PosterCannotClaimExpiredWhileDisputed() (gas: 504726)
+Logs:
+  Vulnerability fixed: Poster could not claim expired funds while disputed!
 
-Ran 1 test for test/SentinelClaimExpired.t.sol:SentinelClaimExpiredTest
-[PASS] test_PosterCannotClaimExpiredWhileSubmitted() (gas: 518634)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 3.46ms (549.46µs CPU time)
-
-Ran 1 test for test/ReputationOutcomeExploit.t.sol:ReputationOutcomeExploit
-[PASS] test_Exploit_RecordOutcome() (gas: 457942)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.21ms (255.52µs CPU time)
-
-Ran 1 test for test/SentinelGuildFactoryDeploy.t.sol:SentinelGuildFactoryDeployTest
-[PASS] test_GuildDAOImplIsInitialized() (gas: 36753)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 545.97µs (88.60µs CPU time)
-
-Ran 7 tests for test/MissionFactory.t.sol:MissionFactoryTest
-[PASS] test_AcceptMission() (gas: 490388)
-[PASS] test_CancelMission() (gas: 507804)
-[PASS] test_CompleteMission() (gas: 707696)
-[PASS] test_CreateMission() (gas: 487713)
-[PASS] test_RevertWhen_DurationTooShort() (gas: 92725)
-[PASS] test_RevertWhen_RewardTooLow() (gas: 92614)
-[PASS] test_SubmitProof() (gas: 546756)
-Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 8.55ms (7.17ms CPU time)
-
-Ran 1 test for test/SentinelMissionFactoryDeploy.t.sol:SentinelMissionFactoryDeployTest
-[PASS] test_MissionEscrowImplIsInitialized() (gas: 40179)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 848.57µs (71.59µs CPU time)
-
-Ran 1 test for test/PaymentRouterAuthRepro.t.sol:PaymentRouterAuthRepro
-[PASS] test_Exploit_UnauthorizedPaymentSettlement_Reverts() (gas: 84231)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 813.79µs (216.56µs CPU time)
-
-Ran 1 test for test/SentinelSubmitProofExpired.t.sol:SentinelSubmitProofExpiredTest
-[PASS] test_PerformerCannotSubmitProofAfterExpiry() (gas: 496626)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.35ms (406.27µs CPU time)
-
-Ran 1 test for test/SentinelDisputeSplitStealing.t.sol:SentinelDisputeSplitStealing
-[PASS] test_SplitStealing() (gas: 1344980)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 3.33ms (1.29ms CPU time)
-
-Ran 1 test for test/SentinelGuildDAOInit.t.sol:SentinelGuildDAOInitTest
-[PASS] test_CannotInitializeImplementation() (gas: 33593)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 907.74µs (72.58µs CPU time)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 5.69ms (1.18ms CPU time)
 
 Ran 1 test for test/FakeEscrowAttack.t.sol:FakeEscrowAttack
-[PASS] test_FakeEscrowAttack() (gas: 998085)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.20ms (611.26µs CPU time)
+[PASS] test_FakeEscrowAttack() (gas: 1000016)
+Logs:
+  Attack prevented: Fake escrow rejected
 
-Ran 1 test for test/VulnerabilityRepro.t.sol:VulnerabilityRepro
-[PASS] test_Exploit_UnauthorizedDisputeSettlement_Reverts() (gas: 611418)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.57ms (499.58µs CPU time)
-
-Ran 2 tests for test/DisputeAfterExpiry.t.sol:DisputeAfterExpiryTest
-[PASS] test_CanRaiseDisputeAfterExpiryIfSubmitted() (gas: 492365)
-[PASS] test_PerformerCannotGriefPosterAfterExpiry() (gas: 489062)
-Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 6.20ms (5.15ms CPU time)
-
-Ran 1 test for test/DisputeResolverSecurity.t.sol:DisputeResolverSecurity
-[PASS] test_AppealBypass() (gas: 1351215)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.56ms (878.86µs CPU time)
-
-Ran 2 tests for test/DisputeFeeBypass.t.sol:DisputeFeeBypass
-[PASS] test_PerformerGetsRewardWithFeesAfterDispute() (gas: 616127)
-[PASS] test_SplitOutcomeApplyFees() (gas: 634723)
-Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 2.34ms (1.24ms CPU time)
-
-Ran 1 test for test/DisputeResolverDeadlock.t.sol:DisputeResolverDeadlock
-[PASS] test_DisputeDeadlock_OnePartyNoShow_Fails() (gas: 1178303)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 4.01ms (682.62µs CPU time)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 7.46ms (1.86ms CPU time)
 
 Ran 1 test for test/FakeMissionDispute.t.sol:FakeMissionDisputeTest
 [PASS] test_CreateDisputeWithFakeEscrow() (gas: 45386)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 5.08ms (124.39µs CPU time)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.06ms (174.48µs CPU time)
 
-Ran 2 tests for test/EscrowLockingExploit.t.sol:EscrowLockingExploit
-[PASS] test_Exploit_Fixed_RevertOnDirectCall() (gas: 481067)
-[PASS] test_LegitimateDispute_AcceptedState() (gas: 930569)
-Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 2.43ms (915.63µs CPU time)
+Ran 2 tests for test/DisputeAfterExpiry.t.sol:DisputeAfterExpiryTest
+[PASS] test_CanRaiseDisputeAfterExpiryIfSubmitted() (gas: 494308)
+[PASS] test_PerformerCannotGriefPosterAfterExpiry() (gas: 491005)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 3.86ms (1.20ms CPU time)
+
+Ran 1 test for test/DisputeResolverDeadlock.t.sol:DisputeResolverDeadlock
+[PASS] test_DisputeDeadlock_OnePartyNoShow_Fails() (gas: 1180482)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 11.33ms (1.84ms CPU time)
 
 Ran 5 tests for test/GuildDAO.t.sol:GuildDAOTest
-[PASS] test_AddMember() (gas: 87536)
+[PASS] test_AddMember() (gas: 87284)
 [PASS] test_Initialize() (gas: 111281)
-[PASS] test_RemoveMember() (gas: 137561)
-[PASS] test_RevertWhen_AddingExistingMember() (gas: 98528)
-[PASS] test_RevertWhen_RemovingNonMember() (gas: 42067)
-Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 1.56ms (796.80µs CPU time)
+[PASS] test_RemoveMember() (gas: 137227)
+[PASS] test_RevertWhen_AddingExistingMember() (gas: 98279)
+[PASS] test_RevertWhen_RemovingNonMember() (gas: 42070)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 3.97ms (1.73ms CPU time)
 
-Ran 2 tests for test/MissionEscrowSecurity.t.sol:MissionEscrowSecurity
-[PASS] test_PosterCannotStealFundsAfterSubmission() (gas: 519201)
-[PASS] test_RevertWhen_PosterAcceptsOwnMission() (gas: 374471)
-Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.59ms (595.08µs CPU time)
+Ran 2 tests for test/DisputeFeeBypass.t.sol:DisputeFeeBypass
+[PASS] test_PerformerGetsRewardWithFeesAfterDispute() (gas: 617979)
+Logs:
+  Performer Balance: 90000000
 
-Ran 1 test for test/DisputeResolverOverrideSplitValidation.t.sol:DisputeResolverOverrideSplitValidationTest
-[PASS] test_OverrideResolution_RevertIfSplitPercentageInvalid() (gas: 1118660)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 3.69ms (936.19µs CPU time)
+[PASS] test_SplitOutcomeApplyFees() (gas: 636575)
+Logs:
+  Performer Balance: 45000000
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 4.69ms (1.75ms CPU time)
 
 Ran 1 test for test/GuildDAOSecurity.t.sol:GuildDAOSecurityTest
-[PASS] test_OfficerCannotRemoveAdmin() (gas: 113107)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 4.35ms (3.37ms CPU time)
+[PASS] test_OfficerCannotRemoveAdmin() (gas: 113110)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.24ms (505.82µs CPU time)
+
+Ran 7 tests for test/MissionFactory.t.sol:MissionFactoryTest
+[PASS] test_AcceptMission() (gas: 492366)
+[PASS] test_CancelMission() (gas: 509782)
+[PASS] test_CompleteMission() (gas: 709544)
+[PASS] test_CreateMission() (gas: 489669)
+[PASS] test_RevertWhen_DurationTooShort() (gas: 92725)
+[PASS] test_RevertWhen_RewardTooLow() (gas: 92614)
+[PASS] test_SubmitProof() (gas: 548734)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 17.35ms (8.13ms CPU time)
+
+Ran 1 test for test/SentinelClaimExpired.t.sol:SentinelClaimExpiredTest
+[PASS] test_PosterCannotClaimExpiredWhileSubmitted() (gas: 520577)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.95ms (522.62µs CPU time)
 
 Ran 4 tests for test/HorizonAchievements.t.sol:HorizonAchievementsTest
 [PASS] test_CreateAchievementType() (gas: 200155)
 [PASS] test_MintAchievement() (gas: 481740)
 [PASS] test_SoulboundTransfer() (gas: 455119)
-[PASS] test_TradableTransfer() (gas: 558619)
-Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 1.58ms (1.09ms CPU time)
+[PASS] test_TradableTransfer() (gas: 558054)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 3.94ms (1.36ms CPU time)
+
+Ran 1 test for test/SentinelDisputeSplitStealing.t.sol:SentinelDisputeSplitStealing
+[PASS] test_SplitStealing() (gas: 1347159)
+Logs:
+  Poster Gain (DDR stolen): 500000000
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 5.10ms (1.45ms CPU time)
+
+Ran 1 test for test/PaymentRouterAuthRepro.t.sol:PaymentRouterAuthRepro
+[PASS] test_Exploit_UnauthorizedPaymentSettlement_Reverts() (gas: 84234)
+Logs:
+  Router Balance Before: 1000000000
+  Router Balance After: 1000000000
+  Attacker Balance: 0
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 5.93ms (391.64µs CPU time)
+
+Ran 2 tests for test/MissionEscrowSecurity.t.sol:MissionEscrowSecurity
+[PASS] test_PosterCannotStealFundsAfterSubmission() (gas: 521144)
+[PASS] test_RevertWhen_PosterAcceptsOwnMission() (gas: 376414)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 3.58ms (974.46µs CPU time)
+
+Ran 1 test for test/SentinelFakeGuildAttack.t.sol:SentinelFakeGuildAttack
+[PASS] test_FakeGuildStealsFee_Reverts() (gas: 43922)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.69ms (136.84µs CPU time)
+
+Ran 1 test for test/SentinelGuildDAOInit.t.sol:SentinelGuildDAOInitTest
+[PASS] test_CannotInitializeImplementation() (gas: 33593)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 640.54µs (64.86µs CPU time)
 
 Ran 1 test for test/MissionEscrow_Authorization.t.sol:MissionEscrowAuthorizationTest
-[PASS] test_RaiseDispute_RevertMessage() (gas: 496446)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.34ms (321.85µs CPU time)
+[PASS] test_RaiseDispute_RevertMessage() (gas: 498389)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.49ms (420.39µs CPU time)
+
+Ran 1 test for test/DisputeResolverOverrideSplitValidation.t.sol:DisputeResolverOverrideSplitValidationTest
+[PASS] test_OverrideResolution_RevertIfSplitPercentageInvalid() (gas: 1120748)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 13.15ms (5.30ms CPU time)
+
+Ran 1 test for test/SentinelGuildFactoryDeploy.t.sol:SentinelGuildFactoryDeployTest
+[PASS] test_GuildDAOImplIsInitialized() (gas: 36753)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 967.59µs (121.27µs CPU time)
+
+Ran 1 test for test/MissionEscrow_UX.t.sol:MissionEscrowUXTest
+[PASS] test_RevertWithNotParty_WhenRandomUserRaisesDispute() (gas: 498366)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.22ms (590.67µs CPU time)
+
+Ran 1 test for test/SentinelMissionFactoryDeploy.t.sol:SentinelMissionFactoryDeployTest
+[PASS] test_MissionEscrowImplIsInitialized() (gas: 40179)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.09ms (93.07µs CPU time)
+
+Ran 3 tests for test/PaymentRouterSecurity.t.sol:PaymentRouterSecurityTest
+[PASS] test_AuthorizedSettlement() (gas: 229721)
+[PASS] test_Exploit_UnauthorizedSettlement() (gas: 142338)
+[PASS] test_RevertWhen_MissionFactoryNotSet() (gas: 1329784)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 7.18ms (5.34ms CPU time)
+
+Ran 2 tests for test/ReputationAttestations.t.sol:ReputationAttestationsTest
+[PASS] testSubmitMultipleRatings() (gas: 224099)
+[PASS] testSubmitRating() (gas: 151545)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.32ms (529.81µs CPU time)
+
+Ran 1 test for test/SentinelSubmitProofExpired.t.sol:SentinelSubmitProofExpiredTest
+[PASS] test_PerformerCannotSubmitProofAfterExpiry() (gas: 498569)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.78ms (588.78µs CPU time)
+
+Ran 2 tests for test/EscrowLockingExploit.t.sol:EscrowLockingExploit
+[PASS] test_Exploit_Fixed_RevertOnDirectCall() (gas: 483010)
+[PASS] test_LegitimateDispute_AcceptedState() (gas: 932721)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 4.77ms (1.14ms CPU time)
+
+Ran 1 test for test/VulnerabilityRepro.t.sol:VulnerabilityRepro
+[PASS] test_Exploit_UnauthorizedDisputeSettlement_Reverts() (gas: 613361)
+Logs:
+  Exploit prevented: Attacker could not settle dispute
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.53ms (551.17µs CPU time)
+
+Ran 1 test for test/ReputationOutcomeExploit.t.sol:ReputationOutcomeExploit
+[PASS] test_Exploit_RecordOutcome() (gas: 459785)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.86ms (282.30µs CPU time)
+
+Ran 1 test for test/DisputeResolverSecurity.t.sol:DisputeResolverSecurity
+[PASS] test_AppealBypass() (gas: 1354061)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 9.45ms (1.08ms CPU time)
+
+Ran 1 test for test/ReputationSecurity.t.sol:ReputationSecurity
+[PASS] test_Exploit_ReputationBypass_Fixed() (gas: 986411)
+Logs:
+  Fix verified: Exploit prevented and valid rating succeeded
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 5.58ms (2.97ms CPU time)
+
+Ran 2 tests for test/ReputationIntegration.t.sol:ReputationIntegrationTest
+[PASS] test_DoNotBlockPayment_WhenReputationReverts() (gas: 832699)
+[PASS] test_MissionOutcomeRecorded_WhenMissionCompleted() (gas: 651961)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 9.39ms (6.96ms CPU time)
 
 ╭--------------------------------------------------+-----------------+--------+--------+--------+---------╮
 | src/DisputeResolver.sol:DisputeResolver Contract |                 |        |        |        |         |
 +=========================================================================================================+
 | Deployment Cost                                  | Deployment Size |        |        |        |         |
 |--------------------------------------------------+-----------------+--------+--------+--------+---------|
-| 2016152                                          | 9162            |        |        |        |         |
+|                                          2138792 |            9729 |        |        |        |         |
 |--------------------------------------------------+-----------------+--------+--------+--------+---------|
 |                                                  |                 |        |        |        |         |
 |--------------------------------------------------+-----------------+--------+--------+--------+---------|
 | Function Name                                    | Min             | Avg    | Median | Max    | # Calls |
 |--------------------------------------------------+-----------------+--------+--------+--------+---------|
-| appealResolution                                 | 34788           | 35856  | 35856  | 36925  | 2       |
+| appealResolution                                 |           34788 |  35856 |  35856 |  36925 |       2 |
 |--------------------------------------------------+-----------------+--------+--------+--------+---------|
-| assignResolver                                   | 55225           | 55228  | 55225  | 55237  | 4       |
+| assignResolver                                   |           55225 |  55228 |  55225 |  55237 |       4 |
 |--------------------------------------------------+-----------------+--------+--------+--------+---------|
-| createDispute                                    | 28169           | 317974 | 435453 | 440188 | 7       |
+| createDispute                                    |           28169 | 318124 | 435662 | 440397 |       7 |
 |--------------------------------------------------+-----------------+--------+--------+--------+---------|
-| finalizeDispute                                  | 31114           | 105992 | 105992 | 180870 | 2       |
+| finalizeDispute                                  |           31357 | 106113 | 106113 | 180870 |       2 |
 |--------------------------------------------------+-----------------+--------+--------+--------+---------|
-| getDDRRate                                       | 249             | 249    | 249    | 249    | 1       |
+| getDDRRate                                       |             249 |    249 |    249 |    249 |       1 |
 |--------------------------------------------------+-----------------+--------+--------+--------+---------|
-| getDispute                                       | 33979           | 33979  | 33979  | 33979  | 5       |
+| getDispute                                       |           33979 |  33979 |  33979 |  33979 |       5 |
 |--------------------------------------------------+-----------------+--------+--------+--------+---------|
-| getDisputesByMission                             | 2790            | 2790   | 2790   | 2790   | 1       |
+| getDisputesByMission                             |            2790 |   2790 |   2790 |   2790 |       1 |
 |--------------------------------------------------+-----------------+--------+--------+--------+---------|
-| overrideResolution                               | 28793           | 28793  | 28793  | 28793  | 1       |
+| overrideResolution                               |           28820 |  28820 |  28820 |  28820 |       1 |
 |--------------------------------------------------+-----------------+--------+--------+--------+---------|
-| resolveDispute                                   | 105102          | 112758 | 109281 | 127369 | 4       |
+| resolveDispute                                   |          105102 | 112778 | 109308 | 127396 |       4 |
 |--------------------------------------------------+-----------------+--------+--------+--------+---------|
-| submitEvidence                                   | 79853           | 91613  | 91613  | 103374 | 2       |
+| submitEvidence                                   |           79735 |  91495 |  91495 | 103256 |       2 |
 ╰--------------------------------------------------+-----------------+--------+--------+--------+---------╯
 
 ╭------------------------------------+-----------------+--------+--------+--------+---------╮
@@ -174,41 +204,41 @@ Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.34ms (321.85µs C
 +===========================================================================================+
 | Deployment Cost                    | Deployment Size |        |        |        |         |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| 1415326                            | 6397            |        |        |        |         |
+|                            1392853 |            6293 |        |        |        |         |
 |------------------------------------+-----------------+--------+--------+--------+---------|
 |                                    |                 |        |        |        |         |
 |------------------------------------+-----------------+--------+--------+--------+---------|
 | Function Name                      | Min             | Avg    | Median | Max    | # Calls |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| ADMIN_ROLE                         | 294             | 294    | 294    | 294    | 1       |
+| ADMIN_ROLE                         |             294 |    294 |    294 |    294 |       1 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| CURATOR_ROLE                       | 316             | 316    | 316    | 316    | 1       |
+| CURATOR_ROLE                       |             316 |    316 |    316 |    316 |       1 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| DEFAULT_ADMIN_ROLE                 | 282             | 282    | 282    | 282    | 1       |
+| DEFAULT_ADMIN_ROLE                 |             282 |    282 |    282 |    282 |       1 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| OFFICER_ROLE                       | 272             | 272    | 272    | 272    | 1       |
+| OFFICER_ROLE                       |             272 |    272 |    272 |    272 |       1 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| addMember                          | 5083            | 26695  | 32099  | 32099  | 5       |
+| addMember                          |            5086 |  26494 |  31847 |  31847 |       5 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| getConfig                          | 7926            | 7926   | 7926   | 7926   | 1       |
+| getConfig                          |            7926 |   7926 |   7926 |   7926 |       1 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| grantOfficerRole                   | 32186           | 32186  | 32186  | 32186  | 1       |
+| grantOfficerRole                   |           32186 |  32186 |  32186 |  32186 |       1 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| hasRole                            | 2750            | 2750   | 2750   | 2750   | 4       |
+| hasRole                            |            2750 |   2750 |   2750 |   2750 |       4 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| initialize                         | 25112           | 184415 | 237516 | 237516 | 8       |
+| initialize                         |           25112 | 184228 | 237267 | 237267 |       8 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| isAdmin                            | 2821            | 2821   | 2821   | 2821   | 2       |
+| isAdmin                            |            2821 |   2821 |   2821 |   2821 |       2 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| isCurator                          | 2842            | 2842   | 2842   | 2842   | 1       |
+| isCurator                          |            2842 |   2842 |   2842 |   2842 |       1 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| isMember                           | 2646            | 2646   | 2646   | 2646   | 5       |
+| isMember                           |            2646 |   2646 |   2646 |   2646 |       5 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| isOfficer                          | 2820            | 2820   | 2820   | 2820   | 1       |
+| isOfficer                          |            2820 |   2820 |   2820 |   2820 |       1 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| members                            | 2822            | 2822   | 2822   | 2822   | 2       |
+| members                            |            2822 |   2822 |   2822 |   2822 |       2 |
 |------------------------------------+-----------------+--------+--------+--------+---------|
-| removeMember                       | 5087            | 12529  | 7455   | 25045  | 3       |
+| removeMember                       |            5090 |  12503 |   7458 |  24963 |       3 |
 ╰------------------------------------+-----------------+--------+--------+--------+---------╯
 
 ╭--------------------------------------------+-----------------+--------+--------+--------+---------╮
@@ -216,15 +246,15 @@ Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.34ms (321.85µs C
 +===================================================================================================+
 | Deployment Cost                            | Deployment Size |        |        |        |         |
 |--------------------------------------------+-----------------+--------+--------+--------+---------|
-| 1925678                                    | 8651            |        |        |        |         |
+|                                    1903178 |            8547 |        |        |        |         |
 |--------------------------------------------+-----------------+--------+--------+--------+---------|
 |                                            |                 |        |        |        |         |
 |--------------------------------------------+-----------------+--------+--------+--------+---------|
 | Function Name                              | Min             | Avg    | Median | Max    | # Calls |
 |--------------------------------------------+-----------------+--------+--------+--------+---------|
-| createGuild                                | 359892          | 359892 | 359892 | 359892 | 6       |
+| createGuild                                |          359643 | 359643 | 359643 | 359643 |       6 |
 |--------------------------------------------+-----------------+--------+--------+--------+---------|
-| guildImplementation                        | 215             | 215    | 215    | 215    | 1       |
+| guildImplementation                        |             215 |    215 |    215 |    215 |       1 |
 ╰--------------------------------------------+-----------------+--------+--------+--------+---------╯
 
 ╭----------------------------------------------------------+-----------------+--------+--------+--------+---------╮
@@ -232,27 +262,27 @@ Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.34ms (321.85µs C
 +=================================================================================================================+
 | Deployment Cost                                          | Deployment Size |        |        |        |         |
 |----------------------------------------------------------+-----------------+--------+--------+--------+---------|
-| 2838829                                                  | 13329           |        |        |        |         |
+|                                                  2829076 |           13284 |        |        |        |         |
 |----------------------------------------------------------+-----------------+--------+--------+--------+---------|
 |                                                          |                 |        |        |        |         |
 |----------------------------------------------------------+-----------------+--------+--------+--------+---------|
 | Function Name                                            | Min             | Avg    | Median | Max    | # Calls |
 |----------------------------------------------------------+-----------------+--------+--------+--------+---------|
-| createAchievementType                                    | 145503          | 155689 | 155695 | 165863 | 4       |
+| createAchievementType                                    |          145503 | 155689 | 155695 | 165863 |       4 |
 |----------------------------------------------------------+-----------------+--------+--------+--------+---------|
-| getAchievement                                           | 5142            | 5142   | 5142   | 5142   | 1       |
+| getAchievement                                           |            5142 |   5142 |   5142 |   5142 |       1 |
 |----------------------------------------------------------+-----------------+--------+--------+--------+---------|
-| getAchievementType                                       | 15234           | 15234  | 15234  | 15234  | 1       |
+| getAchievementType                                       |           15234 |  15234 |  15234 |  15234 |       1 |
 |----------------------------------------------------------+-----------------+--------+--------+--------+---------|
-| getUserAchievementToken                                  | 2700            | 2700   | 2700   | 2700   | 1       |
+| getUserAchievementToken                                  |            2700 |   2700 |   2700 |   2700 |       1 |
 |----------------------------------------------------------+-----------------+--------+--------+--------+---------|
-| hasAchievement                                           | 2676            | 2676   | 2676   | 2676   | 3       |
+| hasAchievement                                           |            2676 |   2676 |   2676 |   2676 |       3 |
 |----------------------------------------------------------+-----------------+--------+--------+--------+---------|
-| mintAchievement                                          | 265461          | 265638 | 265727 | 265727 | 3       |
+| mintAchievement                                          |          265461 | 265638 | 265727 | 265727 |       3 |
 |----------------------------------------------------------+-----------------+--------+--------+--------+---------|
-| ownerOf                                                  | 2638            | 2638   | 2638   | 2638   | 2       |
+| ownerOf                                                  |            2638 |   2638 |   2638 |   2638 |       2 |
 |----------------------------------------------------------+-----------------+--------+--------+--------+---------|
-| transferFrom                                             | 28774           | 79982  | 79982  | 131191 | 2       |
+| transferFrom                                             |           28774 |  79700 |  79700 | 130626 |       2 |
 ╰----------------------------------------------------------+-----------------+--------+--------+--------+---------╯
 
 ╭----------------------------------------------+-----------------+--------+--------+--------+---------╮
@@ -260,35 +290,35 @@ Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.34ms (321.85µs C
 +=====================================================================================================+
 | Deployment Cost                              | Deployment Size |        |        |        |         |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
-| 0                                            | 5569            |        |        |        |         |
+|                                            0 |            5531 |        |        |        |         |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
 |                                              |                 |        |        |        |         |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
 | Function Name                                | Min             | Avg    | Median | Max    | # Calls |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
-| acceptMission                                | 6873            | 14265  | 14587  | 14587  | 24      |
+| acceptMission                                |            6873 |  14265 |  14587 |  14587 |      24 |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
-| approveCompletion                            | 167327          | 174670 | 175819 | 179717 | 4       |
+| approveCompletion                            |          167158 | 174501 | 175629 | 179587 |       4 |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
-| cancelMission                                | 28978           | 28978  | 28978  | 28978  | 1       |
+| cancelMission                                |           28978 |  28978 |  28978 |  28978 |       1 |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
-| claimExpired                                 | 4848            | 14559  | 4848   | 29126  | 5       |
+| claimExpired                                 |            4848 |  14559 |   4848 |  29126 |       5 |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
-| getDisputeDetails                            | 8966            | 8966   | 8966   | 8966   | 5       |
+| getDisputeDetails                            |            8966 |   8966 |   8966 |   8966 |       5 |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
-| getParams                                    | 13487           | 13487  | 13487  | 13487  | 1       |
+| getParams                                    |           13487 |  13487 |  13487 |  13487 |       1 |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
-| getParticipants                              | 6731            | 6731   | 6731   | 6731   | 4       |
+| getParticipants                              |            6731 |   6731 |   6731 |   6731 |       4 |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
-| getRuntime                                   | 7155            | 7155   | 7155   | 7155   | 19      |
+| getRuntime                                   |            7155 |   7155 |   7155 |   7155 |      19 |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
-| initialize                                   | 26290           | 181038 | 166665 | 226365 | 29      |
+| initialize                                   |           26290 | 181038 | 166665 | 226365 |      29 |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
-| raiseDispute                                 | 2444            | 7950   | 7950   | 11950  | 14      |
+| raiseDispute                                 |            2444 |   7950 |   7950 |  11950 |      14 |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
-| settleDispute                                | 2525            | 110756 | 124346 | 191809 | 4       |
+| settleDispute                                |            2525 | 110711 | 124300 | 191718 |       4 |
 |----------------------------------------------+-----------------+--------+--------+--------+---------|
-| submitProof                                  | 4790            | 31272  | 33479  | 33479  | 13      |
+| submitProof                                  |            4790 |  31272 |  33479 |  33479 |      13 |
 ╰----------------------------------------------+-----------------+--------+--------+--------+---------╯
 
 ╭------------------------------------------------+-----------------+--------+--------+--------+---------╮
@@ -296,31 +326,31 @@ Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.34ms (321.85µs C
 +=======================================================================================================+
 | Deployment Cost                                | Deployment Size |        |        |        |         |
 |------------------------------------------------+-----------------+--------+--------+--------+---------|
-| 2162721                                        | 9886            |        |        |        |         |
+|                                        2234528 |           10218 |        |        |        |         |
 |------------------------------------------------+-----------------+--------+--------+--------+---------|
 |                                                |                 |        |        |        |         |
 |------------------------------------------------+-----------------+--------+--------+--------+---------|
 | Function Name                                  | Min             | Avg    | Median | Max    | # Calls |
 |------------------------------------------------+-----------------+--------+--------+--------+---------|
-| createMission                                  | 28258           | 322968 | 327096 | 370464 | 30      |
+| createMission                                  |           28258 | 316437 | 329039 | 389507 |      31 |
 |------------------------------------------------+-----------------+--------+--------+--------+---------|
-| escrowImplementation                           | 327             | 327    | 327    | 327    | 1       |
+| escrowImplementation                           |             327 |    327 |    327 |    327 |       1 |
 |------------------------------------------------+-----------------+--------+--------+--------+---------|
-| getMission                                     | 530             | 2393   | 2530   | 2530   | 15      |
+| getMission                                     |             530 |   2432 |   2530 |   2530 |      21 |
 |------------------------------------------------+-----------------+--------+--------+--------+---------|
-| getMissionParams                               | 22451           | 22451  | 22451  | 22451  | 1       |
+| getMissionParams                               |           22429 |  22429 |  22429 |  22429 |       1 |
 |------------------------------------------------+-----------------+--------+--------+--------+---------|
-| getMissionRuntime                              | 15826           | 15826  | 15826  | 15826  | 5       |
+| getMissionRuntime                              |           15861 |  15861 |  15861 |  15861 |       5 |
 |------------------------------------------------+-----------------+--------+--------+--------+---------|
-| missionCount                                   | 2485            | 2485   | 2485   | 2485   | 1       |
+| missionCount                                   |            2485 |   2485 |   2485 |   2485 |       1 |
 |------------------------------------------------+-----------------+--------+--------+--------+---------|
-| missions                                       | 2520            | 2520   | 2520   | 2520   | 30      |
+| missions                                       |            2520 |   2520 |   2520 |   2520 |      24 |
 |------------------------------------------------+-----------------+--------+--------+--------+---------|
-| setDisputeResolver                             | 47026           | 47084  | 47038  | 47254  | 30      |
+| setDisputeResolver                             |           47136 |  47193 |  47148 |  47364 |      31 |
 |------------------------------------------------+-----------------+--------+--------+--------+---------|
-| setReputationAttestations                      | 30119           | 41519  | 47219  | 47219  | 3       |
+| setReputationAttestations                      |           30119 |  41519 |  47219 |  47219 |       3 |
 |------------------------------------------------+-----------------+--------+--------+--------+---------|
-| transferOwnership                              | 25571           | 25571  | 25571  | 25571  | 2       |
+| transferOwnership                              |           25571 |  25571 |  25571 |  25571 |       2 |
 ╰------------------------------------------------+-----------------+--------+--------+--------+---------╯
 
 ╭----------------------------------------------+-----------------+-------+--------+--------+---------╮
@@ -328,15 +358,15 @@ Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.34ms (321.85µs C
 +====================================================================================================+
 | Deployment Cost                              | Deployment Size |       |        |        |         |
 |----------------------------------------------+-----------------+-------+--------+--------+---------|
-| 1182076                                      | 5308            |       |        |        |         |
+|                                      1181200 |            5304 |       |        |        |         |
 |----------------------------------------------+-----------------+-------+--------+--------+---------|
 |                                              |                 |       |        |        |         |
 |----------------------------------------------+-----------------+-------+--------+--------+---------|
 | Function Name                                | Min             | Avg   | Median | Max    | # Calls |
 |----------------------------------------------+-----------------+-------+--------+--------+---------|
-| setMissionFactory                            | 46148           | 46148 | 46148  | 46148  | 21      |
+| setMissionFactory                            |           46148 | 46148 |  46148 |  46148 |      22 |
 |----------------------------------------------+-----------------+-------+--------+--------+---------|
-| settlePayment                                | 29473           | 60449 | 32267  | 147789 | 4       |
+| settlePayment                                |           29476 | 60410 |  32228 | 147710 |       4 |
 ╰----------------------------------------------+-----------------+-------+--------+--------+---------╯
 
 ╭----------------------------------------------------------------+-----------------+-------+--------+--------+---------╮
@@ -344,25 +374,25 @@ Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.34ms (321.85µs C
 +======================================================================================================================+
 | Deployment Cost                                                | Deployment Size |       |        |        |         |
 |----------------------------------------------------------------+-----------------+-------+--------+--------+---------|
-| 786281                                                         | 3430            |       |        |        |         |
+|                                                         785849 |            3428 |       |        |        |         |
 |----------------------------------------------------------------+-----------------+-------+--------+--------+---------|
 |                                                                |                 |       |        |        |         |
 |----------------------------------------------------------------+-----------------+-------+--------+--------+---------|
 | Function Name                                                  | Min             | Avg   | Median | Max    | # Calls |
 |----------------------------------------------------------------+-----------------+-------+--------+--------+---------|
-| getAverageRating                                               | 2971            | 2971  | 2971   | 2971   | 2       |
+| getAverageRating                                               |            2971 |  2971 |   2971 |   2971 |       2 |
 |----------------------------------------------------------------+-----------------+-------+--------+--------+---------|
-| getRating                                                      | 5254            | 5254  | 5254   | 5254   | 2       |
+| getRating                                                      |            5254 |  5254 |   5254 |   5254 |       2 |
 |----------------------------------------------------------------+-----------------+-------+--------+--------+---------|
-| ratingCounts                                                   | 2591            | 2591  | 2591   | 2591   | 2       |
+| ratingCounts                                                   |            2591 |  2591 |   2591 |   2591 |       2 |
 |----------------------------------------------------------------+-----------------+-------+--------+--------+---------|
-| ratingSums                                                     | 2586            | 2586  | 2586   | 2586   | 2       |
+| ratingSums                                                     |            2586 |  2586 |   2586 |   2586 |       2 |
 |----------------------------------------------------------------+-----------------+-------+--------+--------+---------|
-| recordOutcome                                                  | 30152           | 30152 | 30152  | 30152  | 1       |
+| recordOutcome                                                  |           30052 | 30052 |  30052 |  30052 |       1 |
 |----------------------------------------------------------------+-----------------+-------+--------+--------+---------|
-| setMissionFactory                                              | 45898           | 46050 | 46126  | 46126  | 6       |
+| setMissionFactory                                              |           45898 | 46050 |  46126 |  46126 |       6 |
 |----------------------------------------------------------------+-----------------+-------+--------+--------+---------|
-| submitRating                                                   | 30059           | 67985 | 61080  | 113404 | 8       |
+| submitRating                                                   |           29953 | 67880 |  60975 | 113300 |       8 |
 ╰----------------------------------------------------------------+-----------------+-------+--------+--------+---------╯
 
 ╭---------------------------------------------------------------------+-----------------+-------+--------+-------+---------╮
@@ -370,15 +400,15 @@ Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.34ms (321.85µs C
 +==========================================================================================================================+
 | Deployment Cost                                                     | Deployment Size |       |        |       |         |
 |---------------------------------------------------------------------+-----------------+-------+--------+-------+---------|
-| 512389                                                              | 2335            |       |        |       |         |
+|                                                              512389 |            2335 |       |        |       |         |
 |---------------------------------------------------------------------+-----------------+-------+--------+-------+---------|
 |                                                                     |                 |       |        |       |         |
 |---------------------------------------------------------------------+-----------------+-------+--------+-------+---------|
 | Function Name                                                       | Min             | Avg   | Median | Max   | # Calls |
 |---------------------------------------------------------------------+-----------------+-------+--------+-------+---------|
-| approve                                                             | 46679           | 46679 | 46679  | 46679 | 3       |
+| approve                                                             |           46679 | 46679 |  46679 | 46679 |       3 |
 |---------------------------------------------------------------------+-----------------+-------+--------+-------+---------|
-| mint                                                                | 51064           | 59614 | 59614  | 68164 | 2       |
+| mint                                                                |           51064 | 59614 |  59614 | 68164 |       2 |
 ╰---------------------------------------------------------------------+-----------------+-------+--------+-------+---------╯
 
 ╭-------------------------------------------------+-----------------+-------+--------+-------+---------╮
@@ -386,15 +416,15 @@ Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.34ms (321.85µs C
 +======================================================================================================+
 | Deployment Cost                                 | Deployment Size |       |        |       |         |
 |-------------------------------------------------+-----------------+-------+--------+-------+---------|
-| 470770                                          | 1959            |       |        |       |         |
+|                                          470758 |            1959 |       |        |       |         |
 |-------------------------------------------------+-----------------+-------+--------+-------+---------|
 |                                                 |                 |       |        |       |         |
 |-------------------------------------------------+-----------------+-------+--------+-------+---------|
 | Function Name                                   | Min             | Avg   | Median | Max   | # Calls |
 |-------------------------------------------------+-----------------+-------+--------+-------+---------|
-| setParams                                       | 66018           | 66018 | 66018  | 66018 | 1       |
+| setParams                                       |           66018 | 66018 |  66018 | 66018 |       1 |
 |-------------------------------------------------+-----------------+-------+--------+-------+---------|
-| setRuntime                                      | 44080           | 44080 | 44080  | 44080 | 1       |
+| setRuntime                                      |           44080 | 44080 |  44080 | 44080 |       1 |
 ╰-------------------------------------------------+-----------------+-------+--------+-------+---------╯
 
 ╭--------------------------------------------------------------+-----------------+-------+--------+-------+---------╮
@@ -402,15 +432,15 @@ Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.34ms (321.85µs C
 +===================================================================================================================+
 | Deployment Cost                                              | Deployment Size |       |        |       |         |
 |--------------------------------------------------------------+-----------------+-------+--------+-------+---------|
-| 133099                                                       | 398             |       |        |       |         |
+|                                                       133099 |             398 |       |        |       |         |
 |--------------------------------------------------------------+-----------------+-------+--------+-------+---------|
 |                                                              |                 |       |        |       |         |
 |--------------------------------------------------------------+-----------------+-------+--------+-------+---------|
 | Function Name                                                | Min             | Avg   | Median | Max   | # Calls |
 |--------------------------------------------------------------+-----------------+-------+--------+-------+---------|
-| missions                                                     | 2465            | 2465  | 2465   | 2465  | 2       |
+| getMission                                                   |            2487 |  2487 |   2487 |  2487 |       2 |
 |--------------------------------------------------------------+-----------------+-------+--------+-------+---------|
-| setMission                                                   | 43843           | 43843 | 43843  | 43843 | 3       |
+| setMission                                                   |           43843 | 43843 |  43843 | 43843 |       3 |
 ╰--------------------------------------------------------------+-----------------+-------+--------+-------+---------╯
 
 ╭-----------------------------------------------------------+-----------------+-------+--------+-------+---------╮
@@ -418,17 +448,17 @@ Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.34ms (321.85µs C
 +================================================================================================================+
 | Deployment Cost                                           | Deployment Size |       |        |       |         |
 |-----------------------------------------------------------+-----------------+-------+--------+-------+---------|
-| 512389                                                    | 2335            |       |        |       |         |
+|                                                    512389 |            2335 |       |        |       |         |
 |-----------------------------------------------------------+-----------------+-------+--------+-------+---------|
 |                                                           |                 |       |        |       |         |
 |-----------------------------------------------------------+-----------------+-------+--------+-------+---------|
 | Function Name                                             | Min             | Avg   | Median | Max   | # Calls |
 |-----------------------------------------------------------+-----------------+-------+--------+-------+---------|
-| approve                                                   | 46679           | 46679 | 46679  | 46679 | 2       |
+| approve                                                   |           46679 | 46679 |  46679 | 46679 |       2 |
 |-----------------------------------------------------------+-----------------+-------+--------+-------+---------|
-| balanceOf                                                 | 2559            | 2559  | 2559   | 2559  | 2       |
+| balanceOf                                                 |            2559 |  2559 |   2559 |  2559 |       2 |
 |-----------------------------------------------------------+-----------------+-------+--------+-------+---------|
-| mint                                                      | 51076           | 59626 | 59626  | 68176 | 2       |
+| mint                                                      |           51076 | 59626 |  59626 | 68176 |       2 |
 ╰-----------------------------------------------------------+-----------------+-------+--------+-------+---------╯
 
 ╭---------------------------------------------+-----------------+-------+--------+-------+---------╮
@@ -436,18 +466,18 @@ Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.34ms (321.85µs C
 +==================================================================================================+
 | Deployment Cost                             | Deployment Size |       |        |       |         |
 |---------------------------------------------+-----------------+-------+--------+-------+---------|
-| 562762                                      | 2997            |       |        |       |         |
+|                                      562762 |            2997 |       |        |       |         |
 |---------------------------------------------+-----------------+-------+--------+-------+---------|
 |                                             |                 |       |        |       |         |
 |---------------------------------------------+-----------------+-------+--------+-------+---------|
 | Function Name                               | Min             | Avg   | Median | Max   | # Calls |
 |---------------------------------------------+-----------------+-------+--------+-------+---------|
-| approve                                     | 29231           | 45881 | 46331  | 46343 | 38      |
+| approve                                     |           29231 | 45892 |  46331 | 46343 |      39 |
 |---------------------------------------------+-----------------+-------+--------+-------+---------|
-| balanceOf                                   | 2559            | 2559  | 2559   | 2559  | 30      |
+| balanceOf                                   |            2559 |  2559 |   2559 |  2559 |      30 |
 |---------------------------------------------+-----------------+-------+--------+-------+---------|
-| mint                                        | 51052           | 65182 | 68152  | 68380 | 40      |
+| mint                                        |           51052 | 65255 |  68152 | 68380 |      41 |
 ╰---------------------------------------------+-----------------+-------+--------+-------+---------╯
 
 
-Ran 29 test suites in 57.26ms (79.58ms CPU time): 50 tests passed, 0 failed, 0 skipped (50 total tests)
+Ran 30 test suites in 67.42ms (150.23ms CPU time): 51 tests passed, 0 failed, 0 skipped (51 total tests)
