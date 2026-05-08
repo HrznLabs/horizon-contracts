@@ -27,3 +27,7 @@
 ## 2024-05-20 - [State Variable Cache Optimization]
 **Learning:** In Solidity, accessing a state variable multiple times within a block of code (or modifier) causes multiple `SLOAD` operations. This happens in the `PaymentRouter`'s `onlyAuthorized` modifier where `missionFactory` is accessed to check if it's not address 0, and then again to call `IMissionFactory(missionFactory).getMission(missionId)`.
 **Action:** When a state variable is accessed multiple times within a block of code or modifier, assign it to a local stack variable to batch read and save gas. For example, instead of accessing `missionFactory` multiple times, cache it using `address _missionFactory = missionFactory;`.
+
+## $(date +%Y-%m-%d) - Single-slot Struct Storage Pointer vs Memory Copy
+**Learning:** While copying multi-slot or dynamic structs to `memory` before updating can save gas by batching `SLOAD` and `SSTORE` operations, applying this pattern to extremely small structs that fit entirely in a single storage slot (like `RatingStats` with two `uint128`s) is a de-optimization. The Solidity optimizer handles single-slot updates very efficiently directly via storage pointers. In `ReputationAttestations.sol`, copying `RatingStats` to `memory` and assigning it back added `MSTORE` overhead, costing ~131 extra gas per call.
+**Action:** Always use `storage` pointers for updating structs that pack into a single 32-byte slot. Only copy to `memory` when updating multiple fields across multiple slots.
