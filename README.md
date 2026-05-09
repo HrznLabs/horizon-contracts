@@ -86,7 +86,7 @@ sequenceDiagram
 
     ME->>PR: Settle Payment
 
-    Note right of PR: 4% → Protocol Treasury<br/>4% → Labs Treasury<br/>2% → Resolver Treasury<br/>0-15% → Guild Treasury<br/>75-90% → Performer
+    Note right of PR: 2.5% → Protocol Treasury<br/>2.5% → Labs Treasury<br/>2% → Resolver Treasury<br/>0-15% → Guild Treasury<br/>78-93% → Performer
 ```
 
 ## 📦 Contract Suite
@@ -125,13 +125,13 @@ Routes payments with configurable fee splits.
 
 **Fee Structure:**
 
-| Fee Type | Percentage | Recipient |
-|----------|------------|-----------|
-| Protocol Fee | 4% | Protocol Treasury |
-| Labs Fee | 4% | Labs Treasury |
-| Resolver Fee | 2% | Resolver Treasury |
-| Guild Fee | 0-15% (variable) | Guild Treasury |
-| Performer | 90% - guildFee | Performer |
+| Fee Type | Percentage | BPS | Recipient |
+|----------|------------|-----|-----------|
+| Protocol Fee | 2.5% | 250 BPS | Protocol Treasury |
+| Labs Fee | 2.5% | 250 BPS | Labs Treasury |
+| Resolver Fee | 2% | 200 BPS | Resolver Treasury |
+| Guild Fee | 0-15% (variable) | 0-1500 BPS | Guild Treasury |
+| Performer | 90%+ guaranteed | — | Performer |
 
 #### [`DisputeResolver.sol`](./src/DisputeResolver.sol)
 Handles mission disputes with economic incentives.
