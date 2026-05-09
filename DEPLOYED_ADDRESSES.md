@@ -36,13 +36,15 @@
 
 ## Fee Structure
 
-| Fee Type | Percentage | Recipient |
-|----------|------------|-----------|
-| Protocol Fee | 4% | Protocol Treasury |
-| Labs Fee | 4% | Labs Treasury |
-| Resolver Fee | 2% | Resolver Treasury |
-| Guild Fee | 0-15% (variable) | Guild Treasury |
-| Performer | 90% - guildFee | Performer |
+<!-- Last verified: 2026-05-10 against horizon/packages/contracts/src/PaymentRouter.sol -->
+
+| Fee Type | Percentage | BPS | Recipient |
+|----------|------------|-----|-----------|
+| Protocol Fee | 2.5% | 250 BPS | Protocol Treasury |
+| Labs Fee | 2.5% | 250 BPS | Labs Treasury |
+| Resolver Fee | 2.0% | 200 BPS | Resolver Pool |
+| Guild Fee | 0-15% (variable) | 0-1500 BPS | Guild Treasury |
+| Performer | 90%+ guaranteed | — | Performer |
 
 ### Dispute Resolution Fees
 
