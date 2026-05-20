@@ -31,3 +31,6 @@
 ## $(date +%Y-%m-%d) - Single-slot Struct Storage Pointer vs Memory Copy
 **Learning:** While copying multi-slot or dynamic structs to `memory` before updating can save gas by batching `SLOAD` and `SSTORE` operations, applying this pattern to extremely small structs that fit entirely in a single storage slot (like `RatingStats` with two `uint128`s) is a de-optimization. The Solidity optimizer handles single-slot updates very efficiently directly via storage pointers. In `ReputationAttestations.sol`, copying `RatingStats` to `memory` and assigning it back added `MSTORE` overhead, costing ~131 extra gas per call.
 **Action:** Always use `storage` pointers for updating structs that pack into a single 32-byte slot. Only copy to `memory` when updating multiple fields across multiple slots.
+## 2026-05-20 - Optimize GuildDAO removeMember Role Revocation
+**Learning:** In GuildDAO's `removeMember` function, removing redundant `hasRole` checks for `DEFAULT_ADMIN_ROLE` and `ADMIN_ROLE` during the role revocation phase (since the function already reverts early for these roles) measurably saves gas (from 24963 to 24225, a saving of 738 gas per call) by avoiding dead code and unnecessary mapping lookups.
+**Action:** Avoid redundant checks for states that have already been validated or caused early reverts earlier in the execution path.
