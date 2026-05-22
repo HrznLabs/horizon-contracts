@@ -31,3 +31,6 @@
 ## $(date +%Y-%m-%d) - Single-slot Struct Storage Pointer vs Memory Copy
 **Learning:** While copying multi-slot or dynamic structs to `memory` before updating can save gas by batching `SLOAD` and `SSTORE` operations, applying this pattern to extremely small structs that fit entirely in a single storage slot (like `RatingStats` with two `uint128`s) is a de-optimization. The Solidity optimizer handles single-slot updates very efficiently directly via storage pointers. In `ReputationAttestations.sol`, copying `RatingStats` to `memory` and assigning it back added `MSTORE` overhead, costing ~131 extra gas per call.
 **Action:** Always use `storage` pointers for updating structs that pack into a single 32-byte slot. Only copy to `memory` when updating multiple fields across multiple slots.
+## 2024-05-22 - Optimize redundant `hasRole` checks in `removeMember`
+**Learning:** Checking for early revert conditions is good, but if the function does early revert, subsequent logic should not redundantly check for those exact same conditions if they involve state reads. `hasRole` reads from storage and costs gas (up to 2100 gas for a cold read).
+**Action:** Always scan functions with early reverts to ensure subsequent code does not perform redundant evaluations of those exact same revert conditions, particularly when they involve expensive operations like `SLOAD`.
