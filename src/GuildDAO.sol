@@ -164,9 +164,10 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
 
         memberCount--;
 
-        // Revoke all roles
-        if (hasRole(DEFAULT_ADMIN_ROLE, member)) _revokeRole(DEFAULT_ADMIN_ROLE, member);
-        if (hasRole(ADMIN_ROLE, member)) _revokeRole(ADMIN_ROLE, member);
+        // ⚡ Bolt Optimization: Removed redundant hasRole checks for DEFAULT_ADMIN_ROLE and ADMIN_ROLE.
+        // These are dead code and cost unnecessary gas because the function already reverted above
+        // if the member had either of these roles.
+        // Revoke remaining roles
         if (hasRole(OFFICER_ROLE, member)) _revokeRole(OFFICER_ROLE, member);
         if (hasRole(CURATOR_ROLE, member)) _revokeRole(CURATOR_ROLE, member);
 
