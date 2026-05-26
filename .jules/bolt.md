@@ -34,3 +34,6 @@
 ## 2026-05-19 - [Dead Code Elimination]
 **Learning:** In Solidity, if a function reverts early under specific conditions (e.g., if a user has a certain role), any subsequent checks or logic relying on that condition being true in the same function are dead code.
 **Action:** Always verify that trailing logic blocks (like role revocation) do not redundantly check conditions that were already used to filter out execution earlier in the function.
+## 2026-05-26 - [Cache state variable inside conditional to avoid redundant SLOADs]
+**Learning:** Accessing a state variable multiple times within a conditional block causes multiple `SLOAD` operations. In `MissionFactory.sol`, `guildFactory` was read multiple times if a guild was provided.
+**Action:** When a state variable is accessed multiple times within a conditional block, assign it to a local stack variable to batch read and save gas. Example: `address _guildFactory = guildFactory;`.

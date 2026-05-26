@@ -152,8 +152,11 @@ contract MissionFactory is Ownable, ReentrancyGuard {
 
         // Validate guild if provided
         if (guild != address(0)) {
-            if (guildFactory == address(0)) revert GuildFactoryNotSet();
-            if (!IGuildFactory(guildFactory).isValidGuild(guild)) revert InvalidGuild();
+            // ⚡ Bolt Optimization: Cache state variable to save an SLOAD
+            // Saves gas by avoiding a redundant read of the `guildFactory` state variable
+            address _guildFactory = guildFactory;
+            if (_guildFactory == address(0)) revert GuildFactoryNotSet();
+            if (!IGuildFactory(_guildFactory).isValidGuild(guild)) revert InvalidGuild();
         }
 
         // Increment mission counter
