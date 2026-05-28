@@ -37,3 +37,6 @@
 ## 2026-05-26 - [Cache state variable inside conditional to avoid redundant SLOADs]
 **Learning:** Accessing a state variable multiple times within a conditional block causes multiple `SLOAD` operations. In `MissionFactory.sol`, `guildFactory` was read multiple times if a guild was provided.
 **Action:** When a state variable is accessed multiple times within a conditional block, assign it to a local stack variable to batch read and save gas. Example: `address _guildFactory = guildFactory;`.
+## 2024-05-24 - Single-Slot Struct Memory Copy Overhead in View Functions
+**Learning:** Copying a single-slot struct (e.g., `GuildMember` packed into 17 bytes) from storage to `memory` in a `view` function before returning its fields is a gas de-optimization. The Solidity compiler handles single-slot reads efficiently via bit-masking directly from the single `SLOAD`, so caching to `memory` only adds unnecessary `MSTORE` and memory expansion overhead (~116 gas).
+**Action:** Always use `storage` pointers for reading small, single-slot structs in view functions instead of defining them as `memory` copies.
