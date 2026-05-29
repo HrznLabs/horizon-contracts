@@ -269,7 +269,9 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @return leftAt Timestamp when left
      */
     function members(address account) external view returns (bool, uint256, uint256) {
-        GuildMember memory m = _members[account];
+        // ⚡ Bolt Optimization: Use a storage pointer instead of copying a single-slot struct to memory
+        // This avoids the MSTORE overhead and reduces gas consumption in view functions.
+        GuildMember storage m = _members[account];
         return (m.isMember, uint256(m.joinedAt), uint256(m.leftAt));
     }
 
