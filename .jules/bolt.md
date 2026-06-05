@@ -40,3 +40,6 @@
 ## 2024-05-24 - Single-Slot Struct Memory Copy Overhead in View Functions
 **Learning:** Copying a single-slot struct (e.g., `GuildMember` packed into 17 bytes) from storage to `memory` in a `view` function before returning its fields is a gas de-optimization. The Solidity compiler handles single-slot reads efficiently via bit-masking directly from the single `SLOAD`, so caching to `memory` only adds unnecessary `MSTORE` and memory expansion overhead (~116 gas).
 **Action:** Always use `storage` pointers for reading small, single-slot structs in view functions instead of defining them as `memory` copies.
+## 2025-02-28 - Optimize getAverageRating using storage pointer
+**Learning:** Copying small single-slot structs (like `RatingStats`) to `memory` adds `MSTORE`/`MLOAD` overhead compared to reading directly via `storage` pointers, because the optimizer handles single-slot storage updates efficiently.
+**Action:** Default to `storage` pointers for single-slot structs unless `memory` batching is proven to save gas.
