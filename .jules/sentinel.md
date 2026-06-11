@@ -50,37 +50,3 @@
 **Vulnerability:** The `GuildDAO.removeMember` function marked a member as removed (`isMember = false`) but failed to explicitly revoke assigned access control roles like `ADMIN_ROLE`, `OFFICER_ROLE`, or `CURATOR_ROLE`. This allowed an ousted member to retain their administrative privileges.
 **Learning:** Removing a user from a system's membership list does not automatically revoke their associated role-based access control (RBAC) permissions unless explicitly programmed to do so.
 **Prevention:** When implementing member removal or suspension logic, explicitly check for and revoke any associated roles or privileges granted to that user.
-
-## 2024-05-24 - Duplicate Error Definition
-**Vulnerability:** A minor compilation error in the `IMissionEscrow` interface, where `NotParty` error is defined twice.
-**Learning:** Found a syntax error related to a duplicate error definition (`NotParty`) when compiling the project with `forge`. The error occurred on line 68 in `IMissionEscrow.sol`. However, tests in `MissionEscrow_Authorization.t.sol` expected a different revert.
-**Prevention:** Ensured the duplicate `NotParty` error was removed, and that `test_RaiseDispute_RevertMessage()` in `test/MissionEscrow_Authorization.t.sol` correctly asserts the expected error (`NotDisputeResolver()`) when a non-DisputeResolver attempts to call `raiseDispute()`.
-
-## 2024-05-24 - Dispute Resolver Split/Cancel Deadlock
-**Vulnerability:** The `resolveDispute` function in `DisputeResolver.sol` enforced that for `Split` or `Cancelled` outcomes, *both* the poster and the performer must have deposited their DDR. This means if one party is totally unresponsive, a resolver cannot issue a `Split` or `Cancelled` outcome, leading to a deadlock.
-**Learning:** Found a strict DDR deposit check for `Split`/`Cancelled` outcomes that required both parties to have deposited DDR, which blocks dispute resolution if one party just refuses to participate.
-**Prevention:** Changed the logic in `resolveDispute` to only require that *at least one* party has deposited DDR for `Split` and `Cancelled` outcomes. This allows resolvers to still resolve a dispute if one party goes missing.
-
-## 2025-06-19 - [DDR Stealing in Dispute Split Outcomes]
-**Vulnerability:** In `DisputeResolver.sol`'s `_distributeFunds` function, the `remainingDDR` for `Split` outcomes was distributed using the `splitPercentage` (which was intended only for the escrow reward distribution), rather than proportionally based on what each party originally deposited. This allowed a party who did not deposit DDR to steal a portion of the other party's DDR.
-**Learning:** Deposit/collateral pools must be calculated independently from reward/payout pools, especially when participation is not uniformly enforced (e.g. if one party fails to deposit). Reusing variables like `splitPercentage` for unrelated pools creates critical value leaks.
-**Prevention:** Always distribute returned collateral proportionally to the initial deposits (`(total * deposit) / totalDeposits`), never based on the outcome of a separate reward logic.
-
-## 2025-06-20 - [Bypass of Split Percentage Validation in DAO Override]
-**Vulnerability:** The `overrideResolution` function in `DisputeResolver.sol` lacked the validation check `splitPercentage <= 10_000` for `Split` outcomes, which was present in the standard `resolveDispute` flow. This omission allowed the DAO to inadvertently or maliciously set a split percentage greater than 100%, causing an arithmetic underflow in the fund distribution calculation inside `settleDispute` and potentially bricking the dispute finalization.
-**Learning:** Replicated logic for alternative paths (like an admin override or fallback function) must meticulously mirror all constraint validations of the primary path. Omitting these checks in privileged functions introduces systemic failure points, especially in protocols relying on immutable constants or bounds (like bps <= 10_000).
-**Prevention:** Whenever creating alternative flows or "override" mechanisms that bypass the standard lifecycle, explicitly verify that all mathematical bounds, state assertions, and parameter validations from the standard flow are present and correctly applied in the alternative path.
-
-## 2024-05-27 - Arbitrary Guild Fee Rebate Stealing
-**Vulnerability:** The `MissionFactory.createMission` function accepted an arbitrary `guild` address without validating if it was a real, deployed guild. This allowed a poster to set themselves as the guild to receive the 3% guild fee as a rebate, evading the protocol fee structure.
-**Learning:** Contracts must explicitly validate external entities if those entities are used later in the lifecycle to receive privileged treatment or funds (like referral/guild fees in the `PaymentRouter`).
-**Prevention:** If an external system (like `PaymentRouter`) relies on a parameterized entity for fee distribution, ensure the originating contract (`MissionFactory`) strictly authenticates that entity against a trusted registry (like `GuildFactory`).
-## 2026-04-09 - Prevent DDR Bypass via Split Percentage
-**Vulnerability:** A resolver or DAO override could bypass the Dynamic Dispute Reserve (DDR) requirement for the winning party by setting `DisputeOutcome.Split` with a `splitPercentage` of 0 or 10,000, effectively awarding 100% of the funds to a party that never deposited DDR.
-**Learning:** Edge cases in enum/percentage logic (like 0% or 100% in a Split outcome) can be used to bypass critical security invariants (e.g., ensuring both parties put skin in the game) if not explicitly prevented.
-**Prevention:** Always validate that inputs logically align with the state/outcome they represent. For a 'Split' outcome, the percentage must be strictly greater than 0 and less than 100% (0 < splitPercentage < 10,000).
-
-## 2025-06-25 - [Bypass of DDR Verification in DAO Override]
-**Vulnerability:** The `overrideResolution` function in `DisputeResolver.sol` lacked the DDR deposit enforcement checks that were present in the standard `resolveDispute` flow. This allowed the protocol DAO to set an outcome (e.g., `PosterWins`) where the winner had never deposited DDR, effectively bypassing the protocol's rule and allowing the winner to steal the DDR deposited by the other party.
-**Learning:** Replicated logic for alternative paths (like an admin override or fallback function) must meticulously mirror all state assertions and protocol rules of the primary path. Omitting these checks in privileged functions introduces systemic failure points that can lead to value extraction.
-**Prevention:** Whenever creating alternative flows or "override" mechanisms that bypass the standard lifecycle, explicitly verify that all state assertions, invariant checks, and parameter validations from the standard flow are present and correctly applied in the alternative path.

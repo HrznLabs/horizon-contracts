@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import { IMissionEscrow } from "./interfaces/IMissionEscrow.sol";
-import { MissionEscrow } from "./MissionEscrow.sol";
-import { IGuildFactory } from "./interfaces/IGuildFactory.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IMissionEscrow} from "./interfaces/IMissionEscrow.sol";
+import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
+import {MissionEscrow} from "./MissionEscrow.sol";
+import {IPauseRegistry} from "./interfaces/IPauseRegistry.sol";
+import {IReputationOracle} from "./interfaces/IReputationOracle.sol";
 
 /**
  * @title MissionFactory
@@ -17,6 +19,11 @@ import { IGuildFactory } from "./interfaces/IGuildFactory.sol";
  *
  * The factory is the canonical entrypoint for mission creation in Horizon.
  * It validates parameters, deploys escrow clones, and transfers initial funds.
+ *
+ * Three-layer reputation gating:
+ *   Layer 1: Protocol auto-floor for high-value missions (>= 500 USDC → minRep 200)
+ *   Layer 2: Guild default minimum (if higher than specified)
+ *   Layer 3: Poster override (parameter)
  */
 contract MissionFactory is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -29,27 +36,29 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     /// @notice Implementation contract for MissionEscrow clones
     address public immutable escrowImplementation;
 
-    /// @notice USDC token contract
-    IERC20 public immutable usdc;
-
     /// @notice PaymentRouter contract address
     address public paymentRouter;
 
     /// @notice DisputeResolver contract address
     address public disputeResolver;
 
-    /// @notice ReputationAttestations contract address
-    address public reputationAttestations;
+    /// @notice PauseRegistry for emergency pause control
+    IPauseRegistry public pauseRegistry;
 
-    /// @notice GuildFactory contract address
-    address public guildFactory;
+    /// @notice ReputationOracle for on-chain reputation gating
+    address public reputationOracle;
 
     /// @notice Current mission counter
-    /// @dev Packed with disputeResolver (20 bytes + 12 bytes = 32 bytes)
-    uint96 public missionCount;
+    uint256 public missionCount;
 
     /// @notice Mapping from mission ID to escrow address
     mapping(uint256 => address) public missions;
+
+    /// @notice Reverse mapping from escrow address to mission ID (for PaymentRouter auth)
+    mapping(address => uint256) public escrowToMission;
+
+    /// @notice Guild-level default minimum reputation
+    mapping(address => uint256) public guildMinReputation;
 
     /// @notice Minimum reward amount (1 USDC = 1e6)
     uint256 public constant MIN_REWARD = 1e6;
@@ -62,6 +71,12 @@ contract MissionFactory is Ownable, ReentrancyGuard {
 
     /// @notice Maximum mission duration (30 days)
     uint256 public constant MAX_DURATION = 30 days;
+
+    /// @notice Protocol auto-floor: missions >= this reward get minReputation 200
+    uint256 public constant PREMIUM_MISSION_THRESHOLD = 500e6; // 500 USDC
+
+    /// @notice Protocol auto-floor reputation minimum for premium missions
+    uint256 public constant PROTOCOL_FLOOR_REPUTATION = 200;
 
     // =============================================================================
     // EVENTS
@@ -79,22 +94,22 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     );
 
     event PaymentRouterUpdated(address indexed newRouter);
-    event DisputeResolverUpdated(address indexed resolver);
-    event ReputationAttestationsUpdated(address indexed reputation);
-    event GuildFactoryUpdated(address indexed newFactory);
+    event GuildMinReputationUpdated(address indexed guild, uint256 minReputation);
+    event ReputationOracleUpdated(address indexed oracle);
 
     // =============================================================================
     // ERRORS
     // =============================================================================
 
-    error InvalidRewardAmount(uint256 amount, uint256 min, uint256 max);
-    error InvalidDuration(uint256 duration, uint256 min, uint256 max);
+    error InvalidRewardAmount();
+    error InvalidDuration();
     error InvalidPaymentRouter();
-    error InvalidDisputeResolver();
     error TransferFailed();
     error MissionNotFound();
-    error GuildFactoryNotSet();
-    error InvalidGuild();
+    error Paused();
+    error TokenNotAccepted();
+    /// @notice Reverts when a zero address is supplied to an admin setter
+    error ZeroAddress();
 
     // =============================================================================
     // CONSTRUCTOR
@@ -102,11 +117,11 @@ contract MissionFactory is Ownable, ReentrancyGuard {
 
     /**
      * @notice Deploy the MissionFactory
-     * @param _usdc USDC token address
-     * @param _paymentRouter PaymentRouter contract address
+     * @param _paymentRouter PaymentRouter contract address (token whitelist lives there)
      */
-    constructor(address _usdc, address _paymentRouter) Ownable(msg.sender) {
-        usdc = IERC20(_usdc);
+    constructor(
+        address _paymentRouter
+    ) Ownable(msg.sender) {
         paymentRouter = _paymentRouter;
 
         // Deploy the implementation contract
@@ -118,79 +133,188 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     // =============================================================================
 
     /**
-     * @notice Create a new mission with USDC escrow
-     * @param rewardAmount USDC reward amount (6 decimals)
+     * @notice Create a new mission
+     * @param paymentToken Payment token address (USDC or EURC — must be accepted by PaymentRouter)
+     * @param rewardAmount Token reward amount (6 decimals)
      * @param expiresAt Timestamp when mission expires
      * @param guild Optional guild address (address(0) if none)
      * @param metadataHash IPFS hash of mission metadata
      * @param locationHash IPFS hash of location data
+     * @param minReputation Minimum reputation score for performers (0 = no restriction)
      * @return missionId The ID of the created mission
      */
     function createMission(
+        address paymentToken,
+        uint256 rewardAmount,
+        uint256 expiresAt,
+        address guild,
+        bytes32 metadataHash,
+        bytes32 locationHash,
+        uint256 minReputation
+    ) external nonReentrant returns (uint256 missionId) {
+        // Validate token is accepted by the PaymentRouter
+        if (!IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)) revert TokenNotAccepted();
+        // Check pause state — no new missions when paused
+        if (address(pauseRegistry) != address(0) && pauseRegistry.isPaused(address(this))) {
+            revert Paused();
+        }
+
+        // Validate reward amount
+        if (rewardAmount < MIN_REWARD || rewardAmount > MAX_REWARD) {
+            revert InvalidRewardAmount();
+        }
+
+        // Validate duration
+        // Security (MED-03): explicit expiry check before subtraction prevents
+        // a silent arithmetic underflow revert if expiresAt is in the past.
+        if (expiresAt <= block.timestamp) revert InvalidDuration();
+        uint256 duration = expiresAt - block.timestamp;
+        if (duration < MIN_DURATION || duration > MAX_DURATION) {
+            revert InvalidDuration();
+        }
+
+        // =====================================================================
+        // Three-layer reputation gating
+        // =====================================================================
+
+        uint256 effectiveMinRep = minReputation;
+
+        // Layer 1: Protocol auto-floor for high-value missions (>= 500 USDC)
+        if (rewardAmount >= PREMIUM_MISSION_THRESHOLD && effectiveMinRep < PROTOCOL_FLOOR_REPUTATION) {
+            effectiveMinRep = PROTOCOL_FLOOR_REPUTATION;
+        }
+
+        // Layer 2: Guild default (if higher than specified)
+        if (guild != address(0)) {
+            uint256 guildMin = guildMinReputation[guild];
+            if (guildMin > effectiveMinRep) {
+                effectiveMinRep = guildMin;
+            }
+        }
+
+        // Layer 3: Poster override already applied via `minReputation` parameter
+        // (only applies if poster specified higher — already captured above)
+
+        // Increment mission counter
+        missionId = ++missionCount;
+
+        // Deploy escrow clone
+        address escrow = escrowImplementation.clone();
+
+        // Initialize escrow with reputation gating params
+        IMissionEscrow(escrow).initialize(
+            missionId,
+            msg.sender,
+            rewardAmount,
+            expiresAt,
+            guild,
+            metadataHash,
+            locationHash,
+            paymentRouter,
+            paymentToken,
+            disputeResolver,
+            address(pauseRegistry),
+            effectiveMinRep,
+            reputationOracle
+        );
+
+        // Store mission mapping (both directions)
+        missions[missionId] = escrow;
+        escrowToMission[escrow] = missionId;
+
+        // Transfer payment token from poster to escrow
+        IERC20(paymentToken).safeTransferFrom(msg.sender, escrow, rewardAmount);
+
+        emit MissionCreated(
+            missionId,
+            msg.sender,
+            escrow,
+            rewardAmount,
+            expiresAt,
+            metadataHash,
+            guild,
+            locationHash
+        );
+    }
+
+    /**
+     * @notice Backward-compatible createMission without minReputation
+     * @dev Calls the full version with minReputation=0
+     */
+    function createMission(
+        address paymentToken,
         uint256 rewardAmount,
         uint256 expiresAt,
         address guild,
         bytes32 metadataHash,
         bytes32 locationHash
     ) external nonReentrant returns (uint256 missionId) {
+        // Validate token is accepted by the PaymentRouter
+        if (!IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)) revert TokenNotAccepted();
+        // Check pause state — no new missions when paused
+        if (address(pauseRegistry) != address(0) && pauseRegistry.isPaused(address(this))) {
+            revert Paused();
+        }
+
         // Validate reward amount
         if (rewardAmount < MIN_REWARD || rewardAmount > MAX_REWARD) {
-            revert InvalidRewardAmount(rewardAmount, MIN_REWARD, MAX_REWARD);
+            revert InvalidRewardAmount();
         }
 
         // Validate duration
+        // Security (MED-03): explicit expiry check before subtraction prevents
+        // a silent arithmetic underflow revert if expiresAt is in the past.
+        if (expiresAt <= block.timestamp) revert InvalidDuration();
         uint256 duration = expiresAt - block.timestamp;
         if (duration < MIN_DURATION || duration > MAX_DURATION) {
-            revert InvalidDuration(duration, MIN_DURATION, MAX_DURATION);
+            revert InvalidDuration();
         }
 
-        // ⚡ Bolt Optimization: Cache state variable to save an SLOAD
-        address _disputeResolver = disputeResolver;
+        // Three-layer gating with minReputation=0 (poster default)
+        uint256 effectiveMinRep = 0;
 
-        // Validate dispute resolver
-        if (_disputeResolver == address(0)) revert InvalidDisputeResolver();
+        // Layer 1: Protocol auto-floor
+        if (rewardAmount >= PREMIUM_MISSION_THRESHOLD) {
+            effectiveMinRep = PROTOCOL_FLOOR_REPUTATION;
+        }
 
-        // Validate guild if provided
+        // Layer 2: Guild default
         if (guild != address(0)) {
-            // ⚡ Bolt Optimization: Cache state variable to save an SLOAD
-            // Saves gas by avoiding a redundant read of the `guildFactory` state variable
-            address _guildFactory = guildFactory;
-            if (_guildFactory == address(0)) revert GuildFactoryNotSet();
-            if (!IGuildFactory(_guildFactory).isValidGuild(guild)) revert InvalidGuild();
+            uint256 guildMin = guildMinReputation[guild];
+            if (guildMin > effectiveMinRep) {
+                effectiveMinRep = guildMin;
+            }
         }
 
         // Increment mission counter
-        // Safe cast: missionCount is uint96, so missionId fits in uint96
         missionId = ++missionCount;
 
         // Deploy escrow clone
         address escrow = escrowImplementation.clone();
 
         // Initialize escrow
-        // Safe casts:
-        // - missionId is from uint96 counter
-        // - rewardAmount is validated <= MAX_REWARD (fits in uint96)
-        // - expiresAt is validated via duration <= MAX_DURATION (fits in uint64)
-        IMissionEscrow(escrow)
-            .initialize(
-                uint96(missionId),
-                msg.sender,
-                uint96(rewardAmount),
-                uint64(expiresAt),
-                guild,
-                metadataHash,
-                locationHash,
-                paymentRouter,
-                address(usdc),
-                _disputeResolver,
-                reputationAttestations
-            );
+        IMissionEscrow(escrow).initialize(
+            missionId,
+            msg.sender,
+            rewardAmount,
+            expiresAt,
+            guild,
+            metadataHash,
+            locationHash,
+            paymentRouter,
+            paymentToken,
+            disputeResolver,
+            address(pauseRegistry),
+            effectiveMinRep,
+            reputationOracle
+        );
 
-        // Store mission mapping
+        // Store mission mapping (both directions)
         missions[missionId] = escrow;
+        escrowToMission[escrow] = missionId;
 
-        // Transfer USDC from poster to escrow
-        usdc.safeTransferFrom(msg.sender, escrow, rewardAmount);
+        // Transfer payment token from poster to escrow
+        IERC20(paymentToken).safeTransferFrom(msg.sender, escrow, rewardAmount);
 
         emit MissionCreated(
             missionId,
@@ -219,14 +343,23 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice Get mission ID by escrow address (returns 0 if not found)
+     * @param escrow The escrow contract address
+     * @return missionId The mission ID (0 if not a known escrow)
+     */
+    function getMissionByEscrow(address escrow) external view returns (uint256) {
+        return escrowToMission[escrow];
+    }
+
+    /**
      * @notice Get mission parameters
      * @param missionId The mission ID
      * @return params The mission parameters
      */
-    function getMissionParams(uint256 missionId)
-        external
-        view
-        returns (IMissionEscrow.MissionParams memory params)
+    function getMissionParams(uint256 missionId) 
+        external 
+        view 
+        returns (IMissionEscrow.MissionParams memory params) 
     {
         address escrow = missions[missionId];
         if (escrow == address(0)) revert MissionNotFound();
@@ -238,10 +371,10 @@ contract MissionFactory is Ownable, ReentrancyGuard {
      * @param missionId The mission ID
      * @return runtime The mission runtime state
      */
-    function getMissionRuntime(uint256 missionId)
-        external
-        view
-        returns (IMissionEscrow.MissionRuntime memory runtime)
+    function getMissionRuntime(uint256 missionId) 
+        external 
+        view 
+        returns (IMissionEscrow.MissionRuntime memory runtime) 
     {
         address escrow = missions[missionId];
         if (escrow == address(0)) revert MissionNotFound();
@@ -265,30 +398,35 @@ contract MissionFactory is Ownable, ReentrancyGuard {
     /**
      * @notice Update the dispute resolver address
      * @param _disputeResolver New dispute resolver address
+     * @dev Security: zero-address guard prevents bricking dispute flow for active missions.
      */
     function setDisputeResolver(address _disputeResolver) external onlyOwner {
-        if (_disputeResolver == address(0)) revert InvalidDisputeResolver();
+        if (_disputeResolver == address(0)) revert ZeroAddress();
         disputeResolver = _disputeResolver;
-        emit DisputeResolverUpdated(_disputeResolver);
     }
 
     /**
-     * @notice Update the reputation attestations address
-     * @param _reputationAttestations New reputation attestations address
+     * @notice Set the pause registry address
+     * @param _pauseRegistry PauseRegistry contract address
      */
-    function setReputationAttestations(address _reputationAttestations) external onlyOwner {
-        // Allow setting to 0 to disable
-        reputationAttestations = _reputationAttestations;
-        emit ReputationAttestationsUpdated(_reputationAttestations);
+    function setPauseRegistry(address _pauseRegistry) external onlyOwner {
+        pauseRegistry = IPauseRegistry(_pauseRegistry);
     }
 
     /**
-     * @notice Update the guild factory address
-     * @param _guildFactory New guild factory address
+     * @notice Set the reputation oracle address
+     * @param _reputationOracle ReputationOracle contract address
      */
-    function setGuildFactory(address _guildFactory) external onlyOwner {
-        guildFactory = _guildFactory;
-        emit GuildFactoryUpdated(_guildFactory);
+    function setReputationOracle(address _reputationOracle) external onlyOwner {
+        reputationOracle = _reputationOracle;
+        emit ReputationOracleUpdated(_reputationOracle);
+    }    /**
+     * @notice Set the default minimum reputation for a guild
+     * @param guild The guild address
+     * @param minReputation The minimum reputation score (0-1000)
+     */
+    function setGuildMinReputation(address guild, uint256 minReputation) external onlyOwner {
+        guildMinReputation[guild] = minReputation;
+        emit GuildMinReputationUpdated(guild, minReputation);
     }
 }
-

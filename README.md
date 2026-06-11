@@ -1,11 +1,10 @@
-> **Note: Reference-Only Repository**
+> **Note: Auto-Synced Read-Only Mirror**
 >
-> This is a **reference-only mirror** of the Horizon Protocol smart contracts.
-> Active development happens in the [main monorepo](https://github.com/HrznLabs/horizon).
-> This repo contains the v2.2 core contracts only. M5 token economics contracts
-> are in the monorepo at `packages/contracts/`.
+> This is an **auto-synced read-only mirror** of `packages/contracts` from the [main monorepo](https://github.com/HrznLabs/horizon).
+> It mirrors the full contract package: core (v2.2 + June 2026 audit fixes), M5 token stack, iTake vertical, governance, and all scripts/tests.
+> A GitHub Actions workflow (`mirror-contracts.yml` in the monorepo) keeps this repo in sync on every push to monorepo `main`.
 >
-> **Do not submit PRs here** — contribute to the monorepo instead.
+> **Do not submit PRs here** — contribute to the monorepo instead. Bot-generated optimization PRs are automatically closed.
 
 # Horizon Protocol Smart Contracts
 
@@ -42,17 +41,20 @@ Horizon Protocol enables trustless, escrow-backed task coordination with USDC pa
 
 ## 🌐 Deployed Contracts (Base Sepolia)
 
+> Full address listing (including M5 token stack and iTake vertical) in [DEPLOYED_ADDRESSES.md](./DEPLOYED_ADDRESSES.md).
+
+### Core (Phase 13 redeploy, 2026-03-10)
+
 | Contract | Address | Verified |
 |----------|---------|----------|
-| [PaymentRouter](./src/PaymentRouter.sol) | [`0x94fb7908257ec36f701d2605b51eefed4326ddf5`](https://sepolia.basescan.org/address/0x94fb7908257ec36f701d2605b51eefed4326ddf5#code) | [✅](https://sepolia.basescan.org/address/0x94fb7908257ec36f701d2605b51eefed4326ddf5#code) |
-| [MissionFactory](./src/MissionFactory.sol) | [`0xee9234954b134c39c17a75482da78e46b16f466c`](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c#code) | [✅](https://sepolia.basescan.org/address/0xee9234954b134c39c17a75482da78e46b16f466c#code) |
-| [MissionEscrow (Implementation)](./src/MissionEscrow.sol) | [`0x873Ea710B6b289b0e9D6867B1630066e9721B5c9`](https://sepolia.basescan.org/address/0x873Ea710B6b289b0e9D6867B1630066e9721B5c9#code) | [✅](https://sepolia.basescan.org/address/0x873Ea710B6b289b0e9D6867B1630066e9721B5c9#code) |
-| [GuildFactory](./src/GuildFactory.sol) | [`0xfeae3538a4a1801e47b6d16104aa8586edb55f00`](https://sepolia.basescan.org/address/0xfeae3538a4a1801e47b6d16104aa8586edb55f00#code) | [✅](https://sepolia.basescan.org/address/0xfeae3538a4a1801e47b6d16104aa8586edb55f00#code) |
-| [ReputationAttestations](./src/ReputationAttestations.sol) | [`0xedae9682a0fb6fb3c18d6865461f67db7d748002`](https://sepolia.basescan.org/address/0xedae9682a0fb6fb3c18d6865461f67db7d748002#code) | [✅](https://sepolia.basescan.org/address/0xedae9682a0fb6fb3c18d6865461f67db7d748002#code) |
-| [DisputeResolver](./src/DisputeResolver.sol) | [`0xb00ac4278129928aecc72541b0bcd69d94c1691e`](https://sepolia.basescan.org/address/0xb00ac4278129928aecc72541b0bcd69d94c1691e#code) | [✅](https://sepolia.basescan.org/address/0xb00ac4278129928aecc72541b0bcd69d94c1691e#code) |
-| [HorizonAchievements](./src/HorizonAchievements.sol) | [`0x568e0e3102bfa1f4045d3f62559c0f9823b469bc`](https://sepolia.basescan.org/address/0x568e0e3102bfa1f4045d3f62559c0f9823b469bc#code) | [✅](https://sepolia.basescan.org/address/0x568e0e3102bfa1f4045d3f62559c0f9823b469bc#code) |
+| [MissionFactory](./src/MissionFactory.sol) | [`0x6d97964E9BE016A8AABA2f99F0bA419464Fb88D9`](https://sepolia.basescan.org/address/0x6d97964E9BE016A8AABA2f99F0bA419464Fb88D9#code) | [✅](https://sepolia.basescan.org/address/0x6d97964E9BE016A8AABA2f99F0bA419464Fb88D9#code) |
+| [PaymentRouter](./src/PaymentRouter.sol) | [`0x3013db6C92EF956f86EBC0aDFECe70b80FA73600`](https://sepolia.basescan.org/address/0x3013db6C92EF956f86EBC0aDFECe70b80FA73600#code) | [✅](https://sepolia.basescan.org/address/0x3013db6C92EF956f86EBC0aDFECe70b80FA73600#code) |
+| [GuildFactory](./src/GuildFactory.sol) | [`0x7349Cd1A4f7C1a74Db730743d873de98A2f3a32F`](https://sepolia.basescan.org/address/0x7349Cd1A4f7C1a74Db730743d873de98A2f3a32F#code) | [✅](https://sepolia.basescan.org/address/0x7349Cd1A4f7C1a74Db730743d873de98A2f3a32F#code) |
+| [MissionEscrow (Impl)](./src/MissionEscrow.sol) | [`0x3b02a7eac30Bc4a800Eebd69Fed75c818dB92099`](https://sepolia.basescan.org/address/0x3b02a7eac30Bc4a800Eebd69Fed75c818dB92099#code) | [✅](https://sepolia.basescan.org/address/0x3b02a7eac30Bc4a800Eebd69Fed75c818dB92099#code) |
+| [DisputeResolver](./src/DisputeResolver.sol) | [`0xdE37Ff10A487c852941DC842987dd8d5d8b9E855`](https://sepolia.basescan.org/address/0xdE37Ff10A487c852941DC842987dd8d5d8b9E855#code) | [✅](https://sepolia.basescan.org/address/0xdE37Ff10A487c852941DC842987dd8d5d8b9E855#code) |
+| [HorizonAchievements](./src/HorizonAchievements.sol) | [`0xfCC5971C3704C7a1F1c9E4acFdC7eEd60D4e4949`](https://sepolia.basescan.org/address/0xfCC5971C3704C7a1F1c9E4acFdC7eEd60D4e4949#code) | [✅](https://sepolia.basescan.org/address/0xfCC5971C3704C7a1F1c9E4acFdC7eEd60D4e4949#code) |
 
-**Base Sepolia USDC:** [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e#code)
+**Base Sepolia USDC:** [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e#code) | **EURC:** [`0x808456652fdb597867f38412077A9182bf77359F`](https://sepolia.basescan.org/address/0x808456652fdb597867f38412077A9182bf77359F#code)
 
 ## 📋 Overview
 
@@ -130,7 +132,7 @@ Routes payments with configurable fee splits.
 | Protocol Fee | 2.5% | 250 BPS | Protocol Treasury |
 | Labs Fee | 2.5% | 250 BPS | Labs Treasury |
 | Resolver Fee | 2% | 200 BPS | Resolver Treasury |
-| Guild Fee | 0-15% (variable) | 0-1500 BPS | Guild Treasury |
+| Guild Fee | max 3% (MetaDAO 1% + SubDAO 2%) | 0-300 BPS | Guild Treasury |
 | Performer | 90%+ guaranteed | — | Performer |
 
 #### [`DisputeResolver.sol`](./src/DisputeResolver.sol)
@@ -161,8 +163,8 @@ Factory for deploying `GuildDAO` clones.
 
 ### Supporting Contracts
 
-#### [`ReputationAttestations.sol`](./src/ReputationAttestations.sol)
-On-chain reputation and rating storage.
+#### [`ReputationOracle.sol`](./src/ReputationOracle.sol)
+On-chain reputation scoring with quality-weighted ratings (replaces ReputationAttestations).
 
 ```solidity
 function submitRating(
@@ -194,8 +196,6 @@ function hasAchievement(address user, uint256 typeId) external view returns (boo
 ## 🚀 Getting Started
 
 ### Prerequisites
-
-> For the latest contracts including M5 token economics, clone the [main monorepo](https://github.com/HrznLabs/horizon) instead.
 
 - [Foundry](https://book.getfoundry.sh/getting-started/installation)
 - [Node.js](https://nodejs.org/) (for scripts)

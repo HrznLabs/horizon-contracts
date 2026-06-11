@@ -32,6 +32,7 @@ interface IMissionEscrow {
         address guild;
         bytes32 metadataHash;
         bytes32 locationHash;
+        uint256 minReputation;  // Minimum reputation score to accept (0 = no restriction)
     }
 
     struct MissionRuntime {
@@ -50,43 +51,41 @@ interface IMissionEscrow {
     event MissionCompleted(uint256 indexed id);
     event MissionCancelled(uint256 indexed id);
     event MissionDisputed(uint256 indexed id, address indexed by, bytes32 disputeHash);
-    event DisputeSettled(
-        uint256 indexed id, uint8 outcome, uint256 posterAmount, uint256 performerAmount
-    );
-
-    event ReputationUpdateFailed(uint256 indexed id);
+    event DisputeSettled(uint256 indexed id, uint8 outcome, uint256 posterAmount, uint256 performerAmount);
 
     // =============================================================================
     // ERRORS
     // =============================================================================
 
-    error InvalidState(MissionState current);
+    error InvalidState();
     error NotPoster();
     error NotPerformer();
-    error NotParty();
     error NotDisputeResolver();
     error MissionExpired();
     error MissionNotExpired();
     error AlreadyAccepted();
-    error CannotAcceptOwnMission();
     error DisputeAlreadyRaised();
+    error Paused();
+    error InsufficientReputation(uint256 actual, uint256 required);
 
     // =============================================================================
     // FUNCTIONS
     // =============================================================================
 
     function initialize(
-        uint96 missionId,
+        uint256 missionId,
         address poster,
-        uint96 rewardAmount,
-        uint64 expiresAt,
+        uint256 rewardAmount,
+        uint256 expiresAt,
         address guild,
         bytes32 metadataHash,
         bytes32 locationHash,
         address paymentRouter,
-        address usdc,
+        address paymentToken,
         address disputeResolver,
-        address reputationAttestations
+        address pauseRegistryAddr,
+        uint256 minReputation,
+        address reputationOracle
     ) external;
 
     function acceptMission() external;
@@ -95,7 +94,7 @@ interface IMissionEscrow {
     function cancelMission() external;
     function raiseDispute(bytes32 disputeHash) external;
     function claimExpired() external;
-
+    
     /// @notice Settle escrow based on dispute outcome (called by DisputeResolver)
     /// @param outcome 0=None, 1=PosterWins, 2=PerformerWins, 3=Split, 4=Cancelled
     /// @param splitPercentage For Split outcome, performer's share in basis points (0-10000)
@@ -104,26 +103,10 @@ interface IMissionEscrow {
     function getParams() external view returns (MissionParams memory);
     function getRuntime() external view returns (MissionRuntime memory);
     function getMissionId() external view returns (uint256);
-    function getDisputeResolver() external view returns (address);
-    function getParticipants()
-        external
-        view
-        returns (address poster, address performer, MissionState state);
 
-    /**
-     * @notice Get specific fields needed for dispute resolution
-     * @dev ⚡ Bolt Optimization: Combines required fields from MissionParams
-     *      and MissionRuntime to prevent multiple expensive cross-contract
-     *      calls and reduce returned data size.
-     */
-    function getDisputeDetails()
-        external
-        view
-        returns (
-            address poster,
-            address performer,
-            MissionState state,
-            uint256 rewardAmount,
-            bool disputeRaised
-        );
+    /// @notice Returns the ERC-20 payment token used by this escrow (USDC or EURC)
+    /// @dev Added for HIGH-03: DisputeResolver reads this to use the correct token per dispute
+    function getToken() external view returns (address);
 }
+
+
