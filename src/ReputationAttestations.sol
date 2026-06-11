@@ -240,9 +240,7 @@ contract ReputationAttestations is Ownable {
      * @return count Number of ratings
      */
     function getAverageRating(address user) external view returns (uint256 average, uint256 count) {
-        // ⚡ Bolt Optimization: Use a storage pointer instead of copying a single-slot struct to memory
-        // This avoids the MSTORE/MLOAD overhead and reduces gas consumption in view functions.
-        RatingStats storage stats = _ratingStats[user];
+        RatingStats memory stats = _ratingStats[user];
         count = stats.count;
         if (count == 0) return (0, 0);
 
