@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
-import {IMissionFactory} from "./interfaces/IMissionFactory.sol";
-import {HorizonToken} from "./token/HorizonToken.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IPaymentRouter } from "./interfaces/IPaymentRouter.sol";
+import { IMissionFactory } from "./interfaces/IMissionFactory.sol";
+import { HorizonToken } from "./token/HorizonToken.sol";
 
 /**
  * @title PaymentRouter
@@ -279,19 +279,16 @@ contract PaymentRouter is AccessControl, Pausable, ReentrancyGuard, IPaymentRout
         }
 
         // Ensure total fees never exceed complement of performer floor
-        uint16 totalFees = PROTOCOL_FEE_BPS + LABS_FEE_BPS + RESOLVER_FEE_BPS
-                          + metaDAOFeeBps + subDAOFeeBps;
+        uint16 totalFees =
+            PROTOCOL_FEE_BPS + LABS_FEE_BPS + RESOLVER_FEE_BPS + metaDAOFeeBps + subDAOFeeBps;
         uint16 maxFees = BPS_DENOMINATOR - performerFloorBPS;
         if (totalFees > maxFees) {
             revert InvalidFeeConfig();
         }
 
         IERC20 _token = IERC20(token);
-        FeeSplitWithHierarchy memory split = _calculateHierarchySplit(
-            rewardAmount,
-            subDAOFeeBps,
-            metaDAOFeeBps
-        );
+        FeeSplitWithHierarchy memory split =
+            _calculateHierarchySplit(rewardAmount, subDAOFeeBps, metaDAOFeeBps);
 
         if (split.performerAmount > 0) _token.safeTransfer(performer, split.performerAmount);
         if (split.protocolAmount > 0) _token.safeTransfer(protocolTreasury, split.protocolAmount);
@@ -353,8 +350,8 @@ contract PaymentRouter is AccessControl, Pausable, ReentrancyGuard, IPaymentRout
         if (subDAOFeeBps > MAX_SUBDAO_FEE_BPS) revert InvalidFeeConfig();
         if (metaDAOFeeBps > MAX_METADAO_FEE_BPS) revert InvalidFeeConfig();
 
-        uint16 totalDeliveryFees = PROTOCOL_FEE_BPS + LABS_FEE_BPS + RESOLVER_FEE_BPS
-                                  + metaDAOFeeBps + subDAOFeeBps;
+        uint16 totalDeliveryFees =
+            PROTOCOL_FEE_BPS + LABS_FEE_BPS + RESOLVER_FEE_BPS + metaDAOFeeBps + subDAOFeeBps;
         if (totalDeliveryFees > BPS_DENOMINATOR - performerFloorBPS) revert InvalidFeeConfig();
 
         IERC20 _token = IERC20(token);
@@ -367,11 +364,8 @@ contract PaymentRouter is AccessControl, Pausable, ReentrancyGuard, IPaymentRout
         }
 
         // Step 2: Split delivery fee through hierarchy (courier + protocol + guild fees)
-        FeeSplitWithHierarchy memory split = _calculateHierarchySplit(
-            deliveryFee,
-            subDAOFeeBps,
-            metaDAOFeeBps
-        );
+        FeeSplitWithHierarchy memory split =
+            _calculateHierarchySplit(deliveryFee, subDAOFeeBps, metaDAOFeeBps);
 
         if (split.performerAmount > 0) _token.safeTransfer(performer, split.performerAmount);
         if (split.protocolAmount > 0) _token.safeTransfer(protocolTreasury, split.protocolAmount);
@@ -413,21 +407,22 @@ contract PaymentRouter is AccessControl, Pausable, ReentrancyGuard, IPaymentRout
      * @param guildFeeBps Guild fee in basis points
      * @return split The calculated fee split
      */
-    function getFeeSplit(
-        uint256 rewardAmount,
-        address guild,
-        uint16 guildFeeBps
-    ) external pure returns (FeeSplit memory split) {
+    function getFeeSplit(uint256 rewardAmount, address guild, uint16 guildFeeBps)
+        external
+        pure
+        returns (FeeSplit memory split)
+    {
         return _calculateSplit(rewardAmount, guild, guildFeeBps);
     }
 
     /**
      * @notice Get fee split without guild (backward compatibility)
      */
-    function getFeeSplit(
-        uint256 rewardAmount,
-        bool hasGuild
-    ) external view returns (FeeSplit memory split) {
+    function getFeeSplit(uint256 rewardAmount, bool hasGuild)
+        external
+        view
+        returns (FeeSplit memory split)
+    {
         address guild = hasGuild ? address(1) : address(0);
         uint16 guildFeeBps = hasGuild ? 300 : 0; // Default 3% for compatibility
         return _calculateSplit(rewardAmount, guild, guildFeeBps);
@@ -436,11 +431,11 @@ contract PaymentRouter is AccessControl, Pausable, ReentrancyGuard, IPaymentRout
     /**
      * @notice Get fixed fee configuration
      */
-    function getFixedFees() external pure returns (
-        uint16 protocolFeeBps,
-        uint16 labsFeeBps,
-        uint16 resolverFeeBps
-    ) {
+    function getFixedFees()
+        external
+        pure
+        returns (uint16 protocolFeeBps, uint16 labsFeeBps, uint16 resolverFeeBps)
+    {
         return (PROTOCOL_FEE_BPS, LABS_FEE_BPS, RESOLVER_FEE_BPS);
     }
 
@@ -536,7 +531,10 @@ contract PaymentRouter is AccessControl, Pausable, ReentrancyGuard, IPaymentRout
      *      Note: removal of a treasury mapping is intentionally disallowed — use a dedicated
      *      burn/dead address if a treasury must be deactivated.
      */
-    function setGuildTreasury(address guild, address treasury) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setGuildTreasury(address guild, address treasury)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         if (treasury == address(0)) revert InvalidTreasury();
         guildTreasuries[guild] = treasury;
         emit TreasuryUpdated("guild", treasury);
@@ -594,8 +592,12 @@ contract PaymentRouter is AccessControl, Pausable, ReentrancyGuard, IPaymentRout
      * @notice Check if address is a factory-deployed escrow
      */
     function _isFactoryEscrow(address caller) internal view returns (bool) {
-        if (missionFactory == address(0)) return false;
-        try IMissionFactory(missionFactory).getMissionByEscrow(caller) returns (uint256 missionId) {
+        // Cache missionFactory to stack variable to save a redundant SLOAD
+        address _missionFactory = missionFactory;
+        if (_missionFactory == address(0)) return false;
+        try IMissionFactory(_missionFactory).getMissionByEscrow(caller) returns (
+            uint256 missionId
+        ) {
             return missionId > 0;
         } catch {
             return false;
@@ -626,7 +628,10 @@ contract PaymentRouter is AccessControl, Pausable, ReentrancyGuard, IPaymentRout
      * @dev Emits GuildFeeCapped if fee is reduced. Reverts only if fixed fees alone
      *      exceed the complement of the floor (which indicates a config error).
      */
-    function _enforcePerformerFloor(uint16 requestedGuildFeeBps) internal returns (uint16 effective) {
+    function _enforcePerformerFloor(uint16 requestedGuildFeeBps)
+        internal
+        returns (uint16 effective)
+    {
         uint16 maxGuild = _maxGuildFeeBPS();
 
         if (requestedGuildFeeBps <= maxGuild) {
@@ -641,11 +646,11 @@ contract PaymentRouter is AccessControl, Pausable, ReentrancyGuard, IPaymentRout
     /**
      * @notice Calculate fee split for standard settlement
      */
-    function _calculateSplit(
-        uint256 rewardAmount,
-        address guild,
-        uint16 guildFeeBps
-    ) internal pure returns (FeeSplit memory split) {
+    function _calculateSplit(uint256 rewardAmount, address guild, uint16 guildFeeBps)
+        internal
+        pure
+        returns (FeeSplit memory split)
+    {
         bool hasGuild = guild != address(0);
 
         // Fixed fees (always applied)
@@ -661,7 +666,8 @@ contract PaymentRouter is AccessControl, Pausable, ReentrancyGuard, IPaymentRout
         }
 
         // Performer gets the rest
-        split.performerAmount = rewardAmount - split.protocolAmount - split.labsAmount - split.resolverAmount - split.guildAmount;
+        split.performerAmount = rewardAmount - split.protocolAmount - split.labsAmount
+            - split.resolverAmount - split.guildAmount;
     }
 
     /**
@@ -682,12 +688,8 @@ contract PaymentRouter is AccessControl, Pausable, ReentrancyGuard, IPaymentRout
         split.subDAOAmount = (rewardAmount * subDAOFeeBps) / BPS_DENOMINATOR;
 
         // Performer gets the rest
-        split.performerAmount = rewardAmount
-            - split.protocolAmount
-            - split.labsAmount
-            - split.resolverAmount
-            - split.metaDAOAmount
-            - split.subDAOAmount;
+        split.performerAmount = rewardAmount - split.protocolAmount - split.labsAmount
+            - split.resolverAmount - split.metaDAOAmount - split.subDAOAmount;
     }
 
     /**
@@ -699,7 +701,9 @@ contract PaymentRouter is AccessControl, Pausable, ReentrancyGuard, IPaymentRout
         address guild,
         FeeSplit memory split
     ) internal {
-        if (split.performerAmount > 0) token.safeTransfer(performer, split.performerAmount);
+        if (split.performerAmount > 0) {
+            token.safeTransfer(performer, split.performerAmount);
+        }
         if (split.protocolAmount > 0) token.safeTransfer(protocolTreasury, split.protocolAmount);
 
         if (split.guildAmount > 0 && guild != address(0)) {
