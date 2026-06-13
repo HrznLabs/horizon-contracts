@@ -211,10 +211,13 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @param member Address to remove
      */
     function removeMember(address member) external onlyRole(OFFICER_ROLE) {
-        if (!members[member].isMember) revert NotMember();
+        // Optimization: Cache mapping lookup into a storage pointer to avoid redundant keccak256 hashing and mapping lookups
+        GuildMember storage m = members[member];
 
-        members[member].isMember = false;
-        members[member].leftAt = block.timestamp;
+        if (!m.isMember) revert NotMember();
+
+        m.isMember = false;
+        m.leftAt = block.timestamp;
 
         memberCount--;
         emit GuildMemberRemoved(address(this), member);
