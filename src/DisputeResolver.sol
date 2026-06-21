@@ -12,10 +12,10 @@ import "./interfaces/IMissionEscrow.sol";
  * @title DisputeResolver
  * @author Horizon Protocol
  * @notice Handles mission disputes with DDR (Dynamic Dispute Reserve) and LPP (Loser-Pays Penalty)
- * @dev 
+ * @dev
  * DDR: 5% of reward deposited by both parties when dispute is raised
  * LPP: 2% penalty on losing party distributed to winner + resolver
- * 
+ *
  * Flow:
  * 1. Party raises dispute → DDR deposited
  * 2. Resolver assigned by ResolversDAO
@@ -23,7 +23,7 @@ import "./interfaces/IMissionEscrow.sol";
  * 4. Resolver makes decision
  * 5. 48h appeal period
  * 6. Finalize and distribute funds
- * 
+ *
  * Security invariants:
  * - DDR rate immutable after deployment
  * - Only assigned resolver can resolve
@@ -155,11 +155,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @param evidenceHash IPFS hash of initial evidence
      * @return disputeId The ID of the created dispute
      */
-    function createDispute(
-        address escrowAddress,
-        uint256 missionId,
-        bytes32 evidenceHash
-    ) external nonReentrant returns (uint256 disputeId) {
+    function createDispute(address escrowAddress, uint256 missionId, bytes32 evidenceHash)
+        external
+        nonReentrant
+        returns (uint256 disputeId)
+    {
         // Verify escrow exists and is in disputed state
         IMissionEscrow escrow = IMissionEscrow(escrowAddress);
         IMissionEscrow.MissionParams memory params = escrow.getParams();
@@ -171,8 +171,10 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         // Must be in submitted state or already disputed
-        if (runtime.state != IMissionEscrow.MissionState.Submitted &&
-            runtime.state != IMissionEscrow.MissionState.Disputed) {
+        if (
+            runtime.state != IMissionEscrow.MissionState.Submitted
+                && runtime.state != IMissionEscrow.MissionState.Disputed
+        ) {
             revert InvalidDisputeState();
         }
 
@@ -182,7 +184,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         // Calculate DDR amount
-        uint256 ddrAmount = (params.rewardAmount * DDR_RATE_BPS) / 10000;
+        uint256 ddrAmount = (params.rewardAmount * DDR_RATE_BPS) / 10_000;
 
         // Transfer DDR from initiator
         usdc.safeTransferFrom(msg.sender, address(this), ddrAmount);
@@ -202,7 +204,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             outcome: DisputeOutcome.None,
             resolver: address(0),
             ddrAmount: ddrAmount,
-            lppAmount: (params.rewardAmount * LPP_RATE_BPS) / 10000,
+            lppAmount: (params.rewardAmount * LPP_RATE_BPS) / 10_000,
             posterEvidenceHash: msg.sender == params.poster ? evidenceHash : bytes32(0),
             performerEvidenceHash: msg.sender == runtime.performer ? evidenceHash : bytes32(0),
             resolutionHash: bytes32(0),
@@ -231,10 +233,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @param disputeId The dispute ID
      * @param resolver Address of the resolver
      */
-    function assignResolver(
-        uint256 disputeId,
-        address resolver
-    ) external onlyResolversDAO disputeExists(disputeId) {
+    function assignResolver(uint256 disputeId, address resolver)
+        external
+        onlyResolversDAO
+        disputeExists(disputeId)
+    {
         Dispute storage dispute = _disputes[disputeId];
 
         if (dispute.state != DisputeState.Pending) {
@@ -249,8 +252,8 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         dispute.state = DisputeState.Investigating;
 
         // Set resolver action deadline
-        uint256 ddrTimeout = disputeDDRDeadline[disputeId] > dispute.createdAt 
-            ? disputeDDRDeadline[disputeId] - dispute.createdAt 
+        uint256 ddrTimeout = disputeDDRDeadline[disputeId] > dispute.createdAt
+            ? disputeDDRDeadline[disputeId] - dispute.createdAt
             : DEFAULT_DDR_TIMEOUT;
         resolverDeadline[disputeId] = block.timestamp + (ddrTimeout * RESOLVER_TIMEOUT_MULTIPLIER);
 
@@ -262,15 +265,15 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @param disputeId The dispute ID
      * @param evidenceHash IPFS hash of evidence
      */
-    function submitEvidence(
-        uint256 disputeId,
-        bytes32 evidenceHash
-    ) external nonReentrant disputeExists(disputeId) {
+    function submitEvidence(uint256 disputeId, bytes32 evidenceHash)
+        external
+        nonReentrant
+        disputeExists(disputeId)
+    {
         Dispute storage dispute = _disputes[disputeId];
 
         // Only pending or investigating state
-        if (dispute.state != DisputeState.Pending &&
-            dispute.state != DisputeState.Investigating) {
+        if (dispute.state != DisputeState.Pending && dispute.state != DisputeState.Investigating) {
             revert InvalidDisputeState();
         }
 
@@ -336,7 +339,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert InvalidOutcome();
         }
 
-        if (outcome == DisputeOutcome.Split && splitPercentage > 10000) {
+        if (outcome == DisputeOutcome.Split && splitPercentage > 10_000) {
             revert InvalidOutcome();
         }
 
@@ -366,9 +369,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @notice Appeal a resolution to the DAO
      * @param disputeId The dispute ID
      */
-    function appealResolution(
-        uint256 disputeId
-    ) external disputeExists(disputeId) {
+    function appealResolution(uint256 disputeId) external disputeExists(disputeId) {
         Dispute storage dispute = _disputes[disputeId];
 
         // Only parties can appeal
@@ -393,9 +394,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @notice Finalize dispute and distribute funds
      * @param disputeId The dispute ID
      */
-    function finalizeDispute(
-        uint256 disputeId
-    ) external nonReentrant disputeExists(disputeId) {
+    function finalizeDispute(uint256 disputeId) external nonReentrant disputeExists(disputeId) {
         Dispute storage dispute = _disputes[disputeId];
 
         if (dispute.state == DisputeState.Resolved) {
@@ -491,10 +490,10 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         protocolDAO = _protocolDAO;
     }
 
-    function setTreasuries(
-        address _protocolTreasury,
-        address _resolverTreasury
-    ) external onlyOwner {
+    function setTreasuries(address _protocolTreasury, address _resolverTreasury)
+        external
+        onlyOwner
+    {
         protocolTreasury = _protocolTreasury;
         resolverTreasury = _resolverTreasury;
     }
@@ -575,7 +574,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @notice Claim resolver inaction timeout — both parties get DDR refund
      * @param disputeId The dispute ID
      */
-    function claimResolverTimeout(uint256 disputeId) external nonReentrant disputeExists(disputeId) {
+    function claimResolverTimeout(uint256 disputeId)
+        external
+        nonReentrant
+        disputeExists(disputeId)
+    {
         Dispute storage dispute = _disputes[disputeId];
 
         // Must be in Investigating state (resolver assigned but hasn't acted)
@@ -584,8 +587,10 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         // Both parties must have deposited
-        if (_ddrDeposits[disputeId][dispute.poster] == 0 || 
-            _ddrDeposits[disputeId][dispute.performer] == 0) {
+        if (
+            _ddrDeposits[disputeId][dispute.poster] == 0
+                || _ddrDeposits[disputeId][dispute.performer] == 0
+        ) {
             revert InsufficientDDR();
         }
 
@@ -633,10 +638,13 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
     function _distributeFunds(uint256 disputeId) internal {
         Dispute storage dispute = _disputes[disputeId];
 
+        // ⚡ Bolt: Cache outcome locally to avoid redundant SLOAD operations
+        DisputeOutcome outcome = dispute.outcome;
+
         // First, settle the escrow reward distribution
         IMissionEscrow escrow = IMissionEscrow(dispute.escrowAddress);
         uint256 splitBps = _splitPercentages[disputeId];
-        escrow.settleDispute(uint8(dispute.outcome), splitBps);
+        escrow.settleDispute(uint8(outcome), splitBps);
 
         // Now handle DDR distributions
         uint256 posterDDR = _ddrDeposits[disputeId][dispute.poster];
@@ -644,24 +652,24 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         uint256 totalDDR = posterDDR + performerDDR;
 
         // Calculate fees from DDR pool
-        uint256 resolverFee = (totalDDR * RESOLVER_FEE_BPS) / 10000;
-        uint256 protocolFee = (totalDDR * PROTOCOL_FEE_BPS) / 10000;
+        uint256 resolverFee = (totalDDR * RESOLVER_FEE_BPS) / 10_000;
+        uint256 protocolFee = (totalDDR * PROTOCOL_FEE_BPS) / 10_000;
         uint256 remainingDDR = totalDDR - resolverFee - protocolFee;
 
         uint256 posterPayout = 0;
         uint256 performerPayout = 0;
 
-        if (dispute.outcome == DisputeOutcome.PosterWins) {
+        if (outcome == DisputeOutcome.PosterWins) {
             // Poster wins: gets remaining DDR
             posterPayout = remainingDDR;
-        } else if (dispute.outcome == DisputeOutcome.PerformerWins) {
+        } else if (outcome == DisputeOutcome.PerformerWins) {
             // Performer wins: gets remaining DDR
             performerPayout = remainingDDR;
-        } else if (dispute.outcome == DisputeOutcome.Split) {
+        } else if (outcome == DisputeOutcome.Split) {
             // Split: DDR returned proportionally
-            posterPayout = (remainingDDR * (10000 - splitBps)) / 10000;
-            performerPayout = (remainingDDR * splitBps) / 10000;
-        } else if (dispute.outcome == DisputeOutcome.Cancelled) {
+            posterPayout = (remainingDDR * (10_000 - splitBps)) / 10_000;
+            performerPayout = (remainingDDR * splitBps) / 10_000;
+        } else if (outcome == DisputeOutcome.Cancelled) {
             // Cancelled: DDR returned proportionally to what each deposited
             if (totalDDR > 0) {
                 posterPayout = (remainingDDR * posterDDR) / totalDDR;
@@ -684,12 +692,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         emit DisputeFinalized(
-            disputeId,
-            dispute.outcome,
-            posterPayout,
-            performerPayout,
-            resolverFee,
-            protocolFee
+            disputeId, outcome, posterPayout, performerPayout, resolverFee, protocolFee
         );
     }
 
@@ -699,7 +702,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @param customTimeout Custom timeout (0 = use guild/default)
      * @return timeout The resolved timeout in seconds
      */
-    function _resolveDDRTimeout(address guild, uint256 customTimeout) internal view returns (uint256 timeout) {
+    function _resolveDDRTimeout(address guild, uint256 customTimeout)
+        internal
+        view
+        returns (uint256 timeout)
+    {
         if (customTimeout > 0) {
             if (customTimeout < MIN_DDR_TIMEOUT || customTimeout > MAX_DDR_TIMEOUT) {
                 return DEFAULT_DDR_TIMEOUT;
