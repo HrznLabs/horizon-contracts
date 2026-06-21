@@ -83,8 +83,8 @@ contract DeployGovernanceForGuild is Script {
         // Check if already deployed
         if (factory.hasGovernance(guildAddress)) {
             console2.log("Governance already deployed for this guild!");
-            address existingGovernor = factory.getGovernance(guildAddress);
-            console2.log("Governor:", existingGovernor);
+            address governor = factory.getGovernance(guildAddress);
+            console2.log("Governor:", governor);
             vm.stopBroadcast();
             return;
         }
