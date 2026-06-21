@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {
+    AccessControlUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title GuildDAO
@@ -34,9 +36,9 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
         address admin;
         address treasury;
         uint16 guildFeeBps;
-        bool isMetaDAO;           // Is this a MetaDAO (can have SubDAOs)?
-        address parentMetaDAO;    // Parent MetaDAO address (if SubDAO)
-        uint16 metaDAOFeeBps;     // Fee to parent MetaDAO (if SubDAO, max 100 = 1%)
+        bool isMetaDAO; // Is this a MetaDAO (can have SubDAOs)?
+        address parentMetaDAO; // Parent MetaDAO address (if SubDAO)
+        uint16 metaDAOFeeBps; // Fee to parent MetaDAO (if SubDAO, max 100 = 1%)
     }
 
     struct GuildMember {
@@ -74,7 +76,9 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     event GuildMemberRemoved(address indexed guild, address indexed member);
     event GuildRoleGranted(address indexed guild, address indexed member, string role);
     event GuildConfigUpdated(address indexed guild);
-    event GuildBoardEntryAdded(address indexed guild, uint256 indexed missionId, address indexed curator);
+    event GuildBoardEntryAdded(
+        address indexed guild, uint256 indexed missionId, address indexed curator
+    );
     event MetaDAORegistered(address indexed metaDAO, string name);
     event SubDAORegistered(address indexed subDAO, address indexed metaDAO);
 
@@ -90,6 +94,7 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     error InvalidMetaDAO();
     /// @notice Reverts when a zero address is supplied to an admin setter
     error ZeroAddress();
+    error CannotRemoveAdmin();
 
     // =============================================================================
     // INITIALIZATION
@@ -107,12 +112,10 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @param treasury Guild treasury address
      * @param guildFeeBps Guild fee in basis points
      */
-    function initialize(
-        string calldata name,
-        address admin,
-        address treasury,
-        uint16 guildFeeBps
-    ) external initializer {
+    function initialize(string calldata name, address admin, address treasury, uint16 guildFeeBps)
+        external
+        initializer
+    {
         _initializeGuild(name, admin, treasury, guildFeeBps, false, address(0), 0);
     }
 
@@ -144,7 +147,7 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     ) external initializer {
         if (parentMetaDAO == address(0)) revert InvalidMetaDAO();
         if (metaDAOFeeBps > 100) revert InvalidFee(); // Max 1% to MetaDAO
-        
+
         _initializeGuild(name, admin, treasury, guildFeeBps, false, parentMetaDAO, metaDAOFeeBps);
     }
 
@@ -196,11 +199,7 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     function _addMember(address member) internal {
         if (members[member].isMember) revert AlreadyMember();
 
-        members[member] = GuildMember({
-            isMember: true,
-            joinedAt: block.timestamp,
-            leftAt: 0
-        });
+        members[member] = GuildMember({ isMember: true, joinedAt: block.timestamp, leftAt: 0 });
 
         memberCount++;
         emit GuildMemberAdded(address(this), member);
@@ -212,9 +211,15 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      */
     function removeMember(address member) external onlyRole(OFFICER_ROLE) {
         if (!members[member].isMember) revert NotMember();
+        if (hasRole(DEFAULT_ADMIN_ROLE, member) || hasRole(ADMIN_ROLE, member)) {
+            revert CannotRemoveAdmin();
+        }
 
         members[member].isMember = false;
         members[member].leftAt = block.timestamp;
+
+        _revokeRole(OFFICER_ROLE, member);
+        _revokeRole(CURATOR_ROLE, member);
 
         memberCount--;
         emit GuildMemberRemoved(address(this), member);
@@ -265,11 +270,10 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @dev Security: zero-address guard on treasury prevents guild fee revenue from being
      *      permanently sent to the zero address on every subsequent payment settlement.
      */
-    function updateConfig(
-        string calldata name,
-        address treasury,
-        uint16 guildFeeBps
-    ) external onlyRole(ADMIN_ROLE) {
+    function updateConfig(string calldata name, address treasury, uint16 guildFeeBps)
+        external
+        onlyRole(ADMIN_ROLE)
+    {
         if (treasury == address(0)) revert ZeroAddress();
         if (guildFeeBps > 1000) revert InvalidFee();
 
@@ -343,10 +347,10 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     function registerSubDAO(address subDAO) external onlyRole(ADMIN_ROLE) {
         if (!config.isMetaDAO) revert NotMetaDAO();
         if (registeredSubDAOs[subDAO]) revert AlreadySubDAO();
-        
+
         registeredSubDAOs[subDAO] = true;
         subDAOList.push(subDAO);
-        
+
         emit SubDAORegistered(subDAO, address(this));
     }
 
@@ -391,11 +395,11 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @return parentMetaDAO Parent MetaDAO address (or address(0))
      * @return metaDAOFeeBps Fee to parent MetaDAO
      */
-    function getFeeHierarchy() external view returns (
-        uint16 guildFeeBps,
-        address parentMetaDAO,
-        uint16 metaDAOFeeBps
-    ) {
+    function getFeeHierarchy()
+        external
+        view
+        returns (uint16 guildFeeBps, address parentMetaDAO, uint16 metaDAOFeeBps)
+    {
         return (config.guildFeeBps, config.parentMetaDAO, config.metaDAOFeeBps);
     }
 
@@ -430,10 +434,9 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     /// @param performer The address to check
     /// @return true if the performer meets the stake requirement (or no requirement is set)
     function canAcceptPremiumMission(address performer) external view returns (bool) {
-        if (minStakeForPremium == 0) return true;  // no requirement configured
-        if (sHrznVault == address(0)) return true;  // vault not configured
+        if (minStakeForPremium == 0) return true; // no requirement configured
+        if (sHrznVault == address(0)) return true; // vault not configured
         return IERC20(sHrznVault).balanceOf(performer) >= minStakeForPremium;
     }
 }
-
 
