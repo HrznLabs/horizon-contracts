@@ -267,8 +267,10 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
      * @dev Can be called by poster or performer after acceptance
      */
     function raiseDispute(bytes32 disputeHash) external {
-        if (_runtime.state != MissionState.Accepted && 
-            _runtime.state != MissionState.Submitted) {
+        // Cache the state variable to avoid redundant SLOAD operations, saving gas
+        MissionState currentState = _runtime.state;
+        if (currentState != MissionState.Accepted &&
+            currentState != MissionState.Submitted) {
             revert InvalidState();
         }
         
@@ -291,8 +293,10 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
     function claimExpired() external onlyPoster {
         if (block.timestamp <= _params.expiresAt) revert MissionNotExpired();
         
-        if (_runtime.state == MissionState.Completed || 
-            _runtime.state == MissionState.Cancelled) {
+        if (_runtime.state == MissionState.Completed ||
+            _runtime.state == MissionState.Cancelled ||
+            _runtime.state == MissionState.Submitted ||
+            _runtime.state == MissionState.Disputed) {
             revert InvalidState();
         }
 
