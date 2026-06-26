@@ -12,10 +12,10 @@ import "./interfaces/IMissionEscrow.sol";
  * @title DisputeResolver
  * @author Horizon Protocol
  * @notice Handles mission disputes with DDR (Dynamic Dispute Reserve) and LPP (Loser-Pays Penalty)
- * @dev 
+ * @dev
  * DDR: 5% of reward deposited by both parties when dispute is raised
  * LPP: 2% penalty on losing party distributed to winner + resolver
- * 
+ *
  * Flow:
  * 1. Party raises dispute → DDR deposited
  * 2. Resolver assigned by ResolversDAO
@@ -23,7 +23,7 @@ import "./interfaces/IMissionEscrow.sol";
  * 4. Resolver makes decision
  * 5. 48h appeal period
  * 6. Finalize and distribute funds
- * 
+ *
  * Security invariants:
  * - DDR rate immutable after deployment
  * - Only assigned resolver can resolve
@@ -249,8 +249,8 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         dispute.state = DisputeState.Investigating;
 
         // Set resolver action deadline
-        uint256 ddrTimeout = disputeDDRDeadline[disputeId] > dispute.createdAt 
-            ? disputeDDRDeadline[disputeId] - dispute.createdAt 
+        uint256 ddrTimeout = disputeDDRDeadline[disputeId] > dispute.createdAt
+            ? disputeDDRDeadline[disputeId] - dispute.createdAt
             : DEFAULT_DDR_TIMEOUT;
         resolverDeadline[disputeId] = block.timestamp + (ddrTimeout * RESOLVER_TIMEOUT_MULTIPLIER);
 
@@ -584,7 +584,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         // Both parties must have deposited
-        if (_ddrDeposits[disputeId][dispute.poster] == 0 || 
+        if (_ddrDeposits[disputeId][dispute.poster] == 0 ||
             _ddrDeposits[disputeId][dispute.performer] == 0) {
             revert InsufficientDDR();
         }
