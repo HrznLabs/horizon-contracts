@@ -219,9 +219,11 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
 
         memberCount--;
 
+        // Explicitly revoke roles to prevent privilege retention
         _revokeRole(CURATOR_ROLE, member);
         _revokeRole(OFFICER_ROLE, member);
         _revokeRole(ADMIN_ROLE, member);
+        _revokeRole(DEFAULT_ADMIN_ROLE, member);
 
         emit GuildMemberRemoved(address(this), member);
     }
