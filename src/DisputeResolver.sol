@@ -272,9 +272,8 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
     {
         Dispute storage dispute = _disputes[disputeId];
 
-        // Cache state to save SLOADs
+        // Cache state variable to local stack variable to avoid redundant SLOAD operations
         DisputeState currentState = dispute.state;
-
         // Only pending or investigating state
         if (currentState != DisputeState.Pending && currentState != DisputeState.Investigating) {
             revert InvalidDisputeState();
@@ -294,11 +293,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             if (block.timestamp >= disputeDDRDeadline[disputeId]) {
                 revert DDRDeadlinePassed();
             }
+            // Cache ddrAmount struct field strictly inside the conditional execution block where it is used to save redundant SLOADs
+            uint256 ddrAmt = dispute.ddrAmount;
             // Deposit DDR
-            // Cache ddrAmount to save SLOADs
-            uint256 cachedDdrAmount = dispute.ddrAmount;
-            usdc.safeTransferFrom(msg.sender, address(this), cachedDdrAmount);
-            _ddrDeposits[disputeId][msg.sender] = cachedDdrAmount;
+            usdc.safeTransferFrom(msg.sender, address(this), ddrAmt);
+            _ddrDeposits[disputeId][msg.sender] = ddrAmt;
         }
 
         // Store evidence hash
@@ -344,7 +343,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert InvalidOutcome();
         }
 
-        if (outcome == DisputeOutcome.Split && splitPercentage > 10000) {
+        if (outcome == DisputeOutcome.Split && splitPercentage > 10_000) {
             revert InvalidOutcome();
         }
 
@@ -374,9 +373,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @notice Appeal a resolution to the DAO
      * @param disputeId The dispute ID
      */
-    function appealResolution(
-        uint256 disputeId
-    ) external disputeExists(disputeId) {
+    function appealResolution(uint256 disputeId) external disputeExists(disputeId) {
         Dispute storage dispute = _disputes[disputeId];
 
         // Only parties can appeal
@@ -401,9 +398,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @notice Finalize dispute and distribute funds
      * @param disputeId The dispute ID
      */
-    function finalizeDispute(
-        uint256 disputeId
-    ) external nonReentrant disputeExists(disputeId) {
+    function finalizeDispute(uint256 disputeId) external nonReentrant disputeExists(disputeId) {
         Dispute storage dispute = _disputes[disputeId];
 
         if (dispute.state == DisputeState.Resolved) {
