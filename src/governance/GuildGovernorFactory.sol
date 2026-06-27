@@ -214,23 +214,7 @@ contract GuildGovernorFactory is Ownable {
     /**
      * @notice Get default parameters
      */
-    function getDefaults()
-        external
-        view
-        returns (
-            uint48 votingDelay,
-            uint32 votingPeriod,
-            uint256 proposalThreshold,
-            uint256 quorum,
-            uint256 timelockDelay
-        )
-    {
-        return (
-            defaultVotingDelay,
-            defaultVotingPeriod,
-            defaultProposalThreshold,
-            defaultQuorum,
-            defaultTimelockDelay
-        );
+    function getDefaults() external view returns (uint48, uint32, uint256, uint256, uint256) {
+        return (defaultVotingDelay, defaultVotingPeriod, defaultProposalThreshold, defaultQuorum, defaultTimelockDelay);
     }
 }
