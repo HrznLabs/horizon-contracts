@@ -113,10 +113,12 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @param treasury Guild treasury address
      * @param guildFeeBps Guild fee in basis points
      */
-    function initialize(string calldata name, address admin, address treasury, uint16 guildFeeBps)
-        external
-        initializer
-    {
+    function initialize(
+        string calldata name,
+        address admin,
+        address treasury,
+        uint16 guildFeeBps
+    ) external initializer {
         _initializeGuild(name, admin, treasury, guildFeeBps, false, address(0), 0);
     }
 
