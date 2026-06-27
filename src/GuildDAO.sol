@@ -94,6 +94,8 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     error InvalidMetaDAO();
     /// @notice Reverts when a zero address is supplied to an admin setter
     error ZeroAddress();
+    /// @notice Reverts when an officer tries to remove an admin
+    error CannotRemoveAdmin();
 
     // =============================================================================
     // INITIALIZATION
@@ -213,6 +215,11 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
         GuildMember storage m = members[member];
 
         if (!m.isMember) revert NotMember();
+
+        // Prevent officers from removing admins
+        if (hasRole(DEFAULT_ADMIN_ROLE, member) || hasRole(ADMIN_ROLE, member)) {
+            revert CannotRemoveAdmin();
+        }
 
         m.isMember = false;
         m.leftAt = block.timestamp;
