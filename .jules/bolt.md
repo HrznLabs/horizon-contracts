@@ -4,3 +4,6 @@
 ## 2024-06-12 - Caching State Variables in Internal View Functions
 **Learning:** In Solidity, caching a frequently accessed state variable (like `missionFactory`) into a local stack variable inside internal helper functions (such as `_isFactoryEscrow`) that are called multiple times via modifiers avoids redundant secondary `SLOAD` operations, measurably reducing gas consumption without affecting logic.
 **Action:** Always scan internal view helpers that retrieve state variables for multi-use patterns (e.g., checking for zero-address before making an external call on the same address). Cache the state variable to a local stack variable to save gas.
+## 2024-06-27 - [Storage Pointer Struct Field Caching Optimization]
+**Learning:** In `HorizonAchievements.sol`, when modifying multiple storage slots or passing fields from a `storage` pointer to mapping keys (like `_userHasAchievement[achievement.typeId][from] = false;`), caching the frequently accessed struct field (e.g., `achievement.typeId`) into a local stack variable (`uint256 typeId`) avoids redundant `SLOAD` operations or mapping lookups and significantly reduces gas consumption.
+**Action:** Always cache struct fields into local stack variables when they are accessed multiple times within a function, especially when those fields are used as keys in state mappings.
