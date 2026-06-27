@@ -24,8 +24,8 @@ contract FeeDistributor is AccessControl {
     address public immutable resolverPool;
 
     // Fee split in basis points (must sum to 10_000)
-    uint256 public constant STAKER_BPS   = 4000; // 40%
-    uint256 public constant GUILD_BPS    = 3000; // 30%
+    uint256 public constant STAKER_BPS = 4000; // 40%
+    uint256 public constant GUILD_BPS = 3000; // 30%
     uint256 public constant TREASURY_BPS = 2000; // 20%
     uint256 public constant RESOLVER_BPS = 1000; // 10%
 
@@ -76,7 +76,8 @@ contract FeeDistributor is AccessControl {
 
     /// @notice Record USDC mission volume for a guild in the current period
     function recordGuildVolume(address guild, uint256 usdcVolume)
-        external onlyRole(VOLUME_RECORDER_ROLE)
+        external
+        onlyRole(VOLUME_RECORDER_ROLE)
     {
         require(isRegistered[guild], "FeeDistributor: guild not registered");
         guildVolume[guild] += usdcVolume;
@@ -102,8 +103,8 @@ contract FeeDistributor is AccessControl {
         lastDistributionAt = block.timestamp;
 
         // Calculate splits
-        uint256 stakerAmount   = (amount * STAKER_BPS)   / 10_000;
-        uint256 guildTotal     = (amount * GUILD_BPS)    / 10_000;
+        uint256 stakerAmount = (amount * STAKER_BPS) / 10_000;
+        uint256 guildTotal = (amount * GUILD_BPS) / 10_000;
         uint256 treasuryAmount = (amount * TREASURY_BPS) / 10_000;
         uint256 resolverAmount = amount - stakerAmount - guildTotal - treasuryAmount; // remainder
 
@@ -113,7 +114,9 @@ contract FeeDistributor is AccessControl {
 
         // 2. Guilds: proportional to volume
         if (totalGuildVolume > 0) {
-            for (uint256 i = 0; i < guilds.length; i++) {
+            // Cache guilds.length to save SLOAD gas on multiple loop iterations
+            uint256 len = guilds.length;
+            for (uint256 i = 0; i < len; i++) {
                 address guild = guilds[i];
                 uint256 vol = guildVolume[guild];
                 if (vol == 0) continue;
@@ -135,7 +138,9 @@ contract FeeDistributor is AccessControl {
         usdc.safeTransfer(resolverPool, resolverAmount);
 
         // Reset period volumes
-        for (uint256 i = 0; i < guilds.length; i++) {
+        // Cache guilds.length to save SLOAD gas on multiple loop iterations
+        uint256 len2 = guilds.length;
+        for (uint256 i = 0; i < len2; i++) {
             delete guildVolume[guilds[i]];
         }
         totalGuildVolume = 0;

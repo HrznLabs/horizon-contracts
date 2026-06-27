@@ -155,11 +155,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @param evidenceHash IPFS hash of initial evidence
      * @return disputeId The ID of the created dispute
      */
-    function createDispute(
-        address escrowAddress,
-        uint256 missionId,
-        bytes32 evidenceHash
-    ) external nonReentrant returns (uint256 disputeId) {
+    function createDispute(address escrowAddress, uint256 missionId, bytes32 evidenceHash)
+        external
+        nonReentrant
+        returns (uint256 disputeId)
+    {
         // Verify escrow exists and is in disputed state
         IMissionEscrow escrow = IMissionEscrow(escrowAddress);
         IMissionEscrow.MissionParams memory params = escrow.getParams();
@@ -171,8 +171,10 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         // Must be in submitted state or already disputed
-        if (runtime.state != IMissionEscrow.MissionState.Submitted &&
-            runtime.state != IMissionEscrow.MissionState.Disputed) {
+        if (
+            runtime.state != IMissionEscrow.MissionState.Submitted
+                && runtime.state != IMissionEscrow.MissionState.Disputed
+        ) {
             revert InvalidDisputeState();
         }
 
@@ -182,7 +184,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         // Calculate DDR amount
-        uint256 ddrAmount = (params.rewardAmount * DDR_RATE_BPS) / 10000;
+        uint256 ddrAmount = (params.rewardAmount * DDR_RATE_BPS) / 10_000;
 
         // Transfer DDR from initiator
         usdc.safeTransferFrom(msg.sender, address(this), ddrAmount);
@@ -202,7 +204,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             outcome: DisputeOutcome.None,
             resolver: address(0),
             ddrAmount: ddrAmount,
-            lppAmount: (params.rewardAmount * LPP_RATE_BPS) / 10000,
+            lppAmount: (params.rewardAmount * LPP_RATE_BPS) / 10_000,
             posterEvidenceHash: msg.sender == params.poster ? evidenceHash : bytes32(0),
             performerEvidenceHash: msg.sender == runtime.performer ? evidenceHash : bytes32(0),
             resolutionHash: bytes32(0),
@@ -231,10 +233,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @param disputeId The dispute ID
      * @param resolver Address of the resolver
      */
-    function assignResolver(
-        uint256 disputeId,
-        address resolver
-    ) external onlyResolversDAO disputeExists(disputeId) {
+    function assignResolver(uint256 disputeId, address resolver)
+        external
+        onlyResolversDAO
+        disputeExists(disputeId)
+    {
         Dispute storage dispute = _disputes[disputeId];
 
         if (dispute.state != DisputeState.Pending) {
@@ -262,15 +265,18 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @param disputeId The dispute ID
      * @param evidenceHash IPFS hash of evidence
      */
-    function submitEvidence(
-        uint256 disputeId,
-        bytes32 evidenceHash
-    ) external nonReentrant disputeExists(disputeId) {
+    function submitEvidence(uint256 disputeId, bytes32 evidenceHash)
+        external
+        nonReentrant
+        disputeExists(disputeId)
+    {
         Dispute storage dispute = _disputes[disputeId];
 
+        // Cache state to save SLOADs
+        DisputeState currentState = dispute.state;
+
         // Only pending or investigating state
-        if (dispute.state != DisputeState.Pending &&
-            dispute.state != DisputeState.Investigating) {
+        if (currentState != DisputeState.Pending && currentState != DisputeState.Investigating) {
             revert InvalidDisputeState();
         }
 
@@ -289,8 +295,10 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
                 revert DDRDeadlinePassed();
             }
             // Deposit DDR
-            usdc.safeTransferFrom(msg.sender, address(this), dispute.ddrAmount);
-            _ddrDeposits[disputeId][msg.sender] = dispute.ddrAmount;
+            // Cache ddrAmount to save SLOADs
+            uint256 cachedDdrAmount = dispute.ddrAmount;
+            usdc.safeTransferFrom(msg.sender, address(this), cachedDdrAmount);
+            _ddrDeposits[disputeId][msg.sender] = cachedDdrAmount;
         }
 
         // Store evidence hash
@@ -584,7 +592,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         // Both parties must have deposited
-        if (_ddrDeposits[disputeId][dispute.poster] == 0 ||
+        if (_ddrDeposits[disputeId][dispute.poster] == 0 || 
             _ddrDeposits[disputeId][dispute.performer] == 0) {
             revert InsufficientDDR();
         }
