@@ -293,10 +293,12 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
     function claimExpired() external onlyPoster {
         if (block.timestamp <= _params.expiresAt) revert MissionNotExpired();
         
-        if (_runtime.state == MissionState.Completed ||
-            _runtime.state == MissionState.Cancelled ||
-            _runtime.state == MissionState.Submitted ||
-            _runtime.state == MissionState.Disputed) {
+        // Cache the state variable to avoid redundant SLOAD operations, saving gas
+        MissionState currentState = _runtime.state;
+        if (currentState == MissionState.Completed ||
+            currentState == MissionState.Cancelled ||
+            currentState == MissionState.Submitted ||
+            currentState == MissionState.Disputed) {
             revert InvalidState();
         }
 
