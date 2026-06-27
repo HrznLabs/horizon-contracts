@@ -594,11 +594,10 @@ contract PaymentRouter is AccessControl, Pausable, ReentrancyGuard, IPaymentRout
      * @notice Check if address is a factory-deployed escrow
      */
     function _isFactoryEscrow(address caller) internal view returns (bool) {
-        // Cache the missionFactory state variable to a local stack variable to avoid
-        // redundant SLOAD operations (reading state twice), measurably reducing gas consumption.
-        address _missionFactory = missionFactory;
-        if (_missionFactory == address(0)) return false;
-        try IMissionFactory(_missionFactory).getMissionByEscrow(caller) returns (uint256 missionId) {
+        // Cache missionFactory to avoid redundant SLOAD operations (saves gas)
+        address factory = missionFactory;
+        if (factory == address(0)) return false;
+        try IMissionFactory(factory).getMissionByEscrow(caller) returns (uint256 missionId) {
             return missionId > 0;
         } catch {
             return false;
