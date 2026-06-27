@@ -280,10 +280,11 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @dev Security: zero-address guard on treasury prevents guild fee revenue from being
      *      permanently sent to the zero address on every subsequent payment settlement.
      */
-    function updateConfig(string calldata name, address treasury, uint16 guildFeeBps)
-        external
-        onlyRole(ADMIN_ROLE)
-    {
+    function updateConfig(
+        string calldata name,
+        address treasury,
+        uint16 guildFeeBps
+    ) external onlyRole(ADMIN_ROLE) {
         if (treasury == address(0)) revert ZeroAddress();
         if (guildFeeBps > 1000) revert InvalidFee();
 
@@ -405,11 +406,11 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @return parentMetaDAO Parent MetaDAO address (or address(0))
      * @return metaDAOFeeBps Fee to parent MetaDAO
      */
-    function getFeeHierarchy()
-        external
-        view
-        returns (uint16 guildFeeBps, address parentMetaDAO, uint16 metaDAOFeeBps)
-    {
+    function getFeeHierarchy() external view returns (
+        uint16 guildFeeBps,
+        address parentMetaDAO,
+        uint16 metaDAOFeeBps
+    ) {
         return (config.guildFeeBps, config.parentMetaDAO, config.metaDAOFeeBps);
     }
 
