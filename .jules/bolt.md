@@ -4,3 +4,6 @@
 ## 2024-06-12 - Caching State Variables in Internal View Functions
 **Learning:** In Solidity, caching a frequently accessed state variable (like `missionFactory`) into a local stack variable inside internal helper functions (such as `_isFactoryEscrow`) that are called multiple times via modifiers avoids redundant secondary `SLOAD` operations, measurably reducing gas consumption without affecting logic.
 **Action:** Always scan internal view helpers that retrieve state variables for multi-use patterns (e.g., checking for zero-address before making an external call on the same address). Cache the state variable to a local stack variable to save gas.
+## 2024-06-28 - [Dead Code Removal in Access Control]
+**Learning:** In OpenZeppelin's `AccessControl`, calls to `_revokeRole` perform mapping lookups which cost gas. If a function already verifies that a user *does not* have a certain role (and reverts early if they do), subsequent `_revokeRole` calls for those specific roles are dead code and safe to remove, measurably saving gas (e.g., removing two redundant `_revokeRole` calls saved ~645 gas in `GuildDAO.sol`).
+**Action:** When auditing or optimizing access control functions, always ensure that role revocation or assignment operations are strictly necessary. Avoid performing state updates on roles that have already been validated in earlier assertions.
