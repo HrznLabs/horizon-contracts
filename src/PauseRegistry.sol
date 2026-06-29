@@ -72,6 +72,7 @@ contract PauseRegistry is AccessControl {
     error NotRegistered();
     error AlreadyPaused();
     error NotPaused();
+    error NotAuthorized();
 
     // =============================================================================
     // CONSTRUCTOR
@@ -156,6 +157,7 @@ contract PauseRegistry is AccessControl {
      */
     function reportBalanceChange(address token, address target) external {
         if (!registeredContracts[target]) revert NotRegistered();
+        if (msg.sender != target) revert NotAuthorized();
 
         uint256 previousBalance = lastKnownBalance[target];
         uint256 newBalance = IERC20(token).balanceOf(target);
