@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {DeliveryEscrow} from "./DeliveryEscrow.sol";
 import {IMissionEscrow} from "./interfaces/IMissionEscrow.sol";
+import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
 
 /**
  * @title DeliveryMissionFactory
@@ -53,6 +54,7 @@ contract DeliveryMissionFactory is Ownable {
     error InvalidRewardAmount();
     error InvalidDuration();
     error InsufficientBalance();
+    error TokenNotAccepted();
 
     // =============================================================================
     // CONSTRUCTOR
@@ -90,6 +92,7 @@ contract DeliveryMissionFactory is Ownable {
         bytes32 locationHash
     ) external returns (uint256 missionId) {
         // Validate inputs
+        if (!IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)) revert TokenNotAccepted();
         if (rewardAmount < MIN_REWARD) revert InvalidRewardAmount();
         if (expiresAt < block.timestamp + MIN_DURATION) revert InvalidDuration();
 
