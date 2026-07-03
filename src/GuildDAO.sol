@@ -113,12 +113,10 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @param treasury Guild treasury address
      * @param guildFeeBps Guild fee in basis points
      */
-    function initialize(
-        string calldata name,
-        address admin,
-        address treasury,
-        uint16 guildFeeBps
-    ) external initializer {
+    function initialize(string calldata name, address admin, address treasury, uint16 guildFeeBps)
+        external
+        initializer
+    {
         _initializeGuild(name, admin, treasury, guildFeeBps, false, address(0), 0);
     }
 
@@ -235,8 +233,6 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
         // Explicitly revoke roles to prevent privilege retention
         _revokeRole(CURATOR_ROLE, member);
         _revokeRole(OFFICER_ROLE, member);
-        _revokeRole(ADMIN_ROLE, member);
-        _revokeRole(DEFAULT_ADMIN_ROLE, member);
 
         emit GuildMemberRemoved(address(this), member);
     }
@@ -286,11 +282,10 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @dev Security: zero-address guard on treasury prevents guild fee revenue from being
      *      permanently sent to the zero address on every subsequent payment settlement.
      */
-    function updateConfig(
-        string calldata name,
-        address treasury,
-        uint16 guildFeeBps
-    ) external onlyRole(ADMIN_ROLE) {
+    function updateConfig(string calldata name, address treasury, uint16 guildFeeBps)
+        external
+        onlyRole(ADMIN_ROLE)
+    {
         if (treasury == address(0)) revert ZeroAddress();
         if (guildFeeBps > 1000) revert InvalidFee();
 
@@ -412,11 +407,11 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
      * @return parentMetaDAO Parent MetaDAO address (or address(0))
      * @return metaDAOFeeBps Fee to parent MetaDAO
      */
-    function getFeeHierarchy() external view returns (
-        uint16 guildFeeBps,
-        address parentMetaDAO,
-        uint16 metaDAOFeeBps
-    ) {
+    function getFeeHierarchy()
+        external
+        view
+        returns (uint16 guildFeeBps, address parentMetaDAO, uint16 metaDAOFeeBps)
+    {
         return (config.guildFeeBps, config.parentMetaDAO, config.metaDAOFeeBps);
     }
 

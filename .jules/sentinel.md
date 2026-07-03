@@ -58,3 +58,7 @@
 **Vulnerability:** The `PauseRegistry.reportBalanceChange` function lacked caller validation, allowing any user to pass a malicious token address that returned a manipulated balance for a target contract. This tricked the circuit breaker into detecting a "drain" and pausing the target contract (Denial of Service).
 **Learning:** Functions that act on behalf of a specific contract or user (e.g., reporting a balance change for `target`) must verify that the caller (`msg.sender`) is authorized to make that report, typically by checking `msg.sender == target`.
 **Prevention:** Always validate `msg.sender` against the entity they claim to represent or report for, especially in security-critical mechanisms like circuit breakers.
+## 2024-05-27 - Delivery Mission Token Validation Bypass
+**Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
+**Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
+**Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.

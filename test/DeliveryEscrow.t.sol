@@ -51,6 +51,11 @@ contract DeliveryEscrowTest is Test {
     function _createDeliveryMission() internal returns (uint256 missionId, address escrowAddress) {
         vm.startPrank(poster);
         usdc.approve(address(factory), REWARD_AMOUNT);
+        vm.stopPrank();
+        vm.startPrank(owner);
+        router.setAcceptedToken(address(usdc), true);
+        vm.stopPrank();
+        vm.startPrank(poster);
         
         missionId = factory.createDeliveryMission(
             address(usdc),
@@ -129,7 +134,7 @@ contract DeliveryEscrowTest is Test {
         });
 
         // Initialize delivery
-        vm.prank(poster);
+        vm.prank(address(factory));
         escrow.initializeDelivery(params, waypoints);
 
         // Verify delivery initialized
@@ -167,7 +172,7 @@ contract DeliveryEscrowTest is Test {
             tipAmount: 0
         });
 
-        vm.prank(poster);
+        vm.prank(address(factory));
         escrow.initializeDelivery(params, waypoints);
 
         // Accept mission
@@ -213,7 +218,7 @@ contract DeliveryEscrowTest is Test {
             tipAmount: 0
         });
 
-        vm.prank(poster);
+        vm.prank(address(factory));
         escrow.initializeDelivery(params, waypoints);
 
         // Accept mission
@@ -259,7 +264,7 @@ contract DeliveryEscrowTest is Test {
             tipAmount: 0
         });
 
-        vm.prank(poster);
+        vm.prank(address(factory));
         escrow.initializeDelivery(params, waypoints);
 
         // Accept mission
@@ -316,7 +321,7 @@ contract DeliveryEscrowTest is Test {
             tipAmount: 0
         });
 
-        vm.prank(poster);
+        vm.prank(address(factory));
         escrow.initializeDelivery(params, waypoints);
 
         // Accept mission
@@ -371,7 +376,7 @@ contract DeliveryEscrowTest is Test {
             tipAmount: 0
         });
 
-        vm.prank(poster);
+        vm.prank(address(factory));
         escrow.initializeDelivery(params, waypoints);
 
         // Accept mission
