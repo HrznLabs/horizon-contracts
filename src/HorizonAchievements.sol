@@ -432,17 +432,19 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
         // If this is a transfer (not mint/burn), check soulbound
         if (from != address(0) && to != address(0)) {
             Achievement storage achievement = _achievements[tokenId];
-            AchievementType storage achievementType = _achievementTypes[achievement.typeId];
+            // Cache typeId to avoid redundant SLOAD operations (saves gas)
+            uint256 typeId = achievement.typeId;
+            AchievementType storage achievementType = _achievementTypes[typeId];
 
             if (achievementType.isSoulbound) {
                 revert SoulboundTransferNotAllowed();
             }
 
             // Update tracking for tradable NFTs
-            _userHasAchievement[achievement.typeId][from] = false;
-            _userHasAchievement[achievement.typeId][to] = true;
-            _userAchievementToken[from][achievement.typeId] = 0;
-            _userAchievementToken[to][achievement.typeId] = tokenId;
+            _userHasAchievement[typeId][from] = false;
+            _userHasAchievement[typeId][to] = true;
+            _userAchievementToken[from][typeId] = 0;
+            _userAchievementToken[to][typeId] = tokenId;
         }
 
         return super._update(to, tokenId, auth);
