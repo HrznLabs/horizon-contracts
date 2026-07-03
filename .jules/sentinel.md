@@ -54,3 +54,7 @@
 **Vulnerability:** The `GuildDAO.removeMember` function marked a member as removed (`isMember = false`) but failed to explicitly revoke assigned access control roles like `ADMIN_ROLE`, `OFFICER_ROLE`, or `CURATOR_ROLE`. This allowed an ousted member to retain their administrative privileges.
 **Learning:** Removing a user from a system's membership list does not automatically revoke their associated role-based access control (RBAC) permissions unless explicitly programmed to do so. In OpenZeppelin AccessControl implementations, marking an entity as removed logically does not automatically revoke their assigned roles.
 **Prevention:** When implementing member removal or suspension logic, always explicitly call `_revokeRole()` for all potentially assigned privileges/roles during removal to prevent privilege retention vulnerabilities.
+## 2024-05-27 - Delivery Mission Token Validation Bypass
+**Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
+**Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
+**Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.
