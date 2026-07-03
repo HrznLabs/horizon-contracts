@@ -22,6 +22,7 @@ interface IPauseRegistry {
     error NotRegistered();
     error AlreadyPaused();
     error NotPaused();
+    error NotAuthorized();
 
     /// @notice Check if a target is paused (globally or individually)
     function isPaused(address target) external view returns (bool);

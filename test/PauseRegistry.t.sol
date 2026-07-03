@@ -336,6 +336,7 @@ contract PauseRegistryTest is Test {
         usdc.transfer(address(0xdead), 400e6);
 
         // Report balance change
+        vm.prank(contractA);
         pauseRegistry.reportBalanceChange(address(usdc), contractA);
 
         // Should be auto-paused
@@ -353,6 +354,7 @@ contract PauseRegistryTest is Test {
         vm.prank(contractA);
         usdc.transfer(address(0xdead), 200e6);
 
+        vm.prank(contractA);
         pauseRegistry.reportBalanceChange(address(usdc), contractA);
 
         // Should NOT be paused
