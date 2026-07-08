@@ -199,12 +199,11 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
      * @notice Submit proof of mission completion
      * @param proofHash IPFS hash of completion proof
      */
-    function submitProof(bytes32 proofHash) 
-        external 
+    function submitProof(bytes32 proofHash)
+        external
         virtual
-        onlyPerformer 
-        inState(MissionState.Accepted) 
-        notExpired
+        onlyPerformer
+        inState(MissionState.Accepted)
     {
         _runtime.proofHash = proofHash;
         _runtime.state = MissionState.Submitted;
@@ -274,7 +273,7 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
             currentState != MissionState.Submitted) {
             revert InvalidState();
         }
-        
+
         if (msg.sender != _params.poster && msg.sender != _runtime.performer) {
             revert InvalidState();
         }
@@ -293,7 +292,7 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
      */
     function claimExpired() external onlyPoster {
         if (block.timestamp <= _params.expiresAt) revert MissionNotExpired();
-        
+
         // Cache the state variable to avoid redundant SLOAD operations, saving gas
         MissionState currentState = _runtime.state;
         if (currentState == MissionState.Completed ||
