@@ -324,7 +324,8 @@ contract GuildDAO is Initializable, AccessControlUpgradeable {
     // =============================================================================
 
     function isMember(address account) external view returns (bool) {
-        return members[account].isMember;
+        GuildMember storage m = members[account];
+        return m.isMember;
     }
 
     function isCurator(address account) external view returns (bool) {
