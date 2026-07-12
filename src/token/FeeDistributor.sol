@@ -119,6 +119,7 @@ contract FeeDistributor is AccessControl {
             for (uint256 i = 0; i < len; i++) {
                 address guild = guilds[i];
                 uint256 vol = guildVolume[guild];
+                delete guildVolume[guild]; // Fused loop: delete after loading
                 if (vol == 0) continue;
                 uint256 guildShare = (guildTotal * vol) / totalGuildVolume;
                 if (guildShare > 0) {
@@ -129,6 +130,8 @@ contract FeeDistributor is AccessControl {
         } else {
             // No guild volume — send guild portion to treasury
             treasuryAmount += guildTotal;
+            // totalGuildVolume == 0 implies that either there are no guilds
+            // or all guildVolumes are 0. So no need to loop and reset them.
         }
 
         // 3. Treasury
@@ -137,12 +140,7 @@ contract FeeDistributor is AccessControl {
         // 4. Resolvers
         usdc.safeTransfer(resolverPool, resolverAmount);
 
-        // Reset period volumes
-        // Cache guilds.length to save SLOAD gas on multiple loop iterations
-        uint256 len2 = guilds.length;
-        for (uint256 i = 0; i < len2; i++) {
-            delete guildVolume[guilds[i]];
-        }
+        // Reset total volume
         totalGuildVolume = 0;
 
         emit FeesDistributed(amount, stakerAmount, guildTotal, treasuryAmount, resolverAmount);
