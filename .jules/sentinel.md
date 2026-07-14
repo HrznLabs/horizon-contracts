@@ -62,3 +62,7 @@
 **Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
 **Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
 **Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.
+## 2024-07-14 - Late Proof Submission in MissionEscrow
+**Vulnerability:** The `submitProof` function in both `MissionEscrow.sol` and `DeliveryEscrow.sol` lacked the `notExpired` modifier, allowing proofs to be submitted after the mission deadline.
+**Learning:** In time-locked escrow contracts, state transition functions that can block time-dependent refund mechanisms (like `claimExpired`) must also enforce deadlines. Without `notExpired`, a malicious performer could intentionally wait until after the deadline and submit a late proof, transitioning the state to `Submitted` and preventing the poster from calling `claimExpired` (which reverts if the state is `Submitted`), effectively holding the funds hostage.
+**Prevention:** Ensure all state transition functions that could interfere with time-locked mechanisms explicitly check time constraints (e.g., using a `notExpired` modifier).
