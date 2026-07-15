@@ -62,3 +62,7 @@
 **Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
 **Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
 **Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.
+## 2024-05-27 - Escrow Expiration Bypass
+**Vulnerability:** The `submitProof` functions in `MissionEscrow.sol` and `DeliveryEscrow.sol` lacked expiration checks, allowing performers to submit proofs indefinitely.
+**Learning:** State transition validation in time-locked contracts requires explicit boundary enforcement across all state-mutating functions, not just initial acceptance or refund logic. Overridden functions in child contracts (like `DeliveryEscrow.sol`) drop modifiers from the parent unless explicitly reapplied.
+**Prevention:** Ensure all state-mutating functions interacting with time-sensitive constraints explicitly re-apply modifiers like `notExpired`, especially in derived contracts overriding parent functions.
