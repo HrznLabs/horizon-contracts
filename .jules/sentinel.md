@@ -62,3 +62,7 @@
 **Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
 **Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
 **Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.
+## 2024-05-24 - Missing Expiration Check on Proof Submission
+**Vulnerability:** Performers could submit proofs for missions even after the deadline had passed, potentially locking the contract state indefinitely in "Submitted".
+**Learning:** Smart contract interactions relying on state transitions and deadlines must explicitly re-validate the time constraints at each critical interaction point (`submitProof`), especially in inheritance scenarios where modifiers from overridden base functions (`notExpired`) are not automatically inherited by default.
+**Prevention:** Always verify that modifiers are reapplied when overriding functions in derived contracts to ensure consistency in constraints across execution paths.
