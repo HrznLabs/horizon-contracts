@@ -112,23 +112,29 @@ contract FeeDistributor is AccessControl {
         usdc.safeTransfer(address(vault), stakerAmount);
         vault.notifyRewardAmount(stakerAmount);
 
-        // 2. Guilds: proportional to volume
-        if (totalGuildVolume > 0) {
-            // Cache guilds.length to save SLOAD gas on multiple loop iterations
-            uint256 len = guilds.length;
-            for (uint256 i = 0; i < len; i++) {
-                address guild = guilds[i];
-                uint256 vol = guildVolume[guild];
-                if (vol == 0) continue;
-                uint256 guildShare = (guildTotal * vol) / totalGuildVolume;
+        // 2. Guilds: proportional to volume & Reset period volumes
+        uint256 cachedTotalVolume = totalGuildVolume;
+        uint256 len = guilds.length;
+
+        if (cachedTotalVolume == 0) {
+            // No guild volume — send guild portion to treasury
+            treasuryAmount += guildTotal;
+        }
+
+        for (uint256 i = 0; i < len; i++) {
+            address guild = guilds[i];
+            uint256 vol = guildVolume[guild];
+
+            // Delete unconditionally prior to continuing
+            delete guildVolume[guild];
+
+            if (cachedTotalVolume > 0 && vol > 0) {
+                uint256 guildShare = (guildTotal * vol) / cachedTotalVolume;
                 if (guildShare > 0) {
                     usdc.safeTransfer(guild, guildShare);
                     emit GuildPaid(guild, guildShare);
                 }
             }
-        } else {
-            // No guild volume — send guild portion to treasury
-            treasuryAmount += guildTotal;
         }
 
         // 3. Treasury
@@ -137,12 +143,6 @@ contract FeeDistributor is AccessControl {
         // 4. Resolvers
         usdc.safeTransfer(resolverPool, resolverAmount);
 
-        // Reset period volumes
-        // Cache guilds.length to save SLOAD gas on multiple loop iterations
-        uint256 len2 = guilds.length;
-        for (uint256 i = 0; i < len2; i++) {
-            delete guildVolume[guilds[i]];
-        }
         totalGuildVolume = 0;
 
         emit FeesDistributed(amount, stakerAmount, guildTotal, treasuryAmount, resolverAmount);
