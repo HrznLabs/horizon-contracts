@@ -536,9 +536,12 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert TimeoutNotReached();
         }
 
+        address cachedPoster = dispute.poster;
+        address cachedPerformer = dispute.performer;
+
         // Determine who deposited and who didn't
-        bool posterDeposited = _ddrDeposits[disputeId][dispute.poster] > 0;
-        bool performerDeposited = _ddrDeposits[disputeId][dispute.performer] > 0;
+        bool posterDeposited = _ddrDeposits[disputeId][cachedPoster] > 0;
+        bool performerDeposited = _ddrDeposits[disputeId][cachedPerformer] > 0;
 
         // Both deposited = dispute should proceed, not timeout
         if (posterDeposited && performerDeposited) {
@@ -552,8 +555,8 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         // Only the depositor can claim
-        address depositor = posterDeposited ? dispute.poster : dispute.performer;
-        address forfeiter = posterDeposited ? dispute.performer : dispute.poster;
+        address depositor = posterDeposited ? cachedPoster : cachedPerformer;
+        address forfeiter = posterDeposited ? cachedPerformer : cachedPoster;
 
         if (msg.sender != depositor) {
             revert NotDepositor();
@@ -586,9 +589,12 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert InvalidDisputeState();
         }
 
+        address cachedPoster = dispute.poster;
+        address cachedPerformer = dispute.performer;
+
         // Both parties must have deposited
-        if (_ddrDeposits[disputeId][dispute.poster] == 0 || 
-            _ddrDeposits[disputeId][dispute.performer] == 0) {
+        if (_ddrDeposits[disputeId][cachedPoster] == 0 ||
+            _ddrDeposits[disputeId][cachedPerformer] == 0) {
             revert InsufficientDDR();
         }
 
@@ -598,7 +604,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         // Only parties can claim
-        if (msg.sender != dispute.poster && msg.sender != dispute.performer) {
+        if (msg.sender != cachedPoster && msg.sender != cachedPerformer) {
             revert NotParty();
         }
 
@@ -608,17 +614,17 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         dispute.resolver = address(0);
 
         // Refund both parties' DDR deposits
-        uint256 posterRefund = _ddrDeposits[disputeId][dispute.poster];
-        uint256 performerRefund = _ddrDeposits[disputeId][dispute.performer];
+        uint256 posterRefund = _ddrDeposits[disputeId][cachedPoster];
+        uint256 performerRefund = _ddrDeposits[disputeId][cachedPerformer];
 
-        _ddrDeposits[disputeId][dispute.poster] = 0;
-        _ddrDeposits[disputeId][dispute.performer] = 0;
+        _ddrDeposits[disputeId][cachedPoster] = 0;
+        _ddrDeposits[disputeId][cachedPerformer] = 0;
 
         if (posterRefund > 0) {
-            usdc.safeTransfer(dispute.poster, posterRefund);
+            usdc.safeTransfer(cachedPoster, posterRefund);
         }
         if (performerRefund > 0) {
-            usdc.safeTransfer(dispute.performer, performerRefund);
+            usdc.safeTransfer(cachedPerformer, performerRefund);
         }
 
         emit ResolverInactionTimeout(disputeId, oldResolver);
@@ -636,14 +642,18 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
     function _distributeFunds(uint256 disputeId) internal {
         Dispute storage dispute = _disputes[disputeId];
 
+        DisputeOutcome cachedOutcome = dispute.outcome;
+        address cachedPoster = dispute.poster;
+        address cachedPerformer = dispute.performer;
+
         // First, settle the escrow reward distribution
         IMissionEscrow escrow = IMissionEscrow(dispute.escrowAddress);
         uint256 splitBps = _splitPercentages[disputeId];
-        escrow.settleDispute(uint8(dispute.outcome), splitBps);
+        escrow.settleDispute(uint8(cachedOutcome), splitBps);
 
         // Now handle DDR distributions
-        uint256 posterDDR = _ddrDeposits[disputeId][dispute.poster];
-        uint256 performerDDR = _ddrDeposits[disputeId][dispute.performer];
+        uint256 posterDDR = _ddrDeposits[disputeId][cachedPoster];
+        uint256 performerDDR = _ddrDeposits[disputeId][cachedPerformer];
         uint256 totalDDR = posterDDR + performerDDR;
 
         // Calculate fees from DDR pool
@@ -654,17 +664,17 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         uint256 posterPayout = 0;
         uint256 performerPayout = 0;
 
-        if (dispute.outcome == DisputeOutcome.PosterWins) {
+        if (cachedOutcome == DisputeOutcome.PosterWins) {
             // Poster wins: gets remaining DDR
             posterPayout = remainingDDR;
-        } else if (dispute.outcome == DisputeOutcome.PerformerWins) {
+        } else if (cachedOutcome == DisputeOutcome.PerformerWins) {
             // Performer wins: gets remaining DDR
             performerPayout = remainingDDR;
-        } else if (dispute.outcome == DisputeOutcome.Split) {
+        } else if (cachedOutcome == DisputeOutcome.Split) {
             // Split: DDR returned proportionally
             posterPayout = (remainingDDR * (10000 - splitBps)) / 10000;
             performerPayout = (remainingDDR * splitBps) / 10000;
-        } else if (dispute.outcome == DisputeOutcome.Cancelled) {
+        } else if (cachedOutcome == DisputeOutcome.Cancelled) {
             // Cancelled: DDR returned proportionally to what each deposited
             if (totalDDR > 0) {
                 posterPayout = (remainingDDR * posterDDR) / totalDDR;
@@ -674,10 +684,10 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
 
         // Transfer DDR payouts
         if (posterPayout > 0) {
-            usdc.safeTransfer(dispute.poster, posterPayout);
+            usdc.safeTransfer(cachedPoster, posterPayout);
         }
         if (performerPayout > 0) {
-            usdc.safeTransfer(dispute.performer, performerPayout);
+            usdc.safeTransfer(cachedPerformer, performerPayout);
         }
         if (resolverFee > 0) {
             usdc.safeTransfer(resolverTreasury, resolverFee);
@@ -688,7 +698,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
 
         emit DisputeFinalized(
             disputeId,
-            dispute.outcome,
+            cachedOutcome,
             posterPayout,
             performerPayout,
             resolverFee,
