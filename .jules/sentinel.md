@@ -62,3 +62,7 @@
 **Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
 **Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
 **Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.
+## 2025-07-24 - Missing expiration modifier on state transitions in base and derived escrow contracts
+**Vulnerability:** Performers could wait until after a mission expired and call `submitProof()` to transition the state to `Submitted`, completely bypassing the expiration logic and preventing the poster from claiming their funds via `claimExpired()`.
+**Learning:** Overridden functions in derived contracts (like `DeliveryEscrow.sol`) do not automatically inherit modifiers (like `notExpired`) from their parent contract (`MissionEscrow.sol`). Critical state-checking modifiers must be explicitly reapplied in the overriding function.
+**Prevention:** Always verify that critical state transition functions enforce all constraints, including time-based deadlines, and explicitly re-apply necessary modifiers when overriding inherited functions in Solidity.
