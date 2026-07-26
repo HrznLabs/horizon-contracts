@@ -204,6 +204,7 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
         virtual
         onlyPerformer 
         inState(MissionState.Accepted) 
+        notExpired
     {
         _runtime.proofHash = proofHash;
         _runtime.state = MissionState.Submitted;
