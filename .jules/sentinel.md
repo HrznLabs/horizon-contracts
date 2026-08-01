@@ -62,3 +62,8 @@
 **Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
 **Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
 **Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.
+
+## 2024-08-01 - Enforcement on Proof Submission
+**Vulnerability:** The `submitProof` function lacks deadline enforcement.
+**Learning:** In Solidity, overridden functions do not automatically inherit modifiers. Ensure all state transitions enforce deadlines.
+**Prevention:** Explicitly reapply state-checking modifiers to overridden functions.
