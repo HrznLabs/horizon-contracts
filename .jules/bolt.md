@@ -10,3 +10,11 @@
 ## 2024-06-28 - [Dead Code Removal in Access Control]
 **Learning:** In OpenZeppelin's `AccessControl`, calls to `_revokeRole` perform mapping lookups which cost gas. If a function already verifies that a user *does not* have a certain role (and reverts early if they do), subsequent `_revokeRole` calls for those specific roles are dead code and safe to remove, measurably saving gas (e.g., removing two redundant `_revokeRole` calls saved ~645 gas in `GuildDAO.sol`).
 **Action:** When auditing or optimizing access control functions, always ensure that role revocation or assignment operations are strictly necessary. Avoid performing state updates on roles that have already been validated in earlier assertions.
+
+## 2026-08-06 - Cache Dispute Struct Fields in _distributeFunds
+**Learning:** Caching frequently accessed fields of a storage struct (, , ) into local variables within a single function avoids redundant `SLOAD` operations, saving gas.
+**Action:** Whenever multiple properties of the same storage struct are read multiple times within a function (especially in branches or event emissions like in `_distributeFunds`), read them into memory once and use the cached local variables.
+
+## 2024-05-18 - Cache Dispute Struct Fields in _distributeFunds
+**Learning:** Caching frequently accessed fields of a storage struct (`outcome`, `poster`, `performer`) into local variables within a single function avoids redundant `SLOAD` operations, saving gas.
+**Action:** Whenever multiple properties of the same storage struct are read multiple times within a function (especially in branches or event emissions like in `_distributeFunds`), read them into memory once and use the cached local variables.
