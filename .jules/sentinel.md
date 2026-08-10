@@ -62,3 +62,12 @@
 **Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
 **Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
 **Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.
+## 2026-08-10 - DeliveryEscrow overrides base logic without maintaining critical modifiers
+**Vulnerability:** The `DeliveryEscrow.submitProof` override function drops the `notExpired` modifier present in the base `MissionEscrow` contract, allowing performers to submit deliveries after deadlines.
+**Learning:** In Solidity, overriding functions do not automatically inherit the modifiers attached to the parent contract's definition.
+**Prevention:** Always explicitly reapply critical state-checking modifiers (like `notExpired`, `nonReentrant`) when overriding state-mutating functions in subcontracts.
+
+## 2026-08-10 - DeliveryMissionFactory misses essential interface function for routing
+**Vulnerability:** `DeliveryMissionFactory` does not implement `getMissionByEscrow`. Because `PaymentRouter._isFactoryEscrow` uses this function to authenticate valid escrows, settlement for delivery missions will always fail.
+**Learning:** Cloned factory implementations must fulfill all interface requirements expected by the central router/auth contracts, especially when introducing new mission types.
+**Prevention:** Ensure that new Factory contracts implement all getters expected by the `IMissionFactory` interface to allow successful integration with the `PaymentRouter`.
