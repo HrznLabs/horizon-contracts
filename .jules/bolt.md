@@ -10,3 +10,6 @@
 ## 2024-06-28 - [Dead Code Removal in Access Control]
 **Learning:** In OpenZeppelin's `AccessControl`, calls to `_revokeRole` perform mapping lookups which cost gas. If a function already verifies that a user *does not* have a certain role (and reverts early if they do), subsequent `_revokeRole` calls for those specific roles are dead code and safe to remove, measurably saving gas (e.g., removing two redundant `_revokeRole` calls saved ~645 gas in `GuildDAO.sol`).
 **Action:** When auditing or optimizing access control functions, always ensure that role revocation or assignment operations are strictly necessary. Avoid performing state updates on roles that have already been validated in earlier assertions.
+## 2024-08-10 - Cache storage struct fields to stack variables
+**Learning:** In Solidity, accessing members of a storage struct triggers an SLOAD operation. While subsequent reads are warm, they still cost 100 gas compared to 3 gas for stack variable reads. Caching frequently accessed fields (like `dispute.outcome` in `DisputeResolver._distributeFunds`) into local memory variables avoids these redundant SLOADs and provides a significant gas optimization.
+**Action:** When a struct field is read multiple times within a function (especially in loops or conditional chains), cache it into a local stack variable first.
