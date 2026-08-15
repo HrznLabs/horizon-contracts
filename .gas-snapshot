@@ -1,0 +1,5 @@
+SmokeTest:test_SmokeTest_DeploymentAddresses() (gas: 7386)
+SmokeTest:test_SmokeTest_FullOrderFlow() (gas: 814868)
+SmokeTest:test_SmokeTest_GuildHierarchy() (gas: 32436)
+SmokeTest:test_SmokeTest_InsurancePool() (gas: 1343132)
+SmokeTest:test_SmokeTest_ReputationOracle() (gas: 47702)
