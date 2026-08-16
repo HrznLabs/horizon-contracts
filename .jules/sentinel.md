@@ -62,3 +62,7 @@
 **Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
 **Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
 **Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.
+## 2024-08-16 - Stuck funds on array item removal without clearing volume
+**Vulnerability:** In `FeeDistributor.sol`, removing a guild from the tracking array left its accumulated volume in a mapping, preventing it from being distributed or cleared.
+**Learning:** Arrays are used for iteration, but maps hold the actual state. Removing from one without clearing the other creates desynchronization, especially when total aggregates (`totalGuildVolume`) are involved.
+**Prevention:** Always pair array item removal with full cleanup of related mapping states and aggregate totals to prevent orphan state leading to stuck funds.
