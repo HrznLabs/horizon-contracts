@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IMissionEscrow} from "./interfaces/IMissionEscrow.sol";
-import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
-import {IPauseRegistry} from "./interfaces/IPauseRegistry.sol";
-import {IReputationOracle} from "./interfaces/IReputationOracle.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IMissionEscrow } from "./interfaces/IMissionEscrow.sol";
+import { IPaymentRouter } from "./interfaces/IPaymentRouter.sol";
+import { IPauseRegistry } from "./interfaces/IPauseRegistry.sol";
+import { IReputationOracle } from "./interfaces/IReputationOracle.sol";
 
 /**
  * @title MissionEscrow
@@ -107,9 +107,19 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
         address reputationOracle
     ) external virtual initializer {
         _initializeMission(
-            missionId, poster, rewardAmount, expiresAt, guild,
-            metadataHash, locationHash, paymentRouter, paymentToken,
-            disputeResolver, pauseRegistryAddr, minReputation, reputationOracle
+            missionId,
+            poster,
+            rewardAmount,
+            expiresAt,
+            guild,
+            metadataHash,
+            locationHash,
+            paymentRouter,
+            paymentToken,
+            disputeResolver,
+            pauseRegistryAddr,
+            minReputation,
+            reputationOracle
         );
     }
 
@@ -199,11 +209,11 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
      * @notice Submit proof of mission completion
      * @param proofHash IPFS hash of completion proof
      */
-    function submitProof(bytes32 proofHash) 
-        external 
+    function submitProof(bytes32 proofHash)
+        external
         virtual
-        onlyPerformer 
-        inState(MissionState.Accepted) 
+        onlyPerformer
+        inState(MissionState.Accepted)
     {
         _runtime.proofHash = proofHash;
         _runtime.state = MissionState.Submitted;
@@ -218,24 +228,31 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
      *      after updating state. Although CEI is followed, a malicious router or token
      *      could re-enter; nonReentrant provides defense-in-depth.
      */
-    function approveCompletion()
-        external
-        onlyPoster
-        inState(MissionState.Submitted)
-        nonReentrant
-    {
+    function approveCompletion() external onlyPoster inState(MissionState.Submitted) nonReentrant {
         _runtime.state = MissionState.Completed;
 
-        // Transfer payment token to PaymentRouter for distribution
-        _token.safeTransfer(address(_paymentRouter), _params.rewardAmount);
+        // Transfer base reward to PaymentRouter for distribution, and tip directly to performer
+        uint256 baseReward = _params.rewardAmount;
+        if (address(this).code.length > 0) {
+            // Check if this is a DeliveryEscrow with a tip using low-level call
+            // to avoid interface dependencies. getTipAmount() selector: 0xf4e8b4fa
+            (bool success, bytes memory data) =
+                address(this).staticcall(abi.encodeWithSelector(0xf4e8b4fa));
+            if (success && data.length >= 32) {
+                uint256 tip = abi.decode(data, (uint256));
+                baseReward = _params.rewardAmount - tip;
+            }
+        }
+
+        _token.safeTransfer(address(_paymentRouter), baseReward);
+
+        if (baseReward < _params.rewardAmount) {
+            _token.safeTransfer(_runtime.performer, _params.rewardAmount - baseReward);
+        }
 
         // Settle payment through router (passes token so router distributes the right asset)
         _paymentRouter.settlePayment(
-            _missionId,
-            _runtime.performer,
-            address(_token),
-            _params.rewardAmount,
-            _params.guild
+            _missionId, _runtime.performer, address(_token), baseReward, _params.guild
         );
 
         emit MissionCompleted(_missionId);
@@ -247,12 +264,7 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
      * @dev HIGH-04: nonReentrant added — safeTransfer to an ERC-20 token with hooks
      *      could allow re-entry before state finalization; nonReentrant prevents this.
      */
-    function cancelMission()
-        external
-        onlyPoster
-        inState(MissionState.Open)
-        nonReentrant
-    {
+    function cancelMission() external onlyPoster inState(MissionState.Open) nonReentrant {
         _runtime.state = MissionState.Cancelled;
 
         // Refund poster
@@ -269,11 +281,10 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
     function raiseDispute(bytes32 disputeHash) external {
         // Cache the state variable to avoid redundant SLOAD operations, saving gas
         MissionState currentState = _runtime.state;
-        if (currentState != MissionState.Accepted &&
-            currentState != MissionState.Submitted) {
+        if (currentState != MissionState.Accepted && currentState != MissionState.Submitted) {
             revert InvalidState();
         }
-        
+
         if (msg.sender != _params.poster && msg.sender != _runtime.performer) {
             revert InvalidState();
         }
@@ -292,13 +303,13 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
      */
     function claimExpired() external onlyPoster {
         if (block.timestamp <= _params.expiresAt) revert MissionNotExpired();
-        
+
         // Cache the state variable to avoid redundant SLOAD operations, saving gas
         MissionState currentState = _runtime.state;
-        if (currentState == MissionState.Completed ||
-            currentState == MissionState.Cancelled ||
-            currentState == MissionState.Submitted ||
-            currentState == MissionState.Disputed) {
+        if (
+            currentState == MissionState.Completed || currentState == MissionState.Cancelled
+                || currentState == MissionState.Submitted || currentState == MissionState.Disputed
+        ) {
             revert InvalidState();
         }
 
@@ -362,7 +373,7 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
             performerAmount = _params.rewardAmount;
         } else if (outcome == 3) {
             // Split: Performer portion through PaymentRouter, poster portion direct
-            performerAmount = (_params.rewardAmount * splitPercentage) / 10000;
+            performerAmount = (_params.rewardAmount * splitPercentage) / 10_000;
             posterAmount = _params.rewardAmount - performerAmount;
         } else if (outcome == 4) {
             // Cancelled: Poster gets refund (no protocol fees on refunds)
@@ -384,11 +395,7 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
         if (performerAmount > 0) {
             _token.safeTransfer(address(_paymentRouter), performerAmount);
             _paymentRouter.settlePayment(
-                _missionId,
-                _runtime.performer,
-                address(_token),
-                performerAmount,
-                _params.guild
+                _missionId, _runtime.performer, address(_token), performerAmount, _params.guild
             );
         }
 

@@ -1,0 +1,37 @@
+<<<<<<< SEARCH
+        // Settle payment through router (passes token so router distributes the right asset)
+        _paymentRouter.settlePayment(
+            _missionId,
+            _runtime.performer,
+            address(_token),
+            _params.rewardAmount,
+            _params.guild
+        );
+=======
+        // Settle base reward through router
+        // Get base reward by subtracting any tip added
+        uint256 baseReward = _params.rewardAmount;
+        if (address(this).code.length > 0) {
+            // Check if this is a DeliveryEscrow with a tip using low-level call
+            // to avoid import cycles / interface changes. getTipAmount() selector: 0x981504cc
+            (bool success, bytes memory data) = address(this).staticcall(abi.encodeWithSelector(0x981504cc));
+            if (success && data.length >= 32) {
+                uint256 tip = abi.decode(data, (uint256));
+                baseReward = _params.rewardAmount - tip;
+            }
+        }
+
+        // Settle payment through router for the base reward
+        _paymentRouter.settlePayment(
+            _missionId,
+            _runtime.performer,
+            address(_token),
+            baseReward,
+            _params.guild
+        );
+
+        // Transfer tip directly to performer
+        if (baseReward < _params.rewardAmount) {
+            _token.safeTransfer(_runtime.performer, _params.rewardAmount - baseReward);
+        }
+>>>>>>> REPLACE

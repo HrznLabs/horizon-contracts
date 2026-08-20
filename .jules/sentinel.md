@@ -62,3 +62,7 @@
 **Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
 **Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
 **Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.
+## 2024-08-20 - Tip logic bypassed fee calculation but mistakenly over-routed
+**Vulnerability:** In `DeliveryEscrow.sol`, `addTip` directly augmented `_params.rewardAmount`, which is passed to `PaymentRouter.settlePayment` during `approveCompletion`. This resulted in protocol and guild fees being calculated on the tip amount, contrary to the design that tips should solely go to the performer.
+**Learning:** Inheritance can hide contextual information. `MissionEscrow` (the parent) wasn't aware of the tip logic in `DeliveryEscrow` (the child).
+**Prevention:** When building layered models or extensions, rely on interfaces or explicit overrides if children modify global parameters that parents use. Use specific properties for base vs full amounts rather than reusing fields.
