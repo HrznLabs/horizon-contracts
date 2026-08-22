@@ -62,3 +62,7 @@
 **Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
 **Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
 **Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.
+## 2026-08-22 - DeliveryEscrow PaymentRouter Settlement Failure
+**Vulnerability:** `PaymentRouter._isFactoryEscrow()` relies on `getMissionByEscrow()` to authenticate escrows. `DeliveryMissionFactory` lacks this function (while `MissionFactory` has it), causing settlements for deliveries to silently fail authorization and revert with `OnlyMissionEscrow`.
+**Learning:** When multiple factories are used to deploy different escrow implementations, they must conform to the expected interface used by shared infrastructural contracts like `PaymentRouter`.
+**Prevention:** Ensure all factory contracts inherit from or implement a shared interface (e.g., `IMissionFactory`) that defines required authentication hooks, or use abstract base contracts to enforce interface compliance across factories.
