@@ -8,7 +8,7 @@ import {PaymentRouter} from "../src/PaymentRouter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract MockERC20 is ERC20 {
+contract MockTokenERC20 is ERC20 {
     constructor() ERC20("Mock USDC", "mUSDC") {}
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
@@ -18,7 +18,7 @@ contract MockERC20 is ERC20 {
 contract DeliveryEscrowPoC is Test {
     DeliveryMissionFactory factory;
     PaymentRouter router;
-    MockERC20 usdc;
+    MockTokenERC20 usdc;
 
     address admin = address(1);
     address poster = address(2);
@@ -27,7 +27,7 @@ contract DeliveryEscrowPoC is Test {
     function setUp() public {
         vm.startPrank(admin);
 
-        usdc = new MockERC20();
+        usdc = new MockTokenERC20();
         router = new PaymentRouter(address(usdc), admin, admin, admin, admin);
 
         router.setAcceptedToken(address(usdc), true);
@@ -67,8 +67,9 @@ contract DeliveryEscrowPoC is Test {
         vm.stopPrank();
 
         vm.startPrank(poster);
-        // This will succeed because DeliveryMissionFactory has getMissionByEscrow
+        // This will fail because DeliveryMissionFactory does not have getMissionByEscrow
         // and PaymentRouter calls IMissionFactory(missionFactory).getMissionByEscrow(caller)
+        vm.expectRevert();
         DeliveryEscrow(payable(escrow)).approveCompletion();
         vm.stopPrank();
     }
