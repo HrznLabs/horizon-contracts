@@ -67,9 +67,8 @@ contract DeliveryEscrowPoC is Test {
         vm.stopPrank();
 
         vm.startPrank(poster);
-        // This will fail because DeliveryMissionFactory does not have getMissionByEscrow
+        // This will succeed because DeliveryMissionFactory has getMissionByEscrow
         // and PaymentRouter calls IMissionFactory(missionFactory).getMissionByEscrow(caller)
-        vm.expectRevert();
         DeliveryEscrow(payable(escrow)).approveCompletion();
         vm.stopPrank();
     }
