@@ -10,3 +10,7 @@
 ## 2024-06-28 - [Dead Code Removal in Access Control]
 **Learning:** In OpenZeppelin's `AccessControl`, calls to `_revokeRole` perform mapping lookups which cost gas. If a function already verifies that a user *does not* have a certain role (and reverts early if they do), subsequent `_revokeRole` calls for those specific roles are dead code and safe to remove, measurably saving gas (e.g., removing two redundant `_revokeRole` calls saved ~645 gas in `GuildDAO.sol`).
 **Action:** When auditing or optimizing access control functions, always ensure that role revocation or assignment operations are strictly necessary. Avoid performing state updates on roles that have already been validated in earlier assertions.
+
+## 2026-08-25 - FeeDistributor Loop Fusion
+**Learning:** Merging the secondary guildVolume reset loop into the primary distribution loop (loop fusion) in `FeeDistributor.sol` eliminates a redundant O(N) iteration, saving gas.
+**Action:** Placed the state deletion (`delete guildVolume[guild]`) unconditionally within the merged loop by caching the volume in memory prior to deletion, avoiding any bypasses from conditionals.

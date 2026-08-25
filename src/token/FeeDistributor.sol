@@ -113,22 +113,29 @@ contract FeeDistributor is AccessControl {
         vault.notifyRewardAmount(stakerAmount);
 
         // 2. Guilds: proportional to volume
+        uint256 len = guilds.length;
         if (totalGuildVolume > 0) {
-            // Cache guilds.length to save SLOAD gas on multiple loop iterations
-            uint256 len = guilds.length;
             for (uint256 i = 0; i < len; i++) {
                 address guild = guilds[i];
                 uint256 vol = guildVolume[guild];
-                if (vol == 0) continue;
-                uint256 guildShare = (guildTotal * vol) / totalGuildVolume;
-                if (guildShare > 0) {
-                    usdc.safeTransfer(guild, guildShare);
-                    emit GuildPaid(guild, guildShare);
+
+                // Unconditionally delete to fuse loop (memory cached)
+                delete guildVolume[guild];
+
+                if (vol > 0) {
+                    uint256 guildShare = (guildTotal * vol) / totalGuildVolume;
+                    if (guildShare > 0) {
+                        usdc.safeTransfer(guild, guildShare);
+                        emit GuildPaid(guild, guildShare);
+                    }
                 }
             }
         } else {
             // No guild volume — send guild portion to treasury
             treasuryAmount += guildTotal;
+            for (uint256 i = 0; i < len; i++) {
+                delete guildVolume[guilds[i]];
+            }
         }
 
         // 3. Treasury
@@ -138,11 +145,6 @@ contract FeeDistributor is AccessControl {
         usdc.safeTransfer(resolverPool, resolverAmount);
 
         // Reset period volumes
-        // Cache guilds.length to save SLOAD gas on multiple loop iterations
-        uint256 len2 = guilds.length;
-        for (uint256 i = 0; i < len2; i++) {
-            delete guildVolume[guilds[i]];
-        }
         totalGuildVolume = 0;
 
         emit FeesDistributed(amount, stakerAmount, guildTotal, treasuryAmount, resolverAmount);
