@@ -62,3 +62,7 @@
 **Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
 **Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
 **Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.
+## 2024-05-15 - Stale Guild Volume Vulnerability
+**Vulnerability:** When a guild is removed from `FeeDistributor.sol`, its accumulated `guildVolume` is not cleared, nor is it subtracted from `totalGuildVolume`.
+**Learning:** During fee distribution, remaining guilds receive a disproportionately smaller share, and the difference is locked in the contract. Additionally, if the removed guild is later re-registered, its uncleared volume carries over, leading to incorrect calculations and potential protocol insolvency as payouts will exceed the treasury allocation.
+**Prevention:** When removing an entity from an active ledger that tracks shares (like volume or stakes), always ensure its historical balances are zeroed out and total trackers are updated synchronously, similar to the logic implemented during distributions.
