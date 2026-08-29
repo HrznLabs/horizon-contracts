@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {DeliveryEscrow} from "./DeliveryEscrow.sol";
-import {IMissionEscrow} from "./interfaces/IMissionEscrow.sol";
-import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
+import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { DeliveryEscrow } from "./DeliveryEscrow.sol";
+import { IMissionEscrow } from "./interfaces/IMissionEscrow.sol";
+import { IPaymentRouter } from "./interfaces/IPaymentRouter.sol";
 
 /**
  * @title DeliveryMissionFactory
@@ -60,9 +60,7 @@ contract DeliveryMissionFactory is Ownable {
     // CONSTRUCTOR
     // =============================================================================
 
-    constructor(
-        address _paymentRouter
-    ) Ownable(msg.sender) {
+    constructor(address _paymentRouter) Ownable(msg.sender) {
         paymentRouter = _paymentRouter;
 
         // Deploy implementation contract
@@ -103,21 +101,22 @@ contract DeliveryMissionFactory is Ownable {
         address escrow = deliveryEscrowImplementation.clone();
 
         // Initialize escrow
-        DeliveryEscrow(payable(escrow)).initialize(
-            missionId,
-            msg.sender,
-            rewardAmount,
-            expiresAt,
-            guild,
-            metadataHash,
-            locationHash,
-            paymentRouter,
-            paymentToken,
-            address(0), // disputeResolver - set later via factory admin
-            address(0), // pauseRegistry - set later via factory admin
-            0,          // minReputation - no gating for delivery missions
-            address(0)  // reputationOracle - not used
-        );
+        DeliveryEscrow(payable(escrow))
+            .initialize(
+                missionId,
+                msg.sender,
+                rewardAmount,
+                expiresAt,
+                guild,
+                metadataHash,
+                locationHash,
+                paymentRouter,
+                paymentToken,
+                address(0), // disputeResolver - set later via factory admin
+                address(0), // pauseRegistry - set later via factory admin
+                0, // minReputation - no gating for delivery missions
+                address(0) // reputationOracle - not used
+            );
 
         // Store mission
         missions[missionId] = escrow;
@@ -148,10 +147,10 @@ contract DeliveryMissionFactory is Ownable {
      * @param missionId Mission ID
      * @return Mission parameters
      */
-    function getMissionParams(uint256 missionId) 
-        external 
-        view 
-        returns (IMissionEscrow.MissionParams memory) 
+    function getMissionParams(uint256 missionId)
+        external
+        view
+        returns (IMissionEscrow.MissionParams memory)
     {
         return DeliveryEscrow(payable(missions[missionId])).getParams();
     }
@@ -161,10 +160,10 @@ contract DeliveryMissionFactory is Ownable {
      * @param missionId Mission ID
      * @return Mission runtime state
      */
-    function getMissionRuntime(uint256 missionId) 
-        external 
-        view 
-        returns (IMissionEscrow.MissionRuntime memory) 
+    function getMissionRuntime(uint256 missionId)
+        external
+        view
+        returns (IMissionEscrow.MissionRuntime memory)
     {
         return DeliveryEscrow(payable(missions[missionId])).getRuntime();
     }
@@ -193,5 +192,19 @@ contract DeliveryMissionFactory is Ownable {
         returns (DeliveryEscrow.DeliveryWaypoint[] memory)
     {
         return DeliveryEscrow(payable(missions[missionId])).getWaypoints();
+    }
+
+    /**
+     * @notice Get mission ID by escrow address
+     * @param escrow Escrow address
+     * @return missionId Mission ID (0 if not found)
+     */
+    function getMissionByEscrow(address escrow) external view returns (uint256) {
+        try IMissionEscrow(escrow).getMissionId() returns (uint256 id) {
+            if (missions[id] == escrow) return id;
+        } catch {
+            return 0;
+        }
+        return 0;
     }
 }
