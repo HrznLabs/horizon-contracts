@@ -15,8 +15,7 @@ contract GuildTimelock is TimelockController {
     /// @notice The Guild DAO this timelock is associated with
     address public immutable guildDAO;
 
-    /// @notice Emitted when timelock is deployed
-    event GuildTimelockDeployed(address indexed guildDAO, uint256 minDelay);
+
 
     /**
      * @notice Deploy a new GuildTimelock
@@ -34,6 +33,5 @@ contract GuildTimelock is TimelockController {
         address _guildDAO
     ) TimelockController(_minDelay, _proposers, _executors, _admin) {
         guildDAO = _guildDAO;
-        emit GuildTimelockDeployed(_guildDAO, _minDelay);
     }
 }

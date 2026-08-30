@@ -165,51 +165,20 @@ contract GuildGovernorFactory is Ownable {
     /**
      * @notice Update default governance parameters
      */
-    function setDefaults(
-        uint48 votingDelay,
-        uint32 votingPeriod,
-        uint256 proposalThreshold,
-        uint256 quorum,
-        uint256 timelockDelay
-    ) external onlyOwner {
-        if (quorum > 100) revert InvalidParameters();
-        
-        defaultVotingDelay = votingDelay;
-        defaultVotingPeriod = votingPeriod;
-        defaultProposalThreshold = proposalThreshold;
-        defaultQuorum = quorum;
-        defaultTimelockDelay = timelockDelay;
 
-        emit DefaultsUpdated(votingDelay, votingPeriod, proposalThreshold, quorum, timelockDelay);
-    }
 
     /**
      * @notice Update XP contract address
      */
-    function setXPContract(address newXPContract) external onlyOwner {
-        if (newXPContract == address(0)) revert InvalidXPContract();
-        address oldContract = xpContract;
-        xpContract = newXPContract;
-        emit XPContractUpdated(oldContract, newXPContract);
-    }
+
 
     // =============================================================================
     // VIEW FUNCTIONS
     // =============================================================================
 
-    /**
-     * @notice Check if a guild has governance deployed
-     */
-    function hasGovernance(address guildDAO) external view returns (bool) {
-        return guildGovernors[guildDAO] != address(0);
-    }
 
-    /**
-     * @notice Get governance addresses for a guild
-     */
-    function getGovernance(address guildDAO) external view returns (address governor, address timelock) {
-        return (guildGovernors[guildDAO], guildTimelocks[guildDAO]);
-    }
+
+
 
     /**
      * @notice Get default parameters
