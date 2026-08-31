@@ -13,3 +13,6 @@
 ## 2024-05-18 - Loop Fusion in FeeDistributor
 **Learning:** In FeeDistributor.sol, merging the secondary guildVolume reset loop into the primary distribution loop eliminates a redundant O(N) iteration. State deletion can be placed unconditionally within the merged loop by caching the volume in memory prior to deletion.
 **Action:** Always look for opportunities to fuse secondary state-reset loops into primary computation loops.
+## 2024-05-18 - Factory Contract Size Optimization
+**Learning:** In Factory contracts that deploy multiple child contracts inline (e.g., GuildGovernorFactory), the factory bytecode embeds the full initcode of all child contracts. If this exceeds the 24kb EIP-170 limit, refactoring one of the deployments into an external library (e.g., `GovernorDeployer`) shifts its initcode to the library, dramatically reducing the factory's bytecode footprint.
+**Action:** Use external deployment libraries or proxy patterns when factory contracts encounter EIP-170 size limits due to massive inline initcodes.

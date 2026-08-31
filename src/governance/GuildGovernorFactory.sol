@@ -2,6 +2,29 @@
 pragma solidity ^0.8.24;
 
 import {GuildGovernor} from "./GuildGovernor.sol";
+
+library GovernorDeployer {
+    function deployGovernor(
+        address guildDAO,
+        TimelockController timelock,
+        address xpContract_,
+        uint48 votingDelay,
+        uint32 votingPeriod,
+        uint256 proposalThreshold,
+        uint256 quorumPercent
+    ) external returns (address) {
+        return address(new GuildGovernor(
+            guildDAO,
+            timelock,
+            xpContract_,
+            votingDelay,
+            votingPeriod,
+            proposalThreshold,
+            quorumPercent
+        ));
+    }
+}
+
 import {GuildTimelock} from "./GuildTimelock.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -131,7 +154,7 @@ contract GuildGovernorFactory is Ownable {
         timelock = address(timelockContract);
 
         // Deploy governor
-        GuildGovernor governorContract = new GuildGovernor(
+        governor = GovernorDeployer.deployGovernor(
             guildDAO,
             TimelockController(payable(timelock)),
             xpContract,
@@ -140,7 +163,6 @@ contract GuildGovernorFactory is Ownable {
             proposalThreshold,
             quorumPercent
         );
-        governor = address(governorContract);
 
         // Store references first (checks-effects-interactions)
         guildGovernors[guildDAO] = governor;
