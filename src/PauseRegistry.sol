@@ -28,6 +28,13 @@ contract PauseRegistry is AccessControl {
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
+    /// @notice Trusted off-chain/on-chain monitors allowed to report balance changes
+    ///         on behalf of a registered contract.
+    /// @dev Audit M6: `reportBalanceChange` used to be permissionless, letting anyone
+    ///      trip the circuit breaker for a registered contract by reporting a >= 30%
+    ///      outflow — a free denial-of-service on the whole protocol.
+    bytes32 public constant MONITOR_ROLE = keccak256("MONITOR_ROLE");
+
     // =============================================================================
     // STATE VARIABLES
     // =============================================================================
@@ -72,7 +79,8 @@ contract PauseRegistry is AccessControl {
     error NotRegistered();
     error AlreadyPaused();
     error NotPaused();
-    error NotAuthorized();
+    /// @notice Caller is neither the target itself nor a trusted monitor.
+    error NotAuthorizedReporter();
 
     // =============================================================================
     // CONSTRUCTOR
@@ -84,6 +92,7 @@ contract PauseRegistry is AccessControl {
     constructor(address _admin) {
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(PAUSER_ROLE, _admin);
+        _grantRole(MONITOR_ROLE, _admin);
     }
 
     // =============================================================================
@@ -151,13 +160,17 @@ contract PauseRegistry is AccessControl {
 
     /**
      * @notice Report a balance change and trigger circuit breaker if threshold exceeded
-     * @dev Called by registered contracts after significant token transfers
+     * @dev Called by registered contracts after significant token transfers.
+     *      Audit M6: restricted to the target itself or a MONITOR_ROLE holder — an
+     *      arbitrary caller must not be able to pause a registered contract.
      * @param token ERC20 token to check balance of
      * @param target Contract whose balance changed
      */
     function reportBalanceChange(address token, address target) external {
         if (!registeredContracts[target]) revert NotRegistered();
-        if (msg.sender != target) revert NotAuthorized();
+        if (msg.sender != target && !hasRole(MONITOR_ROLE, msg.sender)) {
+            revert NotAuthorizedReporter();
+        }
 
         uint256 previousBalance = lastKnownBalance[target];
         uint256 newBalance = IERC20(token).balanceOf(target);

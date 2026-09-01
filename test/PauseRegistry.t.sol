@@ -335,7 +335,8 @@ contract PauseRegistryTest is Test {
         vm.prank(contractA);
         usdc.transfer(address(0xdead), 400e6);
 
-        // Report balance change
+        // Report balance change. Audit M6: only the target itself (or a MONITOR_ROLE
+        // holder) may report — this used to be callable by anyone.
         vm.prank(contractA);
         pauseRegistry.reportBalanceChange(address(usdc), contractA);
 
@@ -370,8 +371,72 @@ contract PauseRegistryTest is Test {
 
     function test_CircuitBreaker_OnlyRegisteredCanReport() public {
         // contractA is NOT registered
+        vm.prank(contractA);
         vm.expectRevert(IPauseRegistry.NotRegistered.selector);
         pauseRegistry.reportBalanceChange(address(usdc), contractA);
+    }
+
+    // =========================================================================
+    // AUDIT M6: reportBalanceChange must not be permissionless
+    // =========================================================================
+
+    function _registerAndDrainContractA() internal {
+        vm.startPrank(admin);
+        pauseRegistry.registerContract(contractA);
+        usdc.mint(contractA, 1000e6);
+        pauseRegistry.setLastKnownBalance(contractA, 1000e6);
+        vm.stopPrank();
+
+        // 40% outflow — enough to trip the 30% circuit breaker.
+        vm.prank(contractA);
+        usdc.transfer(address(0xdead), 400e6);
+    }
+
+    /// @notice An unrelated account must not be able to pause a registered contract.
+    function test_M6_ReportBalanceChange_ArbitraryCaller_Reverts() public {
+        _registerAndDrainContractA();
+
+        // FAILED BEFORE FIX: this succeeded and paused contractA — a free DoS on any
+        // registered contract, since anyone could report a real drain at will.
+        vm.prank(attacker);
+        vm.expectRevert(PauseRegistry.NotAuthorizedReporter.selector);
+        pauseRegistry.reportBalanceChange(address(usdc), contractA);
+
+        assertFalse(pauseRegistry.isPaused(contractA));
+        // The attacker also could not silently overwrite the tracked balance.
+        assertEq(pauseRegistry.lastKnownBalance(contractA), 1000e6);
+    }
+
+    /// @notice The registered contract itself may still report.
+    function test_M6_ReportBalanceChange_SelfReport_Allowed() public {
+        _registerAndDrainContractA();
+
+        vm.prank(contractA);
+        pauseRegistry.reportBalanceChange(address(usdc), contractA);
+
+        assertTrue(pauseRegistry.isPaused(contractA));
+    }
+
+    /// @notice A trusted monitor may report on the target's behalf.
+    function test_M6_ReportBalanceChange_MonitorRole_Allowed() public {
+        _registerAndDrainContractA();
+
+        address monitor = address(200);
+        bytes32 monitorRole = pauseRegistry.MONITOR_ROLE(); // resolve before pranking
+        vm.prank(admin);
+        pauseRegistry.grantRole(monitorRole, monitor);
+
+        vm.prank(monitor);
+        pauseRegistry.reportBalanceChange(address(usdc), contractA);
+
+        assertTrue(pauseRegistry.isPaused(contractA));
+    }
+
+    /// @notice Registration is still checked before authorisation.
+    function test_M6_ReportBalanceChange_UnregisteredTarget_RevertsNotRegistered() public {
+        vm.prank(attacker);
+        vm.expectRevert(IPauseRegistry.NotRegistered.selector);
+        pauseRegistry.reportBalanceChange(address(usdc), contractB);
     }
 
     // =========================================================================

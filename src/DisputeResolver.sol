@@ -12,10 +12,10 @@ import "./interfaces/IMissionEscrow.sol";
  * @title DisputeResolver
  * @author Horizon Protocol
  * @notice Handles mission disputes with DDR (Dynamic Dispute Reserve) and LPP (Loser-Pays Penalty)
- * @dev
+ * @dev 
  * DDR: 5% of reward deposited by both parties when dispute is raised
  * LPP: 2% penalty on losing party distributed to winner + resolver
- *
+ * 
  * Flow:
  * 1. Party raises dispute → DDR deposited
  * 2. Resolver assigned by ResolversDAO
@@ -23,7 +23,7 @@ import "./interfaces/IMissionEscrow.sol";
  * 4. Resolver makes decision
  * 5. 48h appeal period
  * 6. Finalize and distribute funds
- *
+ * 
  * Security invariants:
  * - DDR rate immutable after deployment
  * - Only assigned resolver can resolve
@@ -155,11 +155,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @param evidenceHash IPFS hash of initial evidence
      * @return disputeId The ID of the created dispute
      */
-    function createDispute(address escrowAddress, uint256 missionId, bytes32 evidenceHash)
-        external
-        nonReentrant
-        returns (uint256 disputeId)
-    {
+    function createDispute(
+        address escrowAddress,
+        uint256 missionId,
+        bytes32 evidenceHash
+    ) external nonReentrant returns (uint256 disputeId) {
         // Verify escrow exists and is in disputed state
         IMissionEscrow escrow = IMissionEscrow(escrowAddress);
         IMissionEscrow.MissionParams memory params = escrow.getParams();
@@ -170,11 +170,11 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert NotParty();
         }
 
-        // Must be in submitted state or already disputed
-        if (
-            runtime.state != IMissionEscrow.MissionState.Submitted
-                && runtime.state != IMissionEscrow.MissionState.Disputed
-        ) {
+        // audit H4: require the escrow to already be Disputed (caller must have called
+        // escrow.raiseDispute() first). If the escrow is left in Submitted, finalize's
+        // escrow.settleDispute() — which requires Disputed — reverts forever and both
+        // parties' DDR is frozen with no timeout path.
+        if (runtime.state != IMissionEscrow.MissionState.Disputed) {
             revert InvalidDisputeState();
         }
 
@@ -184,7 +184,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
         }
 
         // Calculate DDR amount
-        uint256 ddrAmount = (params.rewardAmount * DDR_RATE_BPS) / 10_000;
+        uint256 ddrAmount = (params.rewardAmount * DDR_RATE_BPS) / 10000;
 
         // Transfer DDR from initiator
         usdc.safeTransferFrom(msg.sender, address(this), ddrAmount);
@@ -204,7 +204,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             outcome: DisputeOutcome.None,
             resolver: address(0),
             ddrAmount: ddrAmount,
-            lppAmount: (params.rewardAmount * LPP_RATE_BPS) / 10_000,
+            lppAmount: (params.rewardAmount * LPP_RATE_BPS) / 10000,
             posterEvidenceHash: msg.sender == params.poster ? evidenceHash : bytes32(0),
             performerEvidenceHash: msg.sender == runtime.performer ? evidenceHash : bytes32(0),
             resolutionHash: bytes32(0),
@@ -233,11 +233,10 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @param disputeId The dispute ID
      * @param resolver Address of the resolver
      */
-    function assignResolver(uint256 disputeId, address resolver)
-        external
-        onlyResolversDAO
-        disputeExists(disputeId)
-    {
+    function assignResolver(
+        uint256 disputeId,
+        address resolver
+    ) external onlyResolversDAO disputeExists(disputeId) {
         Dispute storage dispute = _disputes[disputeId];
 
         if (dispute.state != DisputeState.Pending) {
@@ -248,12 +247,21 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert ResolverAlreadyAssigned();
         }
 
+        // audit H3: both parties must have posted DDR before the dispute leaves
+        // Pending. Otherwise a resolver assigned during the DDR window strands the
+        // sole depositor's DDR forever (resolveDispute requires both DDRs, and
+        // claimDDRTimeout only refunds while state is still Pending).
+        if (_ddrDeposits[disputeId][dispute.poster] == 0
+            || _ddrDeposits[disputeId][dispute.performer] == 0) {
+            revert InsufficientDDR();
+        }
+
         dispute.resolver = resolver;
         dispute.state = DisputeState.Investigating;
 
         // Set resolver action deadline
-        uint256 ddrTimeout = disputeDDRDeadline[disputeId] > dispute.createdAt
-            ? disputeDDRDeadline[disputeId] - dispute.createdAt
+        uint256 ddrTimeout = disputeDDRDeadline[disputeId] > dispute.createdAt 
+            ? disputeDDRDeadline[disputeId] - dispute.createdAt 
             : DEFAULT_DDR_TIMEOUT;
         resolverDeadline[disputeId] = block.timestamp + (ddrTimeout * RESOLVER_TIMEOUT_MULTIPLIER);
 
@@ -265,17 +273,15 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @param disputeId The dispute ID
      * @param evidenceHash IPFS hash of evidence
      */
-    function submitEvidence(uint256 disputeId, bytes32 evidenceHash)
-        external
-        nonReentrant
-        disputeExists(disputeId)
-    {
+    function submitEvidence(
+        uint256 disputeId,
+        bytes32 evidenceHash
+    ) external nonReentrant disputeExists(disputeId) {
         Dispute storage dispute = _disputes[disputeId];
 
-        // Cache state variable to local stack variable to avoid redundant SLOAD operations
-        DisputeState currentState = dispute.state;
         // Only pending or investigating state
-        if (currentState != DisputeState.Pending && currentState != DisputeState.Investigating) {
+        if (dispute.state != DisputeState.Pending &&
+            dispute.state != DisputeState.Investigating) {
             revert InvalidDisputeState();
         }
 
@@ -293,11 +299,9 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             if (block.timestamp >= disputeDDRDeadline[disputeId]) {
                 revert DDRDeadlinePassed();
             }
-            // Cache ddrAmount struct field strictly inside the conditional execution block where it is used to save redundant SLOADs
-            uint256 ddrAmt = dispute.ddrAmount;
             // Deposit DDR
-            usdc.safeTransferFrom(msg.sender, address(this), ddrAmt);
-            _ddrDeposits[disputeId][msg.sender] = ddrAmt;
+            usdc.safeTransferFrom(msg.sender, address(this), dispute.ddrAmount);
+            _ddrDeposits[disputeId][msg.sender] = dispute.ddrAmount;
         }
 
         // Store evidence hash
@@ -343,7 +347,7 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
             revert InvalidOutcome();
         }
 
-        if (outcome == DisputeOutcome.Split && splitPercentage > 10_000) {
+        if (outcome == DisputeOutcome.Split && splitPercentage > 10000) {
             revert InvalidOutcome();
         }
 
@@ -373,7 +377,9 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @notice Appeal a resolution to the DAO
      * @param disputeId The dispute ID
      */
-    function appealResolution(uint256 disputeId) external disputeExists(disputeId) {
+    function appealResolution(
+        uint256 disputeId
+    ) external disputeExists(disputeId) {
         Dispute storage dispute = _disputes[disputeId];
 
         // Only parties can appeal
@@ -398,17 +404,20 @@ contract DisputeResolver is IDisputeResolver, Ownable, ReentrancyGuard {
      * @notice Finalize dispute and distribute funds
      * @param disputeId The dispute ID
      */
-    function finalizeDispute(uint256 disputeId) external nonReentrant disputeExists(disputeId) {
+    function finalizeDispute(
+        uint256 disputeId
+    ) external nonReentrant disputeExists(disputeId) {
         Dispute storage dispute = _disputes[disputeId];
 
-        if (dispute.state == DisputeState.Resolved) {
-            // Must wait for appeal period
-            if (block.timestamp < dispute.appealDeadline) {
-                revert AppealPeriodActive();
-            }
-        } else if (dispute.state != DisputeState.Appealed) {
-            // Appealed disputes are finalized by DAO override
+        // audit H2: only a Resolved dispute whose appeal window has closed may be
+        // finalized here. An Appealed dispute must go through the DAO's
+        // overrideResolution — the previous code fell through and let ANYONE finalize
+        // an appealed dispute with the pre-appeal outcome, neutralizing the appeal.
+        if (dispute.state != DisputeState.Resolved) {
             revert InvalidDisputeState();
+        }
+        if (block.timestamp < dispute.appealDeadline) {
+            revert AppealPeriodActive();
         }
 
         dispute.state = DisputeState.Finalized;

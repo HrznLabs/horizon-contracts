@@ -24,8 +24,8 @@ contract FeeDistributor is AccessControl {
     address public immutable resolverPool;
 
     // Fee split in basis points (must sum to 10_000)
-    uint256 public constant STAKER_BPS = 4000; // 40%
-    uint256 public constant GUILD_BPS = 3000; // 30%
+    uint256 public constant STAKER_BPS   = 4000; // 40%
+    uint256 public constant GUILD_BPS    = 3000; // 30%
     uint256 public constant TREASURY_BPS = 2000; // 20%
     uint256 public constant RESOLVER_BPS = 1000; // 10%
 
@@ -76,8 +76,7 @@ contract FeeDistributor is AccessControl {
 
     /// @notice Record USDC mission volume for a guild in the current period
     function recordGuildVolume(address guild, uint256 usdcVolume)
-        external
-        onlyRole(VOLUME_RECORDER_ROLE)
+        external onlyRole(VOLUME_RECORDER_ROLE)
     {
         require(isRegistered[guild], "FeeDistributor: guild not registered");
         guildVolume[guild] += usdcVolume;
@@ -103,29 +102,41 @@ contract FeeDistributor is AccessControl {
         lastDistributionAt = block.timestamp;
 
         // Calculate splits
-        uint256 stakerAmount = (amount * STAKER_BPS) / 10_000;
-        uint256 guildTotal = (amount * GUILD_BPS) / 10_000;
+        uint256 stakerAmount   = (amount * STAKER_BPS)   / 10_000;
+        uint256 guildTotal     = (amount * GUILD_BPS)    / 10_000;
         uint256 treasuryAmount = (amount * TREASURY_BPS) / 10_000;
         uint256 resolverAmount = amount - stakerAmount - guildTotal - treasuryAmount; // remainder
 
-        // 1. Stakers: transfer USDC to vault and notify
-        usdc.safeTransfer(address(vault), stakerAmount);
-        vault.notifyRewardAmount(stakerAmount);
+        // 1. Stakers: transfer USDC to vault and notify.
+        //    Audit M3(c): sHRZNVault.notifyRewardAmount() requires totalSupply() > 0, so
+        //    with no stakers the whole distribution used to revert and stay blocked until
+        //    somebody staked. Fall back to the treasury instead of bricking distribution.
+        uint256 stakerPaid = 0;
+        if (stakerAmount > 0 && vault.totalSupply() > 0) {
+            usdc.safeTransfer(address(vault), stakerAmount);
+            vault.notifyRewardAmount(stakerAmount);
+            stakerPaid = stakerAmount;
+        } else {
+            treasuryAmount += stakerAmount;
+        }
 
         // 2. Guilds: proportional to volume
+        uint256 guildPaid = 0;
         if (totalGuildVolume > 0) {
-            // Cache guilds.length to save SLOAD gas on multiple loop iterations
-            uint256 len = guilds.length;
-            for (uint256 i = 0; i < len; i++) {
+            for (uint256 i = 0; i < guilds.length; i++) {
                 address guild = guilds[i];
                 uint256 vol = guildVolume[guild];
                 if (vol == 0) continue;
                 uint256 guildShare = (guildTotal * vol) / totalGuildVolume;
                 if (guildShare > 0) {
+                    guildPaid += guildShare;
                     usdc.safeTransfer(guild, guildShare);
                     emit GuildPaid(guild, guildShare);
                 }
             }
+            // Audit M3(b): per-guild integer flooring leaves dust behind. Forward the
+            // remainder to the treasury instead of letting it accumulate in this contract.
+            treasuryAmount += guildTotal - guildPaid;
         } else {
             // No guild volume — send guild portion to treasury
             treasuryAmount += guildTotal;
@@ -138,14 +149,14 @@ contract FeeDistributor is AccessControl {
         usdc.safeTransfer(resolverPool, resolverAmount);
 
         // Reset period volumes
-        // Cache guilds.length to save SLOAD gas on multiple loop iterations
-        uint256 len2 = guilds.length;
-        for (uint256 i = 0; i < len2; i++) {
+        for (uint256 i = 0; i < guilds.length; i++) {
             delete guildVolume[guilds[i]];
         }
         totalGuildVolume = 0;
 
-        emit FeesDistributed(amount, stakerAmount, guildTotal, treasuryAmount, resolverAmount);
+        // Report the amounts actually paid out, not the nominal splits: the staker and
+        // guild slices may have been redirected to the treasury above.
+        emit FeesDistributed(amount, stakerPaid, guildPaid, treasuryAmount, resolverAmount);
     }
 
     // -------------------------------------------------------------------------
@@ -158,6 +169,9 @@ contract FeeDistributor is AccessControl {
         ///      Capped at MAX_GUILDS to keep per-distribution gas predictable.
         require(guilds.length < MAX_GUILDS, "FeeDistributor: max guilds");
         isRegistered[guild] = true;
+        /// @dev Audit M3(a): defensive reset so a re-registered guild can never inherit
+        ///      volume recorded during a previous registration.
+        delete guildVolume[guild];
         guilds.push(guild);
         emit GuildRegistered(guild);
     }
@@ -165,6 +179,17 @@ contract FeeDistributor is AccessControl {
     function removeGuild(address guild) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(isRegistered[guild], "FeeDistributor: not registered");
         isRegistered[guild] = false;
+
+        /// @dev Audit M3(a): the removed guild's volume must leave the denominator too.
+        ///      Otherwise `totalGuildVolume` still counts a slice that the distribute()
+        ///      loop (which only walks *registered* guilds) can never pay out, stranding
+        ///      that USDC in this contract.
+        uint256 vol = guildVolume[guild];
+        if (vol > 0) {
+            totalGuildVolume -= vol;
+            delete guildVolume[guild];
+        }
+
         for (uint256 i = 0; i < guilds.length; i++) {
             if (guilds[i] == guild) {
                 guilds[i] = guilds[guilds.length - 1];
