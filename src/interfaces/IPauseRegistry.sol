@@ -22,7 +22,8 @@ interface IPauseRegistry {
     error NotRegistered();
     error AlreadyPaused();
     error NotPaused();
-    error NotAuthorized();
+    /// @notice Caller is neither the target itself nor a trusted monitor (audit M6).
+    error NotAuthorizedReporter();
 
     /// @notice Check if a target is paused (globally or individually)
     function isPaused(address target) external view returns (bool);

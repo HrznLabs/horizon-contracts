@@ -303,4 +303,114 @@ contract DisputeResolverTimeoutTest is Test {
         uint256 deadline = resolver.resolverDeadline(disputeId);
         assertTrue(deadline > block.timestamp);
     }
+
+    // =========================================================================
+    // AUDIT 2026-08-11 — H2 / H3 / H4 regressions
+    // =========================================================================
+
+    function _ddr() internal view returns (uint256) {
+        return (REWARD_AMOUNT * resolver.DDR_RATE_BPS()) / 10000;
+    }
+
+    /// @dev Disputed escrow + both parties' DDR posted + resolver assigned + resolved.
+    function _resolvedDispute() internal returns (uint256 disputeId, address escrow) {
+        uint256 missionId;
+        (missionId, escrow) = _createDisputedMission();
+        uint256 d = _ddr();
+
+        vm.startPrank(poster);
+        usdc.approve(address(resolver), d);
+        disputeId = resolver.createDispute(escrow, missionId, EVIDENCE_HASH);
+        vm.stopPrank();
+
+        vm.startPrank(performer);
+        usdc.approve(address(resolver), d);
+        resolver.submitEvidence(disputeId, keccak256("perf evidence"));
+        vm.stopPrank();
+
+        vm.prank(resolversDAO);
+        resolver.assignResolver(disputeId, resolverAddr);
+
+        vm.prank(resolverAddr);
+        resolver.resolveDispute(disputeId, IDisputeResolver.DisputeOutcome.PerformerWins, keccak256("res"), 0);
+    }
+
+    /// @notice H2: an APPEALED dispute cannot be finalized by anyone via finalizeDispute
+    /// (that would lock in the pre-appeal outcome and neutralize the appeal). Only the
+    /// DAO's overrideResolution may finalize an appealed dispute.
+    function test_H2_AppealedDisputeCannotBeFinalizedByAnyone() public {
+        (uint256 disputeId,) = _resolvedDispute();
+
+        // A party appeals.
+        vm.prank(poster);
+        resolver.appealResolution(disputeId);
+
+        // Wait past the appeal window and try to finalize — must revert.
+        vm.warp(block.timestamp + resolver.APPEAL_PERIOD() + 1);
+        vm.prank(attacker);
+        vm.expectRevert(IDisputeResolver.InvalidDisputeState.selector);
+        resolver.finalizeDispute(disputeId);
+
+        // The DAO override is the only path for an appealed dispute.
+        vm.prank(protocolDAO);
+        resolver.overrideResolution(disputeId, IDisputeResolver.DisputeOutcome.PosterWins, keccak256("dao"), 0);
+    }
+
+    /// @notice H2 (positive): a Resolved, un-appealed dispute finalizes after the window.
+    function test_H2_ResolvedDisputeFinalizesAfterWindow() public {
+        (uint256 disputeId,) = _resolvedDispute();
+        vm.warp(block.timestamp + resolver.APPEAL_PERIOD() + 1);
+        resolver.finalizeDispute(disputeId); // no revert
+    }
+
+    /// @notice H3: a resolver cannot be assigned until BOTH parties have posted DDR —
+    /// otherwise the sole depositor's DDR is stranded (resolve needs both, and
+    /// claimDDRTimeout only refunds while Pending).
+    function test_H3_AssignResolverRequiresBothDDR() public {
+        (uint256 missionId, address escrow) = _createDisputedMission();
+        uint256 d = _ddr();
+
+        vm.startPrank(poster);
+        usdc.approve(address(resolver), d);
+        uint256 disputeId = resolver.createDispute(escrow, missionId, EVIDENCE_HASH);
+        vm.stopPrank();
+
+        // Performer has NOT deposited — assignment must revert.
+        vm.prank(resolversDAO);
+        vm.expectRevert(IDisputeResolver.InsufficientDDR.selector);
+        resolver.assignResolver(disputeId, resolverAddr);
+
+        // Sole depositor can still recover via the Pending timeout path.
+        vm.warp(block.timestamp + resolver.MAX_DDR_TIMEOUT() + 1);
+        uint256 before = usdc.balanceOf(poster);
+        vm.prank(poster);
+        resolver.claimDDRTimeout(disputeId);
+        assertEq(usdc.balanceOf(poster), before + d);
+    }
+
+    /// @notice H4: createDispute requires the escrow to already be Disputed. A Submitted
+    /// escrow that was never raised would make finalize's settleDispute revert forever.
+    function test_H4_CreateDisputeRequiresDisputedEscrow() public {
+        vm.startPrank(poster);
+        usdc.approve(address(factory), REWARD_AMOUNT);
+        uint256 missionId = factory.createMission(
+            address(usdc), REWARD_AMOUNT, block.timestamp + 1 days, address(0), METADATA_HASH, LOCATION_HASH
+        );
+        vm.stopPrank();
+        address escrow = factory.missions(missionId);
+
+        vm.prank(performer);
+        MissionEscrow(escrow).acceptMission();
+        vm.prank(performer);
+        MissionEscrow(escrow).submitProof(keccak256("proof"));
+        // NOTE: no raiseDispute — escrow stays Submitted.
+
+        uint256 d = _ddr();
+        vm.startPrank(poster);
+        usdc.approve(address(resolver), d);
+        vm.expectRevert(IDisputeResolver.InvalidDisputeState.selector);
+        resolver.createDispute(escrow, missionId, EVIDENCE_HASH);
+        vm.stopPrank();
+    }
 }
+

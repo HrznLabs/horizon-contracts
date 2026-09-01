@@ -6,10 +6,21 @@ import {GuildTimelock} from "./GuildTimelock.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
+/// @notice Minimal view of GuildDAO used to authorise governance deployment.
+interface IGuildAdminCheck {
+    function isAdmin(address account) external view returns (bool);
+}
+
 /**
  * @title GuildGovernorFactory
  * @notice Factory for deploying GuildGovernor and GuildTimelock contracts
  * @dev Deploys a matched pair of Governor + Timelock for each guild
+ *
+ *      Audit M7: `deployGovernance*` writes a ONE-SHOT mapping entry per guild. When it
+ *      was permissionless, anybody could front-run a guild and permanently occupy its
+ *      slot with adversarial parameters (quorum 0, zero timelock delay). Deployment is
+ *      now gated to the factory owner or the guild's own admin, and the parameters are
+ *      bounded by hard minimums.
  */
 contract GuildGovernorFactory is Ownable {
     // =============================================================================
@@ -31,6 +42,12 @@ contract GuildGovernorFactory is Ownable {
     uint256 public defaultProposalThreshold = 100; // 100 XP to propose
     uint256 public defaultQuorum = 10; // 10% quorum
     uint256 public defaultTimelockDelay = 1 days;
+
+    /// @notice Hard floor on quorum so a governor can never be deployed with 0% quorum.
+    uint256 public constant MIN_QUORUM_PERCENT = 4;
+
+    /// @notice Hard floor on the timelock delay so execution is never instant.
+    uint256 public constant MIN_TIMELOCK_DELAY = 1 hours;
 
     // =============================================================================
     // EVENTS
@@ -59,6 +76,8 @@ contract GuildGovernorFactory is Ownable {
     error GovernanceAlreadyDeployed();
     error InvalidXPContract();
     error InvalidParameters();
+    /// @notice Caller is neither the factory owner nor an admin of the target guild.
+    error NotGuildAdmin();
 
     // =============================================================================
     // CONSTRUCTOR
@@ -113,8 +132,11 @@ contract GuildGovernorFactory is Ownable {
         uint256 quorumPercent,
         uint256 timelockDelay
     ) public returns (address governor, address timelock) {
+        _requireGuildAuthorised(guildDAO);
         if (guildGovernors[guildDAO] != address(0)) revert GovernanceAlreadyDeployed();
-        if (quorumPercent > 100) revert InvalidParameters();
+        if (quorumPercent > 100 || quorumPercent < MIN_QUORUM_PERCENT) revert InvalidParameters();
+        if (timelockDelay < MIN_TIMELOCK_DELAY) revert InvalidParameters();
+        if (votingPeriod == 0) revert InvalidParameters();
 
         // Deploy timelock first (governor will be proposer)
         address[] memory proposers = new address[](1);
@@ -159,6 +181,27 @@ contract GuildGovernorFactory is Ownable {
     }
 
     // =============================================================================
+    // INTERNAL
+    // =============================================================================
+
+    /**
+     * @notice Revert unless the caller may claim `guildDAO`'s one-shot governance slot.
+     * @dev Allowed: the factory owner, or an ADMIN_ROLE holder on the GuildDAO itself.
+     *      A guildDAO that does not implement `isAdmin` can only be deployed by the owner.
+     */
+    function _requireGuildAuthorised(address guildDAO) internal view {
+        if (guildDAO == address(0)) revert InvalidParameters();
+        if (msg.sender == owner()) return;
+
+        try IGuildAdminCheck(guildDAO).isAdmin(msg.sender) returns (bool ok) {
+            if (ok) return;
+        } catch {
+            // Fall through to the revert below.
+        }
+        revert NotGuildAdmin();
+    }
+
+    // =============================================================================
     // ADMIN FUNCTIONS
     // =============================================================================
 
@@ -172,8 +215,10 @@ contract GuildGovernorFactory is Ownable {
         uint256 quorum,
         uint256 timelockDelay
     ) external onlyOwner {
-        if (quorum > 100) revert InvalidParameters();
-        
+        if (quorum > 100 || quorum < MIN_QUORUM_PERCENT) revert InvalidParameters();
+        if (timelockDelay < MIN_TIMELOCK_DELAY) revert InvalidParameters();
+        if (votingPeriod == 0) revert InvalidParameters();
+
         defaultVotingDelay = votingDelay;
         defaultVotingPeriod = votingPeriod;
         defaultProposalThreshold = proposalThreshold;
@@ -214,7 +259,23 @@ contract GuildGovernorFactory is Ownable {
     /**
      * @notice Get default parameters
      */
-    function getDefaults() external view returns (uint48, uint32, uint256, uint256, uint256) {
-        return (defaultVotingDelay, defaultVotingPeriod, defaultProposalThreshold, defaultQuorum, defaultTimelockDelay);
+    function getDefaults()
+        external
+        view
+        returns (
+            uint48 votingDelay,
+            uint32 votingPeriod,
+            uint256 proposalThreshold,
+            uint256 quorum,
+            uint256 timelockDelay
+        )
+    {
+        return (
+            defaultVotingDelay,
+            defaultVotingPeriod,
+            defaultProposalThreshold,
+            defaultQuorum,
+            defaultTimelockDelay
+        );
     }
 }

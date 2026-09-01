@@ -432,19 +432,17 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
         // If this is a transfer (not mint/burn), check soulbound
         if (from != address(0) && to != address(0)) {
             Achievement storage achievement = _achievements[tokenId];
-            // Cache typeId to avoid redundant SLOAD operations (saves gas)
-            uint256 typeId = achievement.typeId;
-            AchievementType storage achievementType = _achievementTypes[typeId];
+            AchievementType storage achievementType = _achievementTypes[achievement.typeId];
 
             if (achievementType.isSoulbound) {
                 revert SoulboundTransferNotAllowed();
             }
 
             // Update tracking for tradable NFTs
-            _userHasAchievement[typeId][from] = false;
-            _userHasAchievement[typeId][to] = true;
-            _userAchievementToken[from][typeId] = 0;
-            _userAchievementToken[to][typeId] = tokenId;
+            _userHasAchievement[achievement.typeId][from] = false;
+            _userHasAchievement[achievement.typeId][to] = true;
+            _userAchievementToken[from][achievement.typeId] = 0;
+            _userAchievementToken[to][achievement.typeId] = tokenId;
         }
 
         return super._update(to, tokenId, auth);
@@ -465,12 +463,10 @@ contract HorizonAchievements is ERC721, ERC721URIStorage, ERC721Enumerable, Acce
 
         // Use achievement type's base URI if set
         if (bytes(achievementType.baseTokenURI).length > 0) {
-            // slither-disable-next-line encode-packed-collision
-            return string(abi.encodePacked(achievementType.baseTokenURI, tokenId.toString()));
+            return string.concat(achievementType.baseTokenURI, tokenId.toString());
         }
 
-        // slither-disable-next-line encode-packed-collision
-        return string(abi.encodePacked(_baseTokenURI, tokenId.toString()));
+        return string.concat(_baseTokenURI, tokenId.toString());
     }
 
     function supportsInterface(

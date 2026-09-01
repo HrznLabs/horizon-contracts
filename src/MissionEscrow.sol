@@ -30,6 +30,11 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
     // STATE VARIABLES
     // =============================================================================
 
+    /// @notice Window after expiresAt in which a performer may still submit proof.
+    /// @dev Prevents an honest performer from losing everything by submitting slightly
+    ///      late, while still bounding how long a poster's funds can be held.
+    uint256 public constant SUBMISSION_GRACE_PERIOD = 24 hours;
+
     uint256 internal _missionId;
     MissionParams internal _params;
     MissionRuntime internal _runtime;
@@ -67,6 +72,14 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
 
     modifier notExpired() {
         if (block.timestamp > _params.expiresAt) revert MissionExpired();
+        _;
+    }
+
+    /// @dev Proof may be submitted until expiresAt + SUBMISSION_GRACE_PERIOD.
+    modifier withinSubmissionWindow() {
+        if (block.timestamp > _params.expiresAt + SUBMISSION_GRACE_PERIOD) {
+            revert SubmissionWindowClosed();
+        }
         _;
     }
 
@@ -181,9 +194,15 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
         }
         if (_runtime.performer != address(0)) revert AlreadyAccepted();
 
-        // Reputation gating: check performer score against minimum
+        // Reputation gating: check performer score against minimum.
+        // Audit M5: guildless missions must be scored against GLOBAL reputation. The
+        // guild-scoped mapping `guildScores[user][address(0)]` is never populated, so
+        // reading it made every performer score 0 and left guildless premium missions
+        // (reward >= 500 USDC auto-floors minReputation to 200) permanently unacceptable.
         if (_params.minReputation > 0 && address(_reputationOracle) != address(0)) {
-            uint256 performerScore = _reputationOracle.getScore(msg.sender, _params.guild);
+            uint256 performerScore = _params.guild == address(0)
+                ? _reputationOracle.getGlobalScore(msg.sender)
+                : _reputationOracle.getScore(msg.sender, _params.guild);
             if (performerScore < _params.minReputation) {
                 revert InsufficientReputation(performerScore, _params.minReputation);
             }
@@ -204,6 +223,7 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
         virtual
         onlyPerformer 
         inState(MissionState.Accepted) 
+        withinSubmissionWindow
     {
         _runtime.proofHash = proofHash;
         _runtime.state = MissionState.Submitted;
@@ -217,9 +237,14 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
      * @dev HIGH-04: nonReentrant added — this function makes external calls to PaymentRouter
      *      after updating state. Although CEI is followed, a malicious router or token
      *      could re-enter; nonReentrant provides defense-in-depth.
+     * @dev audit H5: `virtual` so verticals whose escrow holds more than a single courier
+     *      reward (e.g. DeliveryEscrow, which escrows food cost + delivery fee) can replace
+     *      the settlement call with the correct split. Subclasses MUST preserve the
+     *      onlyPoster / inState(Submitted) / nonReentrant guards and the CEI ordering.
      */
     function approveCompletion()
         external
+        virtual
         onlyPoster
         inState(MissionState.Submitted)
         nonReentrant
@@ -267,10 +292,8 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
      * @dev Can be called by poster or performer after acceptance
      */
     function raiseDispute(bytes32 disputeHash) external {
-        // Cache the state variable to avoid redundant SLOAD operations, saving gas
-        MissionState currentState = _runtime.state;
-        if (currentState != MissionState.Accepted &&
-            currentState != MissionState.Submitted) {
+        if (_runtime.state != MissionState.Accepted && 
+            _runtime.state != MissionState.Submitted) {
             revert InvalidState();
         }
         
@@ -291,16 +314,26 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
      * @dev Poster can reclaim if mission expired without being completed
      */
     function claimExpired() external onlyPoster {
-        if (block.timestamp <= _params.expiresAt) revert MissionNotExpired();
-        
-        // Cache the state variable to avoid redundant SLOAD operations, saving gas
-        MissionState currentState = _runtime.state;
-        if (currentState == MissionState.Completed ||
-            currentState == MissionState.Cancelled ||
-            currentState == MissionState.Submitted ||
-            currentState == MissionState.Disputed) {
+        // The performer keeps the grace window to submit; only after it closes
+        // may the poster reclaim.
+        if (block.timestamp <= _params.expiresAt + SUBMISSION_GRACE_PERIOD) {
+            revert MissionNotExpired();
+        }
+
+        if (_runtime.state == MissionState.Completed || 
+            _runtime.state == MissionState.Cancelled) {
             revert InvalidState();
         }
+
+        // Work was delivered — the poster must approve it or raise a dispute
+        // rather than unilaterally reclaiming the reward.
+        if (_runtime.state == MissionState.Submitted) revert ProofAlreadySubmitted();
+
+        // A dispute is in progress — only DisputeResolver.settleDispute() may move
+        // these funds. Without this, a poster could drain the escrow after expiry,
+        // leaving settleDispute() permanently unsettleable (it requires the
+        // Disputed state) and a winning performer with no remedy.
+        if (_runtime.state == MissionState.Disputed) revert DisputeAlreadyRaised();
 
         _runtime.state = MissionState.Cancelled;
         _token.safeTransfer(_params.poster, _params.rewardAmount);
