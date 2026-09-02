@@ -62,3 +62,6 @@
 **Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
 **Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
 **Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.
+## 2024-05-15 - DoS in sHRZNVault Unstaking
+**Learning:** In `sHRZNVault.sol`, the `_update` hook restricts outbound transfers for any user with an active unstake request to enforce the cooldown lock. However, `requestUnstake` updates the request state *before* transferring the shares to the escrow. This triggers the restriction during the escrow transfer itself, causing an unconditional revert.
+**Action:** When implementing transfer hooks that read state to enforce locks, ensure the state modifications required to initiate the lock are ordered correctly relative to the internal transfers, or exempt the specific transaction path from the hook.
