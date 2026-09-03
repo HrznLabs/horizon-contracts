@@ -173,7 +173,7 @@ contract GuildGovernorFactory is Ownable {
         uint256 timelockDelay
     ) external onlyOwner {
         if (quorum > 100) revert InvalidParameters();
-        
+
         defaultVotingDelay = votingDelay;
         defaultVotingPeriod = votingPeriod;
         defaultProposalThreshold = proposalThreshold;
