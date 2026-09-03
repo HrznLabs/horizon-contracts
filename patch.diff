@@ -1,0 +1,36 @@
+--- src/DeliveryMissionFactory.sol
++++ src/DeliveryMissionFactory.sol
+@@ -26,6 +26,7 @@
+
+     uint256 public missionCount;
+     mapping(uint256 => address) public missions;
++    mapping(address => uint256) public escrowToMission;
+
+     // Minimum values
+     uint256 public constant MIN_REWARD = 1e6; // 1 USDC
+@@ -107,7 +108,8 @@
+             address(0)  // reputationOracle - not used
+         );
+
+-        // Store mission
++        // Store mission mapping (both directions)
+         missions[missionId] = escrow;
++        escrowToMission[escrow] = missionId;
+
+         // Transfer payment token from poster to escrow
+@@ -131,6 +133,15 @@
+     // =============================================================================
+
+     /**
++     * @notice Get mission ID by escrow address (returns 0 if not found)
++     * @param escrow The escrow contract address
++     * @return missionId The mission ID (0 if not a known escrow)
++     */
++    function getMissionByEscrow(address escrow) external view returns (uint256) {
++        return escrowToMission[escrow];
++    }
++
++    /**
+      * @notice Get mission parameters
+      * @param missionId Mission ID
+      * @return Mission parameters

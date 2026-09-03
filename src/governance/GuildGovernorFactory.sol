@@ -25,7 +25,12 @@ contract GuildGovernorFactory is Ownable {
     /// @notice Deployed timelocks by guild
     mapping(address => address) public guildTimelocks;
 
-
+    /// @notice Default governance parameters
+    uint48 public defaultVotingDelay = 1; // 1 block (~2 seconds on Base)
+    uint32 public defaultVotingPeriod = 50_400; // ~1 week at 12s blocks
+    uint256 public defaultProposalThreshold = 100; // 100 XP to propose
+    uint256 public defaultQuorum = 10; // 10% quorum
+    uint256 public defaultTimelockDelay = 1 days;
 
     // =============================================================================
     // EVENTS
@@ -37,7 +42,13 @@ contract GuildGovernorFactory is Ownable {
         address indexed timelock
     );
 
-
+    event DefaultsUpdated(
+        uint48 votingDelay,
+        uint32 votingPeriod,
+        uint256 proposalThreshold,
+        uint256 quorum,
+        uint256 timelockDelay
+    );
 
     event XPContractUpdated(address oldContract, address newContract);
 
@@ -72,6 +83,17 @@ contract GuildGovernorFactory is Ownable {
      * @return governor Address of deployed GuildGovernor
      * @return timelock Address of deployed GuildTimelock
      */
+    function deployGovernance(address guildDAO) external returns (address governor, address timelock) {
+        return deployGovernanceWithParams(
+            guildDAO,
+            defaultVotingDelay,
+            defaultVotingPeriod,
+            defaultProposalThreshold,
+            defaultQuorum,
+            defaultTimelockDelay
+        );
+    }
+
     /**
      * @notice Deploy governance for a guild with custom parameters
      * @param guildDAO Address of the GuildDAO contract
@@ -140,7 +162,26 @@ contract GuildGovernorFactory is Ownable {
     // ADMIN FUNCTIONS
     // =============================================================================
 
+    /**
+     * @notice Update default governance parameters
+     */
+    function setDefaults(
+        uint48 votingDelay,
+        uint32 votingPeriod,
+        uint256 proposalThreshold,
+        uint256 quorum,
+        uint256 timelockDelay
+    ) external onlyOwner {
+        if (quorum > 100) revert InvalidParameters();
 
+        defaultVotingDelay = votingDelay;
+        defaultVotingPeriod = votingPeriod;
+        defaultProposalThreshold = proposalThreshold;
+        defaultQuorum = quorum;
+        defaultTimelockDelay = timelockDelay;
+
+        emit DefaultsUpdated(votingDelay, votingPeriod, proposalThreshold, quorum, timelockDelay);
+    }
 
     /**
      * @notice Update XP contract address
@@ -170,5 +211,10 @@ contract GuildGovernorFactory is Ownable {
         return (guildGovernors[guildDAO], guildTimelocks[guildDAO]);
     }
 
-
+    /**
+     * @notice Get default parameters
+     */
+    function getDefaults() external view returns (uint48, uint32, uint256, uint256, uint256) {
+        return (defaultVotingDelay, defaultVotingPeriod, defaultProposalThreshold, defaultQuorum, defaultTimelockDelay);
+    }
 }
