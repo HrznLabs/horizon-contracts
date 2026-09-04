@@ -10,3 +10,6 @@
 ## 2024-06-28 - [Dead Code Removal in Access Control]
 **Learning:** In OpenZeppelin's `AccessControl`, calls to `_revokeRole` perform mapping lookups which cost gas. If a function already verifies that a user *does not* have a certain role (and reverts early if they do), subsequent `_revokeRole` calls for those specific roles are dead code and safe to remove, measurably saving gas (e.g., removing two redundant `_revokeRole` calls saved ~645 gas in `GuildDAO.sol`).
 **Action:** When auditing or optimizing access control functions, always ensure that role revocation or assignment operations are strictly necessary. Avoid performing state updates on roles that have already been validated in earlier assertions.
+## 2026-09-04 - Optimize _isFactoryEscrow
+**Learning:** The `_isFactoryEscrow` uses a try-catch block wrapping an external call which adds significant bytecode and gas overhead. Since the target is a known factory interface returning a `uint256`, we can achieve the same safety and save gas using a low-level `staticcall`.
+**Action:** Always consider replacing try-catch with a low-level call (`staticcall`/`call`) + manual ABI decoding when optimizing gas for internal view functions that check external state, as this prevents generating excessive exception-handling bytecode.
