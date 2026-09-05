@@ -1,0 +1,36 @@
+--- src/DeliveryMissionFactory.sol
++++ src/DeliveryMissionFactory.sol
+@@ -28,6 +28,9 @@
+     uint256 public missionCount;
+     mapping(uint256 => address) public missions;
+
++    /// @notice Reverse mapping from escrow address to mission ID (for PaymentRouter auth)
++    mapping(address => uint256) public escrowToMission;
++
+     // Minimum values
+     uint256 public constant MIN_REWARD = 1e6; // 1 USDC
+     uint256 public constant MIN_DURATION = 1 hours;
+@@ -120,6 +123,7 @@
+
+         // Store mission
+         missions[missionId] = escrow;
++        escrowToMission[escrow] = missionId;
+
+         // Transfer payment token from poster to escrow
+         IERC20(paymentToken).safeTransferFrom(msg.sender, escrow, rewardAmount);
+@@ -142,6 +146,15 @@
+     // =============================================================================
+     // VIEW FUNCTIONS
+     // =============================================================================
++
++    /**
++     * @notice Get mission ID by escrow address (returns 0 if not found)
++     * @param escrow The escrow contract address
++     * @return missionId The mission ID (0 if not a known escrow)
++     */
++    function getMissionByEscrow(address escrow) external view returns (uint256) {
++        return escrowToMission[escrow];
++    }
+
+     /**
+      * @notice Get mission parameters
