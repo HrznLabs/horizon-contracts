@@ -173,7 +173,9 @@ contract DeliveryEscrow is MissionEscrow {
         _deliveryParams = deliveryParams;
 
         // Copy waypoints
-        for (uint256 i = 0; i < waypoints.length; i++) {
+        // Optimization: Cache array length and use pre-increment to save gas per iteration
+        uint256 len = waypoints.length;
+        for (uint256 i = 0; i < len; ++i) {
             _waypoints.push(waypoints[i]);
         }
     }
@@ -236,7 +238,9 @@ contract DeliveryEscrow is MissionEscrow {
      * @return True if all waypoints completed
      */
     function allWaypointsCompleted() public view returns (bool) {
-        for (uint256 i = 0; i < _waypoints.length; i++) {
+        // Optimization: Cache array length and use pre-increment to save gas per iteration
+        uint256 len = _waypoints.length;
+        for (uint256 i = 0; i < len; ++i) {
             if (!_waypoints[i].completed) {
                 return false;
             }
