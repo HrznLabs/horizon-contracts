@@ -125,6 +125,8 @@ contract FeeDistributor is AccessControl {
                     usdc.safeTransfer(guild, guildShare);
                     emit GuildPaid(guild, guildShare);
                 }
+                // @dev Reset volume here to avoid a redundant second loop over guilds
+                delete guildVolume[guild];
             }
         } else {
             // No guild volume — send guild portion to treasury
@@ -137,12 +139,7 @@ contract FeeDistributor is AccessControl {
         // 4. Resolvers
         usdc.safeTransfer(resolverPool, resolverAmount);
 
-        // Reset period volumes
-        // Cache guilds.length to save SLOAD gas on multiple loop iterations
-        uint256 len2 = guilds.length;
-        for (uint256 i = 0; i < len2; i++) {
-            delete guildVolume[guilds[i]];
-        }
+        // Reset total volume (individual volumes are reset above)
         totalGuildVolume = 0;
 
         emit FeesDistributed(amount, stakerAmount, guildTotal, treasuryAmount, resolverAmount);
