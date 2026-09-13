@@ -126,14 +126,18 @@ contract ReputationOracle is AccessControl, IReputationOracle {
         require(users.length <= MAX_BATCH_SIZE, "ReputationOracle: batch too large");
         if (users.length != scores.length) revert ArrayLengthMismatch();
 
-        for (uint256 i = 0; i < users.length; i++) {
-            if (scores[i] > MAX_SCORE) revert ScoreOutOfRange(scores[i]);
+        uint256 length = users.length;
+        for (uint256 i = 0; i < length; i++) {
+            address user = users[i];
+            uint256 newScore = scores[i];
 
-            uint256 oldScore = guildScores[users[i]][guild];
-            if (oldScore == scores[i]) continue;
+            if (newScore > MAX_SCORE) revert ScoreOutOfRange(newScore);
 
-            guildScores[users[i]][guild] = scores[i];
-            emit ScoreUpdated(users[i], guild, oldScore, scores[i]);
+            uint256 oldScore = guildScores[user][guild];
+            if (oldScore == newScore) continue;
+
+            guildScores[user][guild] = newScore;
+            emit ScoreUpdated(user, guild, oldScore, newScore);
         }
 
         emit BatchScoresUpdated(guild, users.length);
