@@ -127,13 +127,15 @@ contract ReputationOracle is AccessControl, IReputationOracle {
         if (users.length != scores.length) revert ArrayLengthMismatch();
 
         for (uint256 i = 0; i < users.length; i++) {
-            if (scores[i] > MAX_SCORE) revert ScoreOutOfRange(scores[i]);
+            address user = users[i];
+            uint256 score = scores[i];
+            if (score > MAX_SCORE) revert ScoreOutOfRange(score);
 
-            uint256 oldScore = guildScores[users[i]][guild];
-            if (oldScore == scores[i]) continue;
+            uint256 oldScore = guildScores[user][guild];
+            if (oldScore == score) continue;
 
-            guildScores[users[i]][guild] = scores[i];
-            emit ScoreUpdated(users[i], guild, oldScore, scores[i]);
+            guildScores[user][guild] = score;
+            emit ScoreUpdated(user, guild, oldScore, score);
         }
 
         emit BatchScoresUpdated(guild, users.length);

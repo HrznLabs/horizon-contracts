@@ -10,3 +10,6 @@
 ## 2024-06-28 - [Dead Code Removal in Access Control]
 **Learning:** In OpenZeppelin's `AccessControl`, calls to `_revokeRole` perform mapping lookups which cost gas. If a function already verifies that a user *does not* have a certain role (and reverts early if they do), subsequent `_revokeRole` calls for those specific roles are dead code and safe to remove, measurably saving gas (e.g., removing two redundant `_revokeRole` calls saved ~645 gas in `GuildDAO.sol`).
 **Action:** When auditing or optimizing access control functions, always ensure that role revocation or assignment operations are strictly necessary. Avoid performing state updates on roles that have already been validated in earlier assertions.
+## 2026-09-14 - Caching calldata array elements in ReputationOracle
+**Learning:** When iterating over parallel `calldata` arrays in `batchUpdateScores`, caching the array elements (e.g., `address user = users[i]` and `uint256 score = scores[i]`) into local variables before their multiple usages within the loop saves gas by avoiding repeated array bounds checks and memory loads, even with `via_ir = true`.
+**Action:** Always cache `calldata` array elements in a local memory variable if they are accessed multiple times within a loop iteration.
