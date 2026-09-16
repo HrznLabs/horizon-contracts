@@ -213,22 +213,25 @@ contract GuildXP is AccessControl {
     ) external whenNotPaused onlyRole(RELAYER_ROLE) {
         if (users.length != xpAmounts.length) revert ArrayLengthMismatch();
 
+        uint256 localTotal = totalGlobalXP;
         for (uint256 i = 0; i < users.length; i++) {
-            uint256 oldXP = globalXP[users[i]];
+            address user = users[i];
             uint256 newXP = xpAmounts[i];
+            uint256 oldXP = globalXP[user];
             
             if (oldXP == newXP) continue;
             
-            globalXP[users[i]] = newXP;
+            globalXP[user] = newXP;
 
             if (newXP > oldXP) {
-                totalGlobalXP += (newXP - oldXP);
+                localTotal += (newXP - oldXP);
             } else {
-                totalGlobalXP -= (oldXP - newXP);
+                localTotal -= (oldXP - newXP);
             }
 
-            emit GlobalXPUpdated(users[i], oldXP, newXP);
+            emit GlobalXPUpdated(user, oldXP, newXP);
         }
+        totalGlobalXP = localTotal;
     }
 
     // =============================================================================
