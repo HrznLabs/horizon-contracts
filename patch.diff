@@ -1,0 +1,23 @@
+diff --git a/src/DeliveryMissionFactory.sol b/src/DeliveryMissionFactory.sol
+--- a/src/DeliveryMissionFactory.sol
++++ b/src/DeliveryMissionFactory.sol
+@@ -155,4 +155,19 @@
+     {
+         return DeliveryEscrow(payable(missions[missionId])).getWaypoints();
+     }
++
++    /**
++     * @notice Authenticates clone for PaymentRouter
++     * @param escrow Address of the escrow
++     * @return missionId The ID of the mission (or 0 if not found)
++     */
++    function getMissionByEscrow(address escrow) external view returns (uint256) {
++        try DeliveryEscrow(payable(escrow)).getMissionId() returns (uint256 mId) {
++            // Verify this factory actually created this escrow address
++            if (missions[mId] == escrow) {
++                return mId;
++            }
++        } catch {}
++        return 0;
++    }
+ }
