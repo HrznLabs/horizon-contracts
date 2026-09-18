@@ -10,3 +10,6 @@
 ## 2024-06-28 - [Dead Code Removal in Access Control]
 **Learning:** In OpenZeppelin's `AccessControl`, calls to `_revokeRole` perform mapping lookups which cost gas. If a function already verifies that a user *does not* have a certain role (and reverts early if they do), subsequent `_revokeRole` calls for those specific roles are dead code and safe to remove, measurably saving gas (e.g., removing two redundant `_revokeRole` calls saved ~645 gas in `GuildDAO.sol`).
 **Action:** When auditing or optimizing access control functions, always ensure that role revocation or assignment operations are strictly necessary. Avoid performing state updates on roles that have already been validated in earlier assertions.
+## 2026-08-31 - Cache Storage Accumulators and Consolidate Memory Reads in Batch Loops
+**Learning:** When running batch updates over lists of items that repeatedly update a single global storage accumulator (e.g., `totalGlobalXP`, `totalGuildXP[guild]`), reading/writing state in every iteration is gas-expensive. Inlining loops and caching the accumulator in a memory variable saves massive gas per iteration.
+**Action:** Next time you find batch update functions iterating over users and maintaining a global total, extract the global total to memory before the loop, update it in memory, and write it back after.

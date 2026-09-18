@@ -154,9 +154,27 @@ contract GuildXP is AccessControl {
     ) external whenNotPaused canUpdateGuild(guild) {
         if (users.length != xpAmounts.length) revert ArrayLengthMismatch();
 
+        uint256 _totalGuildXP = totalGuildXP[guild];
+
         for (uint256 i = 0; i < users.length; i++) {
-            _updateXP(guild, users[i], xpAmounts[i]);
+            address user = users[i];
+            uint256 oldXP = guildXP[guild][user];
+            uint256 newXP = xpAmounts[i];
+
+            if (oldXP == newXP) continue;
+
+            guildXP[guild][user] = newXP;
+
+            if (newXP > oldXP) {
+                _totalGuildXP += (newXP - oldXP);
+            } else {
+                _totalGuildXP -= (oldXP - newXP);
+            }
+
+            emit XPUpdated(guild, user, oldXP, newXP);
         }
+
+        totalGuildXP[guild] = _totalGuildXP;
 
         emit BatchXPUpdated(guild, users.length);
     }
@@ -213,22 +231,27 @@ contract GuildXP is AccessControl {
     ) external whenNotPaused onlyRole(RELAYER_ROLE) {
         if (users.length != xpAmounts.length) revert ArrayLengthMismatch();
 
+        uint256 _totalGlobalXP = totalGlobalXP;
+
         for (uint256 i = 0; i < users.length; i++) {
-            uint256 oldXP = globalXP[users[i]];
+            address user = users[i];
+            uint256 oldXP = globalXP[user];
             uint256 newXP = xpAmounts[i];
             
             if (oldXP == newXP) continue;
             
-            globalXP[users[i]] = newXP;
+            globalXP[user] = newXP;
 
             if (newXP > oldXP) {
-                totalGlobalXP += (newXP - oldXP);
+                _totalGlobalXP += (newXP - oldXP);
             } else {
-                totalGlobalXP -= (oldXP - newXP);
+                _totalGlobalXP -= (oldXP - newXP);
             }
 
-            emit GlobalXPUpdated(users[i], oldXP, newXP);
+            emit GlobalXPUpdated(user, oldXP, newXP);
         }
+
+        totalGlobalXP = _totalGlobalXP;
     }
 
     // =============================================================================
