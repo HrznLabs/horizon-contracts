@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
-import { IReputationOracle } from "./interfaces/IReputationOracle.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {IReputationOracle} from "./interfaces/IReputationOracle.sol";
 
 /**
  * @title ReputationOracle
@@ -86,12 +86,11 @@ contract ReputationOracle is AccessControl, IReputationOracle {
     // =========================================================================
 
     /// @inheritdoc IReputationOracle
-    function updateScore(address user, address guild, uint256 score)
-        external
-        override
-        whenNotPaused
-        onlyRole(RELAYER_ROLE)
-    {
+    function updateScore(
+        address user,
+        address guild,
+        uint256 score
+    ) external override whenNotPaused onlyRole(RELAYER_ROLE) {
         if (score > MAX_SCORE) revert ScoreOutOfRange(score);
 
         uint256 oldScore = guildScores[user][guild];
@@ -102,12 +101,10 @@ contract ReputationOracle is AccessControl, IReputationOracle {
     }
 
     /// @inheritdoc IReputationOracle
-    function updateGlobalScore(address user, uint256 score)
-        external
-        override
-        whenNotPaused
-        onlyRole(RELAYER_ROLE)
-    {
+    function updateGlobalScore(
+        address user,
+        uint256 score
+    ) external override whenNotPaused onlyRole(RELAYER_ROLE) {
         if (score > MAX_SCORE) revert ScoreOutOfRange(score);
 
         uint256 oldScore = globalScores[user];
@@ -118,32 +115,28 @@ contract ReputationOracle is AccessControl, IReputationOracle {
     }
 
     /// @inheritdoc IReputationOracle
-    function batchUpdateScores(address[] calldata users, address guild, uint256[] calldata scores)
-        external
-        override
-        whenNotPaused
-        onlyRole(RELAYER_ROLE)
-    {
+    function batchUpdateScores(
+        address[] calldata users,
+        address guild,
+        uint256[] calldata scores
+    ) external override whenNotPaused onlyRole(RELAYER_ROLE) {
         /// @dev Cap batch size to prevent out-of-gas DoS. A relayer submitting an
         ///      oversized batch would either revert on-chain (wasting gas) or be
         ///      exploited to stall legitimate score updates.
         require(users.length <= MAX_BATCH_SIZE, "ReputationOracle: batch too large");
         if (users.length != scores.length) revert ArrayLengthMismatch();
 
-        uint256 len = users.length;
-        for (uint256 i = 0; i < len; i++) {
-            address user = users[i];
-            uint256 score = scores[i];
-            if (score > MAX_SCORE) revert ScoreOutOfRange(score);
+        for (uint256 i = 0; i < users.length; i++) {
+            if (scores[i] > MAX_SCORE) revert ScoreOutOfRange(scores[i]);
 
-            uint256 oldScore = guildScores[user][guild];
-            if (oldScore == score) continue;
+            uint256 oldScore = guildScores[users[i]][guild];
+            if (oldScore == scores[i]) continue;
 
-            guildScores[user][guild] = score;
-            emit ScoreUpdated(user, guild, oldScore, score);
+            guildScores[users[i]][guild] = scores[i];
+            emit ScoreUpdated(users[i], guild, oldScore, scores[i]);
         }
 
-        emit BatchScoresUpdated(guild, len);
+        emit BatchScoresUpdated(guild, users.length);
     }
 
     // =========================================================================
@@ -151,12 +144,17 @@ contract ReputationOracle is AccessControl, IReputationOracle {
     // =========================================================================
 
     /// @inheritdoc IReputationOracle
-    function getScore(address user, address guild) external view override returns (uint256) {
+    function getScore(
+        address user,
+        address guild
+    ) external view override returns (uint256) {
         return guildScores[user][guild];
     }
 
     /// @inheritdoc IReputationOracle
-    function getGlobalScore(address user) external view override returns (uint256) {
+    function getGlobalScore(
+        address user
+    ) external view override returns (uint256) {
         return globalScores[user];
     }
 
@@ -166,12 +164,10 @@ contract ReputationOracle is AccessControl, IReputationOracle {
     }
 
     /// @inheritdoc IReputationOracle
-    function getScoreWithTier(address user, address guild)
-        external
-        view
-        override
-        returns (uint256 score, uint8 tier)
-    {
+    function getScoreWithTier(
+        address user,
+        address guild
+    ) external view override returns (uint256 score, uint8 tier) {
         score = guildScores[user][guild];
         tier = _deriveTier(score);
     }
@@ -206,9 +202,9 @@ contract ReputationOracle is AccessControl, IReputationOracle {
 
     function _deriveTier(uint256 score) internal pure returns (uint8) {
         if (score >= DIAMOND_THRESHOLD) return 4; // Diamond
-        if (score >= GOLD_THRESHOLD) return 3; // Gold
-        if (score >= SILVER_THRESHOLD) return 2; // Silver
-        if (score >= BRONZE_THRESHOLD) return 1; // Bronze
-        return 0; // Newcomer
+        if (score >= GOLD_THRESHOLD) return 3;    // Gold
+        if (score >= SILVER_THRESHOLD) return 2;  // Silver
+        if (score >= BRONZE_THRESHOLD) return 1;  // Bronze
+        return 0;                                  // Newcomer
     }
 }
