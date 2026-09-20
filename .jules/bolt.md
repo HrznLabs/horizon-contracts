@@ -10,3 +10,6 @@
 ## 2024-06-28 - [Dead Code Removal in Access Control]
 **Learning:** In OpenZeppelin's `AccessControl`, calls to `_revokeRole` perform mapping lookups which cost gas. If a function already verifies that a user *does not* have a certain role (and reverts early if they do), subsequent `_revokeRole` calls for those specific roles are dead code and safe to remove, measurably saving gas (e.g., removing two redundant `_revokeRole` calls saved ~645 gas in `GuildDAO.sol`).
 **Action:** When auditing or optimizing access control functions, always ensure that role revocation or assignment operations are strictly necessary. Avoid performing state updates on roles that have already been validated in earlier assertions.
+## 2024-05-18 - Caching MLOAD for Multiple Element Reads in Loop
+**Learning:** Even with `via_ir = true` on compiler 0.8.24, looking up multiple array properties (like `users[i]` and `scores[i]`) across separate loop statements incurs repetitive bounds checks and index offset calculations.
+**Action:** Extract loop element lookups (`address user = users[i];`) inside loop headers before using them multiple times within the block to ensure bounds checking and access logic are only paid once per element.
