@@ -27,6 +27,7 @@ contract DeliveryMissionFactory is Ownable {
 
     uint256 public missionCount;
     mapping(uint256 => address) public missions;
+    mapping(address => uint256) public escrowToMission;
 
     // Minimum values
     uint256 public constant MIN_REWARD = 1e6; // 1 USDC
@@ -121,6 +122,7 @@ contract DeliveryMissionFactory is Ownable {
 
         // Store mission
         missions[missionId] = escrow;
+        escrowToMission[escrow] = missionId;
 
         // Transfer payment token from poster to escrow
         IERC20(paymentToken).safeTransferFrom(msg.sender, escrow, rewardAmount);
@@ -187,6 +189,15 @@ contract DeliveryMissionFactory is Ownable {
      * @param missionId Mission ID
      * @return Array of waypoints
      */
+    /**
+     * @notice Get mission ID by escrow address (returns 0 if not found)
+     * @param escrow The escrow contract address
+     * @return missionId The mission ID (0 if not a known escrow)
+     */
+    function getMissionByEscrow(address escrow) external view returns (uint256) {
+        return escrowToMission[escrow];
+    }
+
     function getWaypoints(uint256 missionId)
         external
         view
