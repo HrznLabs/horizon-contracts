@@ -62,3 +62,6 @@
 **Vulnerability:** The `createDeliveryMission` function in `DeliveryMissionFactory.sol` lacked the validation check against `IPaymentRouter(paymentRouter).acceptedTokens(paymentToken)`, which was properly implemented in the base `MissionFactory.sol`. This allowed users to create delivery missions with arbitrary, unapproved tokens (e.g. fake USDC).
 **Learning:** Factory clones that deviate from base implementations need to explicitly duplicate core validation logic unless it is inherited.
 **Prevention:** Always verify token whitelists using the central router before initializing escrows handling external value.
+## 2025-02-21 - Front-running DoS in DeliveriesDAO
+**Learning:** Any user can front-run a legitimate poster by calling `createInsurancePolicy(missionId, 0, false)` with an arbitrary `missionId` in `DeliveriesDAO.sol`, thus permanently blocking the true poster from securing insurance coverage for their mission because the contract simply checks if `policies[missionId].missionId == 0`.
+**Action:** Always ensure access controls or contextual validation (such as fetching mission details from a trusted factory/escrow) are present when allocating resources tied to shared or sequential IDs like `missionId`.
