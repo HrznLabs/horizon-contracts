@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
 
 /**
  * @title GuildXP
@@ -55,12 +55,7 @@ contract GuildXP is AccessControl {
     // EVENTS
     // =============================================================================
 
-    event XPUpdated(
-        address indexed guild,
-        address indexed user,
-        uint256 oldXP,
-        uint256 newXP
-    );
+    event XPUpdated(address indexed guild, address indexed user, uint256 oldXP, uint256 newXP);
 
     event GlobalXPUpdated(address indexed user, uint256 oldXP, uint256 newXP);
 
@@ -94,9 +89,9 @@ contract GuildXP is AccessControl {
     /// @notice Check if caller can update XP for a guild
     modifier canUpdateGuild(address guild) {
         if (
-            !hasRole(RELAYER_ROLE, msg.sender) && // Global relayer
-            !guildRelayers[guild][msg.sender] && // Guild-specific relayer
-            guildAdmins[guild] != msg.sender // Guild admin
+            !hasRole(RELAYER_ROLE, msg.sender) // Global relayer
+                && !guildRelayers[guild][msg.sender] // Guild-specific relayer
+                && guildAdmins[guild] != msg.sender // Guild admin
         ) {
             revert NotAuthorized();
         }
@@ -114,10 +109,10 @@ contract GuildXP is AccessControl {
      */
     constructor(address admin, address globalRelayer) {
         if (admin == address(0)) revert ZeroAddress();
-        
+
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ADMIN_ROLE, admin);
-        
+
         if (globalRelayer != address(0)) {
             _grantRole(RELAYER_ROLE, globalRelayer);
         }
@@ -133,11 +128,11 @@ contract GuildXP is AccessControl {
      * @param user User address
      * @param newXP New XP amount
      */
-    function updateXP(
-        address guild,
-        address user,
-        uint256 newXP
-    ) external whenNotPaused canUpdateGuild(guild) {
+    function updateXP(address guild, address user, uint256 newXP)
+        external
+        whenNotPaused
+        canUpdateGuild(guild)
+    {
         _updateXP(guild, user, newXP);
     }
 
@@ -147,15 +142,39 @@ contract GuildXP is AccessControl {
      * @param users Array of user addresses
      * @param xpAmounts Array of XP amounts
      */
-    function batchUpdateXP(
-        address guild,
-        address[] calldata users,
-        uint256[] calldata xpAmounts
-    ) external whenNotPaused canUpdateGuild(guild) {
+    function batchUpdateXP(address guild, address[] calldata users, uint256[] calldata xpAmounts)
+        external
+        whenNotPaused
+        canUpdateGuild(guild)
+    {
         if (users.length != xpAmounts.length) revert ArrayLengthMismatch();
 
-        for (uint256 i = 0; i < users.length; i++) {
-            _updateXP(guild, users[i], xpAmounts[i]);
+        uint256 len = users.length;
+        uint256 totalGuildXPDeltaAdded = 0;
+        uint256 totalGuildXPDeltaSubtracted = 0;
+
+        for (uint256 i = 0; i < len; i++) {
+            address user = users[i];
+            uint256 newXP = xpAmounts[i];
+            uint256 oldXP = guildXP[guild][user];
+
+            if (oldXP == newXP) continue;
+
+            guildXP[guild][user] = newXP;
+
+            if (newXP > oldXP) {
+                totalGuildXPDeltaAdded += (newXP - oldXP);
+            } else {
+                totalGuildXPDeltaSubtracted += (oldXP - newXP);
+            }
+
+            emit XPUpdated(guild, user, oldXP, newXP);
+        }
+
+        if (totalGuildXPDeltaAdded > totalGuildXPDeltaSubtracted) {
+            totalGuildXP[guild] += (totalGuildXPDeltaAdded - totalGuildXPDeltaSubtracted);
+        } else if (totalGuildXPDeltaSubtracted > totalGuildXPDeltaAdded) {
+            totalGuildXP[guild] -= (totalGuildXPDeltaSubtracted - totalGuildXPDeltaAdded);
         }
 
         emit BatchXPUpdated(guild, users.length);
@@ -166,9 +185,9 @@ contract GuildXP is AccessControl {
      */
     function _updateXP(address guild, address user, uint256 newXP) internal {
         uint256 oldXP = guildXP[guild][user];
-        
+
         if (oldXP == newXP) return; // No change
-        
+
         guildXP[guild][user] = newXP;
 
         // Update total guild XP
@@ -185,14 +204,15 @@ contract GuildXP is AccessControl {
      * @notice Update global XP for a user
      * @dev Only global relayers or admins can update global XP
      */
-    function updateGlobalXP(
-        address user,
-        uint256 newXP
-    ) external whenNotPaused onlyRole(RELAYER_ROLE) {
+    function updateGlobalXP(address user, uint256 newXP)
+        external
+        whenNotPaused
+        onlyRole(RELAYER_ROLE)
+    {
         uint256 oldXP = globalXP[user];
-        
+
         if (oldXP == newXP) return;
-        
+
         globalXP[user] = newXP;
 
         if (newXP > oldXP) {
@@ -207,27 +227,39 @@ contract GuildXP is AccessControl {
     /**
      * @notice Batch update global XP
      */
-    function batchUpdateGlobalXP(
-        address[] calldata users,
-        uint256[] calldata xpAmounts
-    ) external whenNotPaused onlyRole(RELAYER_ROLE) {
+    function batchUpdateGlobalXP(address[] calldata users, uint256[] calldata xpAmounts)
+        external
+        whenNotPaused
+        onlyRole(RELAYER_ROLE)
+    {
         if (users.length != xpAmounts.length) revert ArrayLengthMismatch();
 
-        for (uint256 i = 0; i < users.length; i++) {
-            uint256 oldXP = globalXP[users[i]];
+        uint256 len = users.length;
+        uint256 totalGlobalXPDeltaAdded = 0;
+        uint256 totalGlobalXPDeltaSubtracted = 0;
+
+        for (uint256 i = 0; i < len; i++) {
+            address user = users[i];
             uint256 newXP = xpAmounts[i];
-            
+            uint256 oldXP = globalXP[user];
+
             if (oldXP == newXP) continue;
-            
-            globalXP[users[i]] = newXP;
+
+            globalXP[user] = newXP;
 
             if (newXP > oldXP) {
-                totalGlobalXP += (newXP - oldXP);
+                totalGlobalXPDeltaAdded += (newXP - oldXP);
             } else {
-                totalGlobalXP -= (oldXP - newXP);
+                totalGlobalXPDeltaSubtracted += (oldXP - newXP);
             }
 
-            emit GlobalXPUpdated(users[i], oldXP, newXP);
+            emit GlobalXPUpdated(user, oldXP, newXP);
+        }
+
+        if (totalGlobalXPDeltaAdded > totalGlobalXPDeltaSubtracted) {
+            totalGlobalXP += (totalGlobalXPDeltaAdded - totalGlobalXPDeltaSubtracted);
+        } else if (totalGlobalXPDeltaSubtracted > totalGlobalXPDeltaAdded) {
+            totalGlobalXP -= (totalGlobalXPDeltaSubtracted - totalGlobalXPDeltaAdded);
         }
     }
 
@@ -260,9 +292,8 @@ contract GuildXP is AccessControl {
      * @notice Check if an address can update XP for a guild
      */
     function canUpdate(address guild, address account) external view returns (bool) {
-        return hasRole(RELAYER_ROLE, account) ||
-               guildRelayers[guild][account] ||
-               guildAdmins[guild] == account;
+        return hasRole(RELAYER_ROLE, account) || guildRelayers[guild][account]
+            || guildAdmins[guild] == account;
     }
 
     // =============================================================================
@@ -278,7 +309,7 @@ contract GuildXP is AccessControl {
         if (!hasRole(ADMIN_ROLE, msg.sender) && guildAdmins[guild] != msg.sender) {
             revert NotAuthorized();
         }
-        
+
         guildAdmins[guild] = admin;
         emit GuildAdminSet(guild, admin);
     }
@@ -293,7 +324,7 @@ contract GuildXP is AccessControl {
         if (guildAdmins[guild] != msg.sender && !hasRole(ADMIN_ROLE, msg.sender)) {
             revert NotAuthorized();
         }
-        
+
         guildRelayers[guild][relayer] = authorized;
         emit GuildRelayerSet(guild, relayer, authorized);
     }
