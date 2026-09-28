@@ -10,3 +10,6 @@
 ## 2024-06-28 - [Dead Code Removal in Access Control]
 **Learning:** In OpenZeppelin's `AccessControl`, calls to `_revokeRole` perform mapping lookups which cost gas. If a function already verifies that a user *does not* have a certain role (and reverts early if they do), subsequent `_revokeRole` calls for those specific roles are dead code and safe to remove, measurably saving gas (e.g., removing two redundant `_revokeRole` calls saved ~645 gas in `GuildDAO.sol`).
 **Action:** When auditing or optimizing access control functions, always ensure that role revocation or assignment operations are strictly necessary. Avoid performing state updates on roles that have already been validated in earlier assertions.
+## 2024-05-20 - Avoid zero-to-zero SSTOREs in batch resets
+**Learning:** In FeeDistributor, resetting a mapping array mapping across multiple entities using `delete` unconditionally can incur redundant `SSTORE` costs if the values are already zero.
+**Action:** Always wrap storage clears (`delete`) inside loops with an `if (val != 0)` condition to avoid paying for zero-to-zero writes.

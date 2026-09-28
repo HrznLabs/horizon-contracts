@@ -141,7 +141,11 @@ contract FeeDistributor is AccessControl {
         // Cache guilds.length to save SLOAD gas on multiple loop iterations
         uint256 len2 = guilds.length;
         for (uint256 i = 0; i < len2; i++) {
-            delete guildVolume[guilds[i]];
+            address guild = guilds[i];
+            // Optimization: avoid zero-to-zero SSTORE to save gas when volume is already 0
+            if (guildVolume[guild] != 0) {
+                delete guildVolume[guild];
+            }
         }
         totalGuildVolume = 0;
 
