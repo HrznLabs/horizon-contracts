@@ -65,3 +65,6 @@
 ## 2026-09-25 - DeliveryEscrow Settlement Locking
 **Learning:** Factory contracts that deploy authorized escrows (like DeliveryMissionFactory) MUST implement `getMissionByEscrow(address)` to allow `PaymentRouter._isFactoryEscrow()` to correctly authenticate clones and prevent settlement from reverting.
 **Action:** Always verify that newly added factory contracts conform to the expected IMissionFactory interface expected by the router before integrating.
+## 2026-10-02 - Missing Interface Implementation causes Denial of Service in Settlement
+**Learning:** When adding a new factory contract (like `DeliveryMissionFactory`) that deploys clones interacting with an authorized router (like `PaymentRouter`), the factory must implement the exact verification view functions (`getMissionByEscrow`) expected by the router's authorization check (`_isFactoryEscrow`). Missing this leads to complete denial of service during payment settlement.
+**Action:** Ensure new factory contracts implementing parallel flows fully satisfy the interfaces expected by shared core authorization contracts.
