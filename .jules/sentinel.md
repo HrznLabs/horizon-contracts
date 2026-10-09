@@ -65,3 +65,6 @@
 ## 2026-09-25 - DeliveryEscrow Settlement Locking
 **Learning:** Factory contracts that deploy authorized escrows (like DeliveryMissionFactory) MUST implement `getMissionByEscrow(address)` to allow `PaymentRouter._isFactoryEscrow()` to correctly authenticate clones and prevent settlement from reverting.
 **Action:** Always verify that newly added factory contracts conform to the expected IMissionFactory interface expected by the router before integrating.
+## 2024-05-24 - Missing getMissionByEscrow Implementation
+**Learning:** Factory clones must accurately implement authentication interfaces that centralized routers expect. `PaymentRouter` relies on `IMissionFactory.getMissionByEscrow` to authorize clones settling payments, but `DeliveryMissionFactory` lacks this method compared to `MissionFactory`.
+**Action:** Always check newly implemented clone factories against the interfaces required by routing contracts.
