@@ -65,3 +65,6 @@
 ## 2026-09-25 - DeliveryEscrow Settlement Locking
 **Learning:** Factory contracts that deploy authorized escrows (like DeliveryMissionFactory) MUST implement `getMissionByEscrow(address)` to allow `PaymentRouter._isFactoryEscrow()` to correctly authenticate clones and prevent settlement from reverting.
 **Action:** Always verify that newly added factory contracts conform to the expected IMissionFactory interface expected by the router before integrating.
+## 2024-10-10 - Unstake request denial of service due to transfer hook state ordering
+**Learning:** In `sHRZNVault.sol`, the `requestUnstake` function updates the user's cooldown state (`unstakeRequests[msg.sender]`) before transferring shares into escrow via `_transfer`. However, `_transfer` hooks into `_update`, which checks if `unstakeRequests[from].shares == 0` to block outbound transfers during cooldown. Because the state is updated *before* the transfer, the transfer reverts, permanently DoS-ing the unstake functionality.
+**Action:** When a function initiates state changes that impose restrictions evaluated in standard token hooks (like `_update`), perform the state update *after* the internal token transfers to avoid self-denial of service, or explicitly exempt the function's internal transfers from the hook's restrictions.
