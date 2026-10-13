@@ -36,9 +36,24 @@
 | [iTakeMetaDAO](./src/DeliveriesDAO.sol) | [`0x883B7D8CA234912B82AC9718664c2dF224c98a67`](https://sepolia.basescan.org/address/0x883B7D8CA234912B82AC9718664c2dF224c98a67#code) | [View](https://sepolia.basescan.org/address/0x883B7D8CA234912B82AC9718664c2dF224c98a67#code) |
 | [AtobaDAO (SubDAO)](./src/DeliveriesDAO.sol) | [`0x85fB5f85FeC3c18a47e21f22AB69A9bBB09d913f`](https://sepolia.basescan.org/address/0x85fB5f85FeC3c18a47e21f22AB69A9bBB09d913f#code) | [View](https://sepolia.basescan.org/address/0x85fB5f85FeC3c18a47e21f22AB69A9bBB09d913f#code) |
 | [LisboaCafe (SubDAO)](./src/DeliveriesDAO.sol) | [`0xAA0096E1038449220dB872c19BDF9CD6d619b7BA`](https://sepolia.basescan.org/address/0xAA0096E1038449220dB872c19BDF9CD6d619b7BA#code) | [View](https://sepolia.basescan.org/address/0xAA0096E1038449220dB872c19BDF9CD6d619b7BA#code) |
-| [DeliveryMissionFactory](./src/DeliveryMissionFactory.sol) | [`0x77DD51c63A3fEE0442f4383B5a9D91d470BD04F5`](https://sepolia.basescan.org/address/0x77DD51c63A3fEE0442f4383B5a9D91d470BD04F5#code) | [View](https://sepolia.basescan.org/address/0x77DD51c63A3fEE0442f4383B5a9D91d470BD04F5#code) |
-| [DeliveryEscrow (Implementation)](./src/DeliveryEscrow.sol) | [`0x21Fd1D6f66BFf3B084FdA428C75b659A46446f4b`](https://sepolia.basescan.org/address/0x21Fd1D6f66BFf3B084FdA428C75b659A46446f4b#code) | [View](https://sepolia.basescan.org/address/0x21Fd1D6f66BFf3B084FdA428C75b659A46446f4b#code) |
+| [DeliveryMissionFactory](./src/DeliveryMissionFactory.sol) | [`0xf02Cdc9eD74E2fd63Cc98ED10e78A53512e25d53`](https://sepolia.basescan.org/address/0xf02Cdc9eD74E2fd63Cc98ED10e78A53512e25d53#code) | [View](https://sepolia.basescan.org/address/0xf02Cdc9eD74E2fd63Cc98ED10e78A53512e25d53#code) |
+| [DeliveryEscrow (Implementation)](./src/DeliveryEscrow.sol) | [`0x0A2F4Eeed28D630f0592068054e974991eBFe08B`](https://sepolia.basescan.org/address/0x0A2F4Eeed28D630f0592068054e974991eBFe08B#code) | [View](https://sepolia.basescan.org/address/0x0A2F4Eeed28D630f0592068054e974991eBFe08B#code) |
 | [DeliveriesDAO](./src/DeliveriesDAO.sol) | [`0xaB2F7787b72FcFfEA8E543375FE2db44D9C6ae53`](https://sepolia.basescan.org/address/0xaB2F7787b72FcFfEA8E543375FE2db44D9C6ae53#code) | [View](https://sepolia.basescan.org/address/0xaB2F7787b72FcFfEA8E543375FE2db44D9C6ae53#code) |
+| [GuildFactory (iTake)](./src/GuildFactory.sol) | [`0xB3720D5f3Ff1A6385aC0C1f54f88536F68a967F3`](https://sepolia.basescan.org/address/0xB3720D5f3Ff1A6385aC0C1f54f88536F68a967F3#code) | [View](https://sepolia.basescan.org/address/0xB3720D5f3Ff1A6385aC0C1f54f88536F68a967F3#code) |
+| [GuildDAO (Implementation, iTake)](./src/GuildDAO.sol) | [`0x456D4c04F9001fDE8cdc306dd6b07a79655BB131`](https://sepolia.basescan.org/address/0x456D4c04F9001fDE8cdc306dd6b07a79655BB131#code) | [View](https://sepolia.basescan.org/address/0x456D4c04F9001fDE8cdc306dd6b07a79655BB131#code) |
+
+### 2026-10-13 Redeploy (Base Sepolia)
+
+Deployed and BaseScan-verified by `0x2b30efBA367D669c9cd7723587346a79b67A42DB`.
+
+| Contract | New address | Block | Replaces |
+|----------|-------------|-------|----------|
+| DeliveryMissionFactory | `0xf02Cdc9eD74E2fd63Cc98ED10e78A53512e25d53` | 48074534 | `0x77DD51c63A3fEE0442f4383B5a9D91d470BD04F5` |
+| DeliveryEscrow (Implementation) | `0x0A2F4Eeed28D630f0592068054e974991eBFe08B` | - | `0x21Fd1D6f66BFf3B084FdA428C75b659A46446f4b` |
+| GuildFactory (iTake) | `0xB3720D5f3Ff1A6385aC0C1f54f88536F68a967F3` | 48074577 | `0xB54795f8049De1acf729160bcD9184e50E4f267E` |
+| GuildDAO (Implementation, iTake) | `0x456D4c04F9001fDE8cdc306dd6b07a79655BB131` | - | n/a |
+
+Reason: GuildDAO fix (#949) and DeliveryEscrow.settleDispute fix plus router wiring (#954). The core GuildFactory (`0x7349...`, Phase 13 redeploy) is unchanged by this redeploy.
 
 ### Not Yet Deployed (pending governance bootstrap)
 
