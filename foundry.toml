@@ -19,7 +19,7 @@ fmt.quote_style = "double"
 fmt.number_underscore = "thousands"
 
 # Testing
-fuzz.runs = 256
+fuzz.runs = 1000
 invariant.runs = 256
 
 [profile.ci]
@@ -45,3 +45,5 @@ base_mainnet = "https://mainnet.base.org"
 [etherscan]
 base_sepolia = { key = "${BASESCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }
 base_mainnet = { key = "${BASESCAN_API_KEY}", url = "https://api.basescan.org/api" }
+
+

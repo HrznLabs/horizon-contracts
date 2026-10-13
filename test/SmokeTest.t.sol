@@ -26,7 +26,8 @@ import {MockERC20} from "./mocks/MockERC20.sol";
  * Test 2: test_SmokeTest_FullOrderFlow
  *   - Deploys all contracts locally (no fork required)
  *   - Executes a complete delivery mission: create → accept → submit → approve
- *   - Verifies fee splits (SubDAO 2% + MetaDAO 0.5% + performer >= 90%)
+ *   - Verifies the audit-H5 (#819) split: restaurant receives the food cost, the courier
+ *     receives the DELIVERY FEE net of fees (SubDAO 2% + MetaDAO 0.5% + performer >= 90%)
  *   - Verifies events emitted at each lifecycle step
  *
  * To run against Base Sepolia fork (validates real deployment):
@@ -47,7 +48,11 @@ contract SmokeTest is Test {
     uint16 constant BPS_DENOM       = 10000;
 
     uint256 constant ONE_USDC  = 1e6;
-    uint256 constant ORDER_AMT = 15e6; // €15.00
+    uint256 constant ORDER_AMT = 15e6; // €15.00 — the FULL order escrowed by the customer
+
+    // audit H5 (#819): the escrow holds the full order and splits it at settlement.
+    uint256 constant FOOD_COST    = 12e6; // €12.00 -> restaurant, in full
+    uint256 constant DELIVERY_FEE = 3e6;  // €3.00  -> hierarchy split (courier >= 90%)
 
     // =========================================================================
     // Test 1: Deployment addresses have code deployed
@@ -141,6 +146,8 @@ contract SmokeTest is Test {
         missionFactory = new DeliveryMissionFactory(
             address(paymentRouter)
         );
+        // audit C2: configure a dispute resolver before any mission is created.
+        missionFactory.setDisputeResolver(makeAddr("smokeDisputeResolver"));
 
         // Grant SETTLER_ROLE to missionFactory and admin (admin uses it for direct test calls)
         bytes32 _settlerRole = paymentRouter.SETTLER_ROLE();
@@ -184,7 +191,8 @@ contract SmokeTest is Test {
      *   2. Performer accepts the mission
      *   3. Performer submits proof (delivery complete)
      *   4. Poster approves completion (triggers payment settlement)
-     *   5. Verify: performer gets >= 90%, SubDAO + MetaDAO get correct fees
+     *   5. Verify: restaurant gets the food cost, courier gets >= 90% of the DELIVERY FEE,
+     *      SubDAO + MetaDAO get their share of the delivery fee
      *   6. Verify: sum of all payouts == ORDER_AMT (no wei lost)
      */
     function test_SmokeTest_FullOrderFlow() public {
@@ -196,13 +204,42 @@ contract SmokeTest is Test {
 
         uint256 expiresAt = block.timestamp + 2 hours;
 
+        // Delivery params are now set atomically at creation (issue #812). This smoke
+        // test exercises the escrow/settlement path with no waypoints (allWaypointsCompleted
+        // is vacuously true), so an empty waypoint array preserves the original flow.
+        DeliveryEscrow.DeliveryParams memory deliveryParams = DeliveryEscrow.DeliveryParams({
+            pickup: DeliveryEscrow.DeliveryLocation(0, 0, bytes32("pickup"), 0, 0, false),
+            dropoff: DeliveryEscrow.DeliveryLocation(0, 0, bytes32("dropoff"), 0, 0, false),
+            package: DeliveryEscrow.PackageDetails(3, 1, 1000, 0),
+            pickupWindowStart: block.timestamp,
+            pickupWindowEnd: expiresAt,
+            deliveryDeadline: expiresAt,
+            realTimeTrackingEnabled: false,
+            tipAmount: 0
+        });
+        DeliveryEscrow.DeliveryWaypoint[] memory noWaypoints = new DeliveryEscrow.DeliveryWaypoint[](0);
+
+        // audit H5 (#819): the food/delivery breakdown is now recorded on-chain and must
+        // account for every escrowed wei (foodCost + deliveryFee + tip == rewardAmount).
+        DeliveryEscrow.DeliverySettlement memory settlement = DeliveryEscrow.DeliverySettlement({
+            foodCost: FOOD_COST,
+            deliveryFee: DELIVERY_FEE,
+            restaurantDAO: restaurantSubDAO,
+            subDAOFeeBps: SUBDAO_FEE_BPS,
+            metaDAO: itakeMetaDAO,
+            metaDAOFeeBps: METADAO_FEE_BPS
+        });
+
         uint256 missionId = missionFactory.createDeliveryMission(
             address(usdc),
             ORDER_AMT,
             expiresAt,
             restaurantSubDAO,       // guild (the restaurant)
             bytes32("metadata"),    // metadataHash
-            bytes32("location")     // locationHash
+            bytes32("location"),    // locationHash
+            deliveryParams,
+            settlement,
+            noWaypoints
         );
         vm.stopPrank();
 
@@ -275,43 +312,64 @@ contract SmokeTest is Test {
         // ---------------------------------------------------------------
         // Step 5: Verify fee distribution
         //
-        // approveCompletion() calls settlePayment() (base path) which uses the
-        // hardcoded default 3% guild fee from getGuildFeeBps().
-        // The iTake-specific hierarchy (SubDAO 2% + MetaDAO 0.5%) is used via
-        // settlePaymentWithHierarchy() which is tested separately below.
+        // audit H5 (#819). This assertion used to require the courier to receive
+        // >= 90% of the WHOLE order — which encoded the bug: approveCompletion() routed
+        // food cost + delivery fee through settlePayment() as if it were all courier
+        // reward, so the restaurant was paid nothing. approveCompletion() now calls
+        // settleRestaurantOrder(): the restaurant is paid its food cost in full and only
+        // the DELIVERY FEE is split, so the performer floor applies to the delivery fee.
         // ---------------------------------------------------------------
 
-        uint256 performerGot  = usdc.balanceOf(performer)       - performerBefore;
-        uint256 guildGot      = usdc.balanceOf(subDAOTreasury)   - subDAOBefore;
+        uint256 performerGot  = usdc.balanceOf(performer)        - performerBefore;
+        uint256 restaurantGot = usdc.balanceOf(subDAOTreasury)   - subDAOBefore;
+        uint256 metaDAOGot    = usdc.balanceOf(metaDAOTreasury)  - metaDAOBefore;
         uint256 protocolGot   = usdc.balanceOf(protocolTreasury) - protocolBefore;
         uint256 labsGot       = usdc.balanceOf(labsTreasury)     - labsBefore;
         uint256 resolverGot   = usdc.balanceOf(resolverTreasury) - resolverBefore;
 
-        console.log("Performer (>=90%):", performerGot);
-        console.log("Guild (3% default):", guildGot);
-        console.log("Protocol (2.5%):  ", protocolGot);
-        console.log("Labs (2.5%):      ", labsGot);
-        console.log("Resolver (2%):    ", resolverGot);
+        console.log("Courier (>=90% of delivery fee):", performerGot);
+        console.log("Restaurant (food cost + 2%):    ", restaurantGot);
+        console.log("MetaDAO (0.5% of fee):          ", metaDAOGot);
+        console.log("Protocol (2.5% of fee):         ", protocolGot);
+        console.log("Labs (2.5% of fee):             ", labsGot);
+        console.log("Resolver (2% of fee):           ", resolverGot);
 
-        // Performer floor: >= 90%
-        assertGe(
-            performerGot,
-            (ORDER_AMT * PERFORMER_FLOOR) / BPS_DENOM,
-            "Performer below 90% floor"
+        // Restaurant is paid the food cost in full, plus its SubDAO share of the fee.
+        uint256 expectedSubDAO = (DELIVERY_FEE * SUBDAO_FEE_BPS) / BPS_DENOM;
+        assertEq(
+            restaurantGot,
+            FOOD_COST + expectedSubDAO,
+            "Restaurant must receive the food cost in full"
         );
 
+        // MetaDAO takes its share of the delivery fee only.
+        assertEq(
+            metaDAOGot,
+            (DELIVERY_FEE * METADAO_FEE_BPS) / BPS_DENOM,
+            "MetaDAO fee must be charged on the delivery fee only"
+        );
+
+        // Performer floor applies to the delivery fee, NOT the whole order.
+        assertGe(
+            performerGot,
+            (DELIVERY_FEE * PERFORMER_FLOOR) / BPS_DENOM,
+            "Courier below 90% floor on the delivery fee"
+        );
+        assertLe(performerGot, DELIVERY_FEE, "Courier must not be paid out of the food cost");
+
         // No wei lost (allow 1 wei rounding)
-        uint256 totalOut = performerGot + guildGot + protocolGot + labsGot + resolverGot;
+        uint256 totalOut = performerGot + restaurantGot + metaDAOGot + protocolGot + labsGot + resolverGot;
         assertApproxEqAbs(totalOut, ORDER_AMT, 1, "Wei lost in fee distribution");
 
         // Escrow should be empty after settlement
         assertEq(usdc.balanceOf(escrow), 0, "Escrow should be empty after settlement");
 
-        console.log("Step 5 OK: Fee distribution verified, no wei lost");
+        console.log("Step 5 OK: Food/delivery split verified, no wei lost");
 
         // ---------------------------------------------------------------
-        // Step 6: Verify iTake hierarchy settlement (SubDAO 2% + MetaDAO 0.5%)
-        // This uses settlePaymentWithHierarchy which is the actual iTake payment path.
+        // Step 6: Verify the raw hierarchy split (SubDAO 2% + MetaDAO 0.5%)
+        // settlePaymentWithHierarchy is the no-food variant (whole amount is reward);
+        // the delivery happy path above uses settleRestaurantOrder instead (audit H5).
         // ---------------------------------------------------------------
         usdc.mint(address(paymentRouter), ORDER_AMT); // Fund router for direct test
 
@@ -374,6 +432,13 @@ contract SmokeTest is Test {
         deliveriesDAO.curatePerformer(performer, 90);
         assertTrue(deliveriesDAO.isPerformerCurated(performer), "Performer should be curated");
 
+        // Audit M4: coverage is reserved 1:1 against pool capital, so the pool must be
+        // funded before it can underwrite anything — a 1% premium cannot back a 100% payout.
+        uint256 seed = 100e6;
+        usdc.mint(address(this), seed);
+        usdc.approve(address(deliveriesDAO), seed);
+        deliveriesDAO.fundPool(seed);
+
         // Create insurance policy (curated rate = 1%)
         uint256 premium = (coverage * 100) / 10000; // 1% = 100_000
         usdc.mint(poster, premium);
@@ -384,8 +449,9 @@ contract SmokeTest is Test {
         deliveriesDAO.createInsurancePolicy(missionId, coverage, true);
 
         (uint256 poolBalance, , uint256 totalPremiums) = deliveriesDAO.getPoolStats();
-        assertEq(poolBalance, premium, "Pool should hold premium");
+        assertEq(poolBalance, seed + premium, "Pool should hold seed + premium");
         assertEq(totalPremiums, premium, "Total premiums should match");
+        assertEq(deliveriesDAO.reservedCoverage(), coverage, "Coverage should be reserved");
 
         console.log("Insurance pool test passed");
     }

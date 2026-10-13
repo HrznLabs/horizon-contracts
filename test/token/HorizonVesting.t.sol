@@ -180,6 +180,91 @@ contract HorizonVestingTest is Test {
         vesting.revoke();
     }
 
+    // -------------------------------------------------------------------------
+    // Audit M1: accrued tokens must survive revocation
+    // -------------------------------------------------------------------------
+
+    /// @notice Before the fix, `revoke()` left the accrued amount in the contract but
+    ///         `vestedAmount()` short-circuited to 0, so `releasable()` was 0 and
+    ///         `release()` reverted "nothing to release" forever.
+    function test_M1_Revoke_AccruedRemainsClaimable() public {
+        uint64 halfTs = START + TOTAL_DURATION / 2;
+        vm.warp(halfTs);
+
+        uint256 accrued = vesting.releasable();
+        assertGt(accrued, 0, "precondition: something must have accrued");
+
+        uint256 treasuryBefore = token.balanceOf(treasury);
+
+        vm.prank(admin);
+        vesting.revoke();
+
+        // The snapshot is recorded and still reported as claimable.
+        assertEq(vesting.revokedReleasable(), accrued);
+        assertEq(vesting.releasable(), accrued);
+        // The contract still physically holds exactly the accrued amount.
+        assertEq(token.balanceOf(address(vesting)), accrued);
+        // Treasury got only the unvested remainder.
+        assertEq(token.balanceOf(treasury), treasuryBefore + (VEST_AMOUNT - accrued));
+
+        // FAILED BEFORE FIX: this reverted with "nothing to release".
+        vm.prank(beneficiary);
+        vesting.release();
+
+        assertEq(token.balanceOf(beneficiary), accrued);
+        assertEq(token.balanceOf(address(vesting)), 0);
+        assertEq(vesting.released(), accrued);
+        assertEq(vesting.revokedReleasable(), 0);
+    }
+
+    function test_M1_Revoke_ClaimIsOneShot() public {
+        vm.warp(START + TOTAL_DURATION / 2);
+        vm.prank(admin);
+        vesting.revoke();
+
+        vm.prank(beneficiary);
+        vesting.release();
+
+        // No further accrual after revocation, even at full term.
+        vm.warp(START + TOTAL_DURATION);
+        assertEq(vesting.releasable(), 0);
+        vm.prank(beneficiary);
+        vm.expectRevert("HorizonVesting: nothing to release");
+        vesting.release();
+    }
+
+    function test_M1_Revoke_BeforeCliff_NothingClaimable() public {
+        vm.warp(START + CLIFF_DURATION / 2);
+        vm.prank(admin);
+        vesting.revoke();
+
+        assertEq(vesting.revokedReleasable(), 0);
+        assertEq(vesting.releasable(), 0);
+        assertEq(token.balanceOf(address(vesting)), 0);
+    }
+
+    /// @notice The revoke snapshot must exclude anything the beneficiary already claimed.
+    function test_M1_Revoke_AfterPartialRelease_NoDoubleClaim() public {
+        vm.warp(START + CLIFF_DURATION);
+        vm.prank(beneficiary);
+        vesting.release();
+        uint256 claimedAtCliff = token.balanceOf(beneficiary);
+
+        // Accrue more, then revoke without releasing.
+        vm.warp(START + TOTAL_DURATION / 2);
+        uint256 pending = vesting.releasable();
+
+        vm.prank(admin);
+        vesting.revoke();
+        assertEq(vesting.revokedReleasable(), pending);
+
+        vm.prank(beneficiary);
+        vesting.release();
+
+        assertEq(token.balanceOf(beneficiary), claimedAtCliff + pending);
+        assertEq(token.balanceOf(address(vesting)), 0);
+    }
+
     function test_Revoke_NonOwner_Reverts() public {
         vm.prank(beneficiary);
         vm.expectRevert();
