@@ -67,8 +67,11 @@ contract ReentrantToken {
         balanceOf[to]   += amount;
         emit Transfer(from, to, amount);
 
-        // On transfer TO the PaymentRouter, attempt reentrancy back into the escrow
-        if (attackArmed && to == attackTarget) {
+        // While armed, reenter the escrow on the FIRST transfer (which is the
+        // escrow -> PaymentRouter payout inside approveCompletion). The reentrant
+        // call must revert (nonReentrant / onlyPoster / inState), bubbling up and
+        // reverting the whole settlement.
+        if (attackArmed) {
             attackArmed = false; // prevent infinite loop
             MissionEscrow(attackTarget).approveCompletion();
         }
@@ -427,6 +430,20 @@ contract EthskillsAuditTest is Test {
         });
     }
 
+    /// @dev audit H5 (#819): initializeDelivery now requires a settlement breakdown that
+    ///      accounts for the whole escrowed reward. A plain courier job (no restaurant)
+    ///      puts the entire reward in the delivery fee.
+    function _fullFeeSettlement() internal pure returns (DeliveryEscrow.DeliverySettlement memory) {
+        return DeliveryEscrow.DeliverySettlement({
+            foodCost: 0,
+            deliveryFee: REWARD,
+            restaurantDAO: address(0),
+            subDAOFeeBps: 0,
+            metaDAO: address(0),
+            metaDAOFeeBps: 0
+        });
+    }
+
     /// @notice Calling initializeDelivery from a non-factory address reverts NotFactory()
     function test_HIGH05_InitializeDelivery_NotFactory_Reverts() public {
         (DeliveryEscrow escrow,) = _deployDeliveryEscrow();
@@ -435,7 +452,7 @@ contract EthskillsAuditTest is Test {
 
         vm.prank(attacker);
         vm.expectRevert(DeliveryEscrow.NotFactory.selector);
-        escrow.initializeDelivery(_emptyDeliveryParams(), waypoints);
+        escrow.initializeDelivery(_emptyDeliveryParams(), _fullFeeSettlement(), waypoints);
     }
 
     /// @notice Calling initializeDelivery twice from the factory reverts DeliveryAlreadyInitialized()
@@ -446,12 +463,12 @@ contract EthskillsAuditTest is Test {
 
         // First call — succeeds
         vm.prank(factoryAddr);
-        escrow.initializeDelivery(_emptyDeliveryParams(), waypoints);
+        escrow.initializeDelivery(_emptyDeliveryParams(), _fullFeeSettlement(), waypoints);
 
         // Second call — must revert
         vm.prank(factoryAddr);
         vm.expectRevert(DeliveryEscrow.DeliveryAlreadyInitialized.selector);
-        escrow.initializeDelivery(_emptyDeliveryParams(), waypoints);
+        escrow.initializeDelivery(_emptyDeliveryParams(), _fullFeeSettlement(), waypoints);
     }
 
     // =========================================================================
@@ -544,8 +561,9 @@ contract EthskillsAuditTest is Test {
     /// @notice Stake a large HRZN position (approaching protocol max), distribute a
     ///         small USDC reward, and verify earned() returns non-zero.
     function test_HIGH02_VaultPrecision_SmallReward_NonZeroEarned() public {
-        // Stake 1B HRZN (1e27 wei) — simulates the full supply being staked
-        uint256 stakeAmount = 1_000_000_000e18; // 1B HRZN
+        // Stake the treasury's full 800M HRZN (team/advisor allocations are vested
+        // elsewhere) — a large position to stress small-reward precision.
+        uint256 stakeAmount = 800_000_000e18; // 800M HRZN (treasury balance)
         vm.prank(treasury);
         hrzn.transfer(alice, stakeAmount);
         vm.prank(alice);
@@ -553,7 +571,7 @@ contract EthskillsAuditTest is Test {
         vm.prank(alice);
         vault.deposit(stakeAmount, alice);
 
-        // totalSupply ~ 1e30 (with _decimalsOffset()==3, shares = assets * 10^3 at first deposit)
+        // Shares = assets * 10^_decimalsOffset() (offset 6) at first deposit.
         uint256 supply = vault.totalSupply();
         assertGt(supply, 0, "Supply must be non-zero");
 
@@ -573,7 +591,7 @@ contract EthskillsAuditTest is Test {
     /// @notice Without the 1e30 fix, rewardPerTokenStored would truncate to 0 for
     ///         small amounts relative to a large supply.  Verify the stored value is > 0.
     function test_HIGH02_RewardPerTokenStored_NonZeroForSmallReward() public {
-        uint256 stakeAmount = 1_000_000_000e18; // 1B HRZN
+        uint256 stakeAmount = 800_000_000e18; // 800M HRZN (treasury balance)
         vm.prank(treasury);
         hrzn.transfer(alice, stakeAmount);
         vm.prank(alice);
@@ -597,7 +615,10 @@ contract EthskillsAuditTest is Test {
 
     /// @notice Values <= block.timestamp must revert with InvalidDuration()
     function testFuzz_MED03_ExpiredMission_Reverts(uint256 secondsInPast) public {
-        secondsInPast = bound(secondsInPast, 0, 365 days);
+        // Warp forward so block.timestamp has headroom, then bound the offset within
+        // it — otherwise `block.timestamp - secondsInPast` underflows in the test itself.
+        vm.warp(block.timestamp + 400 days);
+        secondsInPast = bound(secondsInPast, 0, block.timestamp);
         uint256 expiresAt = block.timestamp - secondsInPast;
 
         usdc.mint(poster, REWARD);
@@ -749,49 +770,50 @@ contract EthskillsAuditTest is Test {
     // MED-04 — sHRZNVault transfer during cooldown (shares locked)
     // =========================================================================
 
-    function test_MED04_TransferDuringCooldown_Reverts() public {
+    function test_MED04_EscrowRemovesFromBalance_AndBlocksSecondRequest() public {
         _depositHRZN(alice, 100e18);
+        uint256 total = vault.balanceOf(alice);
+        uint256 half = total / 2;
 
-        // Request unstake — shares move to escrow (vault address)
+        // Request unstake of half — those shares move to the vault escrow.
         vm.prank(alice);
-        vault.requestUnstake(100e18);
+        vault.requestUnstake(half);
 
-        // Confirm alice now has 0 transferable shares
-        // (shares are held by address(this) = vault)
-        assertEq(vault.balanceOf(alice), 0, "Alice shares should be escrowed");
+        // The escrowed shares leave alice's balance and are held by the vault;
+        // she cannot double-spend them.
+        assertEq(vault.balanceOf(alice), total - half, "remaining stays with alice");
+        assertEq(vault.balanceOf(address(vault)), half, "escrowed on the vault");
 
-        // Any attempt to transfer the 0 balance is a no-op, but the
-        // real invariant is that requestUnstake itself would revert on
-        // a second attempt while a pending request is active.
+        // Only one pending request at a time — a second request reverts even though
+        // she still holds transferable shares.
         vm.prank(alice);
         vm.expectRevert("sHRZNVault: pending request");
         vault.requestUnstake(1);
     }
 
-    /// @notice Transfer FROM alice (before requestUnstake) should work; transfer
-    ///         AFTER requestUnstake via the locked-escrow path should revert.
-    function test_MED04_TransferAfterUnstakeRequest_LocksShares() public {
+    /// @notice audit C1/M2: the redundant cooldown transfer-lock was removed. The
+    ///         real safety invariant is that escrowed shares live on the vault (the
+    ///         user can't move them), while a user's *remaining* shares stay freely
+    ///         transferable during a pending request.
+    function test_MED04_EscrowedSafe_RemainingTransferable() public {
         _depositHRZN(alice, 200e18);
+        uint256 total = vault.balanceOf(alice);
+        uint256 half = total / 2;
 
-        // Transfer half to bob while no pending request — must succeed
+        // Alice escrows half via a pending unstake request.
         vm.prank(alice);
-        vault.transfer(bob, 100e18);
-        assertEq(vault.balanceOf(bob), 100e18, "Bob must receive shares");
+        vault.requestUnstake(half);
+        assertEq(vault.balanceOf(address(vault)), half, "half escrowed on vault");
 
-        // Now alice requests unstake for her remaining 100 shares
+        // Her remaining (non-escrowed) shares are still transferable — no lock.
         vm.prank(alice);
-        vault.requestUnstake(100e18);
-
-        // Alice now has 0 transferable balance; trying to transfer 1 wei
-        // should revert because of the cooldown lock on alice (she has pending shares)
-        // ... but the contract transfers shares TO the vault at request time,
-        // so alice.balance == 0 and a transfer would revert with ERC20InsufficientBalance.
-        // The _update() revert path triggers when from has unstakeRequest.shares > 0,
-        // but since alice's balance was cleared, any external transfer of her balance
-        // is already blocked by the balance check. Verify the revert.
-        vm.prank(alice);
-        vm.expectRevert(); // either insufficient balance or cooldown revert
         vault.transfer(bob, 1);
+        assertEq(vault.balanceOf(bob), 1, "remaining shares transferable");
+
+        // She cannot open a second concurrent request.
+        vm.prank(alice);
+        vm.expectRevert("sHRZNVault: pending request");
+        vault.requestUnstake(1);
     }
 
     // =========================================================================

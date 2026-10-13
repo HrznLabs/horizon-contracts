@@ -63,6 +63,8 @@ interface IMissionEscrow {
     error NotDisputeResolver();
     error MissionExpired();
     error MissionNotExpired();
+    error SubmissionWindowClosed();
+    error ProofAlreadySubmitted();
     error AlreadyAccepted();
     error DisputeAlreadyRaised();
     error Paused();

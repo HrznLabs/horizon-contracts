@@ -9,6 +9,22 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * @title DeliveryEscrow
  * @notice Extended escrow contract for delivery missions with multi-stop support
  * @dev Inherits from MissionEscrow and adds delivery-specific functionality
+ *
+ * Settlement model (audit H5, option A — issue #819)
+ * -------------------------------------------------
+ * The escrow holds the FULL order value:
+ *
+ *     rewardAmount == foodCost + deliveryFee + tipAmount
+ *
+ * and `approveCompletion()` splits it on-chain:
+ *   - `foodCost`    -> restaurant (SubDAO) treasury, in full, no protocol fee
+ *   - `deliveryFee` -> PaymentRouter.settleRestaurantOrder, split courier / protocol /
+ *                      labs / resolver / MetaDAO / SubDAO (courier >= performer floor)
+ *   - `tipAmount`   -> courier, in full, no protocol fee
+ *
+ * Before this change the inherited `MissionEscrow.approveCompletion()` routed the whole
+ * balance through `settlePayment()` as courier reward, so the courier received ~90% of the
+ * food cost and the restaurant received nothing.
  */
 contract DeliveryEscrow is MissionEscrow {
     using SafeERC20 for IERC20;
@@ -62,6 +78,32 @@ contract DeliveryEscrow is MissionEscrow {
         uint256 tipAmount;
     }
 
+    /**
+     * @notice On-chain breakdown of the escrowed order, used at settlement.
+     * @dev audit H5 / issue #819. Fields are ordered so each address packs with its
+     *      companion uint16 into a single storage slot (4 slots total).
+     *
+     *      Invariant, enforced at creation and re-checked at settlement:
+     *          foodCost + deliveryFee + DeliveryParams.tipAmount == MissionParams.rewardAmount
+     *
+     *      `addTip()` bumps `rewardAmount` and `tipAmount` by the same value, so the
+     *      invariant holds for the whole lifetime of the escrow.
+     */
+    struct DeliverySettlement {
+        /// @notice Paid to the restaurant treasury in full — no protocol fee is taken.
+        uint256 foodCost;
+        /// @notice Split through the PaymentRouter fee hierarchy; courier gets the remainder.
+        uint256 deliveryFee;
+        /// @notice Restaurant SubDAO receiving `foodCost` (+ its share of the delivery fee).
+        address restaurantDAO;
+        /// @notice Restaurant's share of the DELIVERY FEE in bps (<= PaymentRouter.MAX_SUBDAO_FEE_BPS).
+        uint16 subDAOFeeBps;
+        /// @notice MetaDAO for the vertical (e.g. iTake).
+        address metaDAO;
+        /// @notice MetaDAO's share of the DELIVERY FEE in bps (<= PaymentRouter.MAX_METADAO_FEE_BPS).
+        uint16 metaDAOFeeBps;
+    }
+
     // =============================================================================
     // STATE VARIABLES
     // =============================================================================
@@ -69,6 +111,9 @@ contract DeliveryEscrow is MissionEscrow {
     DeliveryParams private _deliveryParams;
     DeliveryWaypoint[] private _waypoints;
     TrackingCheckpoint[] private _trackingCheckpoints;
+
+    /// @notice audit H5: food/delivery breakdown used by approveCompletion().
+    DeliverySettlement private _settlement;
 
     /// @notice HIGH-05: Address of the factory that deployed this clone.
     ///         Set during base initialize() by the factory passing itself as caller.
@@ -89,6 +134,18 @@ contract DeliveryEscrow is MissionEscrow {
     event TipAdded(uint256 indexed missionId, uint256 tipAmount, uint256 totalTip);
     event DeliveryLocationVerified(uint256 indexed missionId, uint8 locationType, bool verified);
 
+    /// @notice audit H5: emitted on the happy path with the exact amounts the escrow moved.
+    /// @param foodCostToRestaurant Amount routed to the restaurant treasury (no fees taken)
+    /// @param deliveryFeeRouted Amount handed to PaymentRouter for the hierarchy split
+    /// @param tipToPerformer Tip paid straight to the courier (no fees taken)
+    event DeliveryOrderSettled(
+        uint256 indexed missionId,
+        address indexed performer,
+        uint256 foodCostToRestaurant,
+        uint256 deliveryFeeRouted,
+        uint256 tipToPerformer
+    );
+
     // =============================================================================
     // ERRORS
     // =============================================================================
@@ -103,6 +160,12 @@ contract DeliveryEscrow is MissionEscrow {
     error NotFactory();
     /// @notice HIGH-05: Thrown when initializeDelivery() is called a second time
     error DeliveryAlreadyInitialized();
+    /// @notice audit H5: foodCost + deliveryFee + tipAmount must equal the escrowed rewardAmount
+    error SettlementBreakdownMismatch(uint256 expected, uint256 provided);
+    /// @notice audit H5: foodCost > 0 (or a SubDAO fee) with no restaurant to pay
+    error MissingRestaurantDAO();
+    /// @notice audit H5: a MetaDAO fee was configured with no MetaDAO to pay
+    error MissingMetaDAO();
 
     // =============================================================================
     // INITIALIZATION
@@ -152,25 +215,51 @@ contract DeliveryEscrow is MissionEscrow {
 
     /**
      * @notice Initialize delivery escrow with delivery-specific parameters.
-     * @dev HIGH-05: Two security fixes applied here:
+     * @dev Security invariants enforced here (HIGH-05, and audit H5 for item 3):
      *      1. Access control: only the factory that deployed this clone may call this
      *         function, preventing front-running by arbitrary callers.
      *      2. Initialization guard: uses a dedicated `_deliveryInitialized` boolean
      *         instead of checking `_deliveryParams.pickup.latitude == 0`. The latitude
      *         field is a geographic value that can legitimately be 0 (equator/prime
      *         meridian), making it an unreliable sentinel.
+     *      3. audit H5: records the food/delivery settlement breakdown and enforces that
+     *         it accounts for every escrowed wei. Fee-cap validation against the live
+     *         PaymentRouter configuration happens in DeliveryMissionFactory (which holds
+     *         the router address); the arithmetic invariant is enforced here so the escrow
+     *         can never store a breakdown it cannot settle, regardless of the caller.
      * @param deliveryParams Delivery-specific parameters
+     * @param settlement Food/delivery/DAO breakdown used at settlement time
      * @param waypoints Array of waypoints for this delivery
      */
     function initializeDelivery(
         DeliveryParams calldata deliveryParams,
+        DeliverySettlement calldata settlement,
         DeliveryWaypoint[] calldata waypoints
     ) external {
         if (msg.sender != _factory) revert NotFactory();
         if (_deliveryInitialized) revert DeliveryAlreadyInitialized();
 
+        // audit H5: every escrowed wei must have a destination.
+        uint256 breakdown = settlement.foodCost + settlement.deliveryFee + deliveryParams.tipAmount;
+        if (breakdown != _params.rewardAmount) {
+            revert SettlementBreakdownMismatch(_params.rewardAmount, breakdown);
+        }
+
+        // audit H5: a payout with no recipient would be stranded in the PaymentRouter,
+        // breaking the "nothing stuck" invariant. Reject at creation instead.
+        if (
+            (settlement.foodCost > 0 || settlement.subDAOFeeBps > 0)
+            && settlement.restaurantDAO == address(0)
+        ) {
+            revert MissingRestaurantDAO();
+        }
+        if (settlement.metaDAOFeeBps > 0 && settlement.metaDAO == address(0)) {
+            revert MissingMetaDAO();
+        }
+
         _deliveryInitialized = true;
         _deliveryParams = deliveryParams;
+        _settlement = settlement;
 
         // Copy waypoints
         for (uint256 i = 0; i < waypoints.length; i++) {
@@ -324,6 +413,87 @@ contract DeliveryEscrow is MissionEscrow {
     }
 
     // =============================================================================
+    // SETTLEMENT (audit H5 / issue #819)
+    // =============================================================================
+
+    /**
+     * @notice Get the stored food/delivery settlement breakdown
+     * @return The DeliverySettlement recorded at creation
+     */
+    function getSettlement() external view returns (DeliverySettlement memory) {
+        return _settlement;
+    }
+
+    /**
+     * @notice Approve the delivery and settle the order with the correct on-chain split.
+     * @dev audit H5 (issue #819). Replaces the inherited settlement, which routed the whole
+     *      escrow balance to the courier as if it were all reward — paying the courier ~90%
+     *      of the food cost and the restaurant nothing.
+     *
+     *      Payout, summing to exactly `rewardAmount`:
+     *        tipAmount  -> courier directly (100%, no protocol fee)
+     *        foodCost   -> restaurant treasury, in full, via settleRestaurantOrder step 1
+     *        deliveryFee-> hierarchy split via settleRestaurantOrder step 2
+     *                      (courier >= performer floor, then protocol/labs/resolver/DAOs)
+     *
+     *      Safety properties are identical to the base function: onlyPoster,
+     *      inState(Submitted), nonReentrant, and CEI — the state is set to Completed before
+     *      any token transfer. `settleRestaurantOrder` transfers out of the router's own
+     *      balance, so the funds are pushed to the router first (same as the base path).
+     */
+    function approveCompletion()
+        external
+        override
+        onlyPoster
+        inState(MissionState.Submitted)
+        nonReentrant
+    {
+        DeliverySettlement memory settlement = _settlement;
+        uint256 tip = _deliveryParams.tipAmount;
+        uint256 total = _params.rewardAmount;
+
+        // Defense in depth: the invariant is established at creation and preserved by
+        // addTip(), so a mismatch here means storage was corrupted — refuse to pay out.
+        uint256 breakdown = settlement.foodCost + settlement.deliveryFee + tip;
+        if (breakdown != total) revert SettlementBreakdownMismatch(total, breakdown);
+
+        // CEI: finalize state before any external call.
+        _runtime.state = MissionState.Completed;
+
+        address courier = _runtime.performer;
+
+        // Tips belong entirely to the courier — the protocol takes no cut.
+        if (tip > 0) {
+            _token.safeTransfer(courier, tip);
+        }
+
+        uint256 routed = total - tip; // == foodCost + deliveryFee
+        if (routed > 0) {
+            _token.safeTransfer(address(_paymentRouter), routed);
+            _paymentRouter.settleRestaurantOrder(
+                _missionId,
+                courier,
+                address(_token),
+                settlement.foodCost,
+                settlement.deliveryFee,
+                settlement.restaurantDAO,
+                settlement.metaDAO,
+                settlement.subDAOFeeBps,
+                settlement.metaDAOFeeBps
+            );
+        }
+
+        emit DeliveryOrderSettled(
+            _missionId,
+            courier,
+            settlement.foodCost,
+            settlement.deliveryFee,
+            tip
+        );
+        emit MissionCompleted(_missionId);
+    }
+
+    // =============================================================================
     // DELIVERY-SPECIFIC GETTERS
     // =============================================================================
 
@@ -382,6 +552,11 @@ contract DeliveryEscrow is MissionEscrow {
         
         // Manually update state (can't call super with modifiers)
         require(_runtime.state == MissionState.Accepted, "Invalid state");
+
+        // Mirror MissionEscrow.withinSubmissionWindow (modifiers aren't inherited here)
+        if (block.timestamp > _params.expiresAt + SUBMISSION_GRACE_PERIOD) {
+            revert SubmissionWindowClosed();
+        }
         _runtime.proofHash = proofHash;
         _runtime.state = MissionState.Submitted;
         

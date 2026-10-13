@@ -68,6 +68,7 @@ contract BuybackExecutor is AccessControl {
         address _factory,
         address _admin
     ) {
+        require(_router != address(0), "BuybackExecutor: zero router");
         usdc = IERC20(_usdc);
         hrzn = HorizonToken(_hrzn);
         router = IAerodromeRouter(_router);
@@ -82,6 +83,7 @@ contract BuybackExecutor is AccessControl {
 
     /// @notice Update the Aerodrome router (admin only — used to swap testnet mock for mainnet)
     function setRouter(address _router, address _factory) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_router != address(0), "BuybackExecutor: zero router");
         router = IAerodromeRouter(_router);
         aerodromeFactory = _factory;
         emit RouterUpdated(_router, _factory);

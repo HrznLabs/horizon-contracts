@@ -325,6 +325,79 @@ contract ReputationGatingTest is Test {
     }
 
     // =========================================================================
+    // Audit M5: guildless missions must be scored against GLOBAL reputation
+    // =========================================================================
+
+    /// @notice A guildless mission >= 500 USDC auto-floors minReputation to 200. The escrow
+    ///         used to read `guildScores[user][address(0)]`, which is never written, so every
+    ///         performer scored 0 and the mission could never be accepted by anyone.
+    function test_M5_GuildlessPremiumMission_AcceptableWithGlobalScore() public {
+        vm.prank(relayer);
+        oracle.updateGlobalScore(performer, 300);
+        // Guild-scoped score for address(0) stays empty — that is the whole point.
+        assertEq(oracle.getScore(performer, address(0)), 0);
+
+        uint256 mid = _createMissionNoGuild(REWARD_600, 0);
+        address escrow = factory.missions(mid);
+
+        IMissionEscrow.MissionParams memory params = IMissionEscrow(escrow).getParams();
+        assertEq(params.minReputation, 200); // protocol auto-floor
+        assertEq(params.guild, address(0));
+
+        // FAILED BEFORE FIX: reverted with InsufficientReputation(0, 200).
+        vm.prank(performer);
+        IMissionEscrow(escrow).acceptMission();
+
+        IMissionEscrow.MissionRuntime memory rt = IMissionEscrow(escrow).getRuntime();
+        assertEq(rt.performer, performer);
+    }
+
+    /// @notice Reading global reputation must still REJECT under-qualified performers.
+    function test_M5_GuildlessPremiumMission_BlocksLowGlobalScore() public {
+        vm.prank(relayer);
+        oracle.updateGlobalScore(newUser, 150);
+
+        uint256 mid = _createMissionNoGuild(REWARD_600, 0);
+        address escrow = factory.missions(mid);
+
+        vm.prank(newUser);
+        vm.expectRevert(
+            abi.encodeWithSelector(IMissionEscrow.InsufficientReputation.selector, 150, 200)
+        );
+        IMissionEscrow(escrow).acceptMission();
+    }
+
+    /// @notice A high guild score must NOT let a performer through a guildless mission.
+    function test_M5_GuildScore_DoesNotSatisfyGuildlessMission() public {
+        // performer has guild score 500 (from setUp) but no global score.
+        assertEq(oracle.getGlobalScore(performer), 0);
+
+        uint256 mid = _createMissionNoGuild(REWARD_100, 400);
+        address escrow = factory.missions(mid);
+
+        vm.prank(performer);
+        vm.expectRevert(
+            abi.encodeWithSelector(IMissionEscrow.InsufficientReputation.selector, 0, 400)
+        );
+        IMissionEscrow(escrow).acceptMission();
+    }
+
+    /// @notice Regression guard: guild-scoped missions still read the guild-scoped score.
+    function test_M5_GuildMission_StillUsesGuildScopedScore() public {
+        // Global score is 0; guild score is 500.
+        assertEq(oracle.getGlobalScore(performer), 0);
+
+        uint256 mid = _createMission(REWARD_100, 400);
+        address escrow = factory.missions(mid);
+
+        vm.prank(performer);
+        IMissionEscrow(escrow).acceptMission();
+
+        IMissionEscrow.MissionRuntime memory rt = IMissionEscrow(escrow).getRuntime();
+        assertEq(rt.performer, performer);
+    }
+
+    // =========================================================================
     // Fuzz: reputation gating accepts or rejects correctly
     // =========================================================================
 

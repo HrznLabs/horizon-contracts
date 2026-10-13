@@ -35,6 +35,10 @@ interface IInsuranceProvider {
  * @title DeliveriesDAO
  * @notice Specialized guild for delivery missions with insurance pool
  * @dev Manages curated performers and provides insurance coverage
+ *
+ *      OPS NOTE (audit M4): the privileged role here is a single `Ownable` owner that can
+ *      process claims and withdraw pool surplus. Transferring ownership to a multisig /
+ *      the DAO timelock is an operational task and is deliberately NOT encoded here.
  */
 contract DeliveriesDAO is Ownable {
     using SafeERC20 for IERC20;
@@ -49,6 +53,13 @@ contract DeliveriesDAO is Ownable {
     uint256 public insurancePoolBalance;
     uint256 public totalClaimsPaid;
     uint256 public totalPremiumsCollected;
+
+    /// @notice Aggregate coverage backing all currently-active policies.
+    /// @dev Audit M4: premiums are 1–2% of coverage while claims pay up to 100%, and the
+    ///      owner could previously withdraw the entire pool including the premiums backing
+    ///      live policies. This reserve is held 1:1 against outstanding coverage: it caps
+    ///      `withdrawFunds` to genuine surplus and gates new policies on real solvency.
+    uint256 public reservedCoverage;
     
     // Curated performers (verified, trusted)
     mapping(address => bool) public curatedPerformers;
@@ -98,6 +109,8 @@ contract DeliveriesDAO is Ownable {
     event InsuranceClaimProcessed(uint256 indexed claimId, bool approved, uint256 paidAmount);
     event FeesUpdated(uint256 curatedFee, uint256 publicFee);
     event FundsWithdrawn(address indexed recipient, uint256 amount);
+    event PoolFunded(address indexed from, uint256 amount);
+    event PolicyClosed(uint256 indexed missionId, uint256 coverageReleased);
 
     // =============================================================================
     // ERRORS
@@ -108,6 +121,10 @@ contract DeliveriesDAO is Ownable {
     error ClaimAlreadyProcessed();
     error NotAuthorized();
     error InvalidFeeRate();
+    /// @notice The pool cannot back this coverage on top of what is already reserved.
+    error InsufficientSolvency(uint256 available, uint256 required);
+    /// @notice Payout would exceed the policy's coverage.
+    error ExceedsCoverage();
 
     // =============================================================================
     // CONSTRUCTOR
@@ -192,19 +209,30 @@ contract DeliveriesDAO is Ownable {
         uint256 coverageAmount,
         bool curated
     ) external {
+        // `createdAt` is non-zero for every real policy, so this also closes the
+        // missionId == 0 hole left by the old `missionId == 0` sentinel check.
         // slither-disable-next-line incorrect-equality
-        require(policies[missionId].missionId == 0, "Policy already exists");
-        
+        require(policies[missionId].createdAt == 0, "Policy already exists");
+
         uint256 feeRate = curated ? curatedInsuranceFee : publicInsuranceFee;
         uint256 premium = (coverageAmount * feeRate) / 10000;
-        
+
         // Transfer premium from poster
         usdc.safeTransferFrom(msg.sender, address(this), premium);
-        
+
         // Update pool balance
         insurancePoolBalance += premium;
         totalPremiumsCollected += premium;
-        
+
+        // Audit M4: refuse to underwrite coverage the pool cannot actually pay.
+        // Reserving 1:1 means the DAO must capitalise the pool (see fundPool) rather
+        // than pretend 1–2% premiums back 100% payouts.
+        uint256 newReserved = reservedCoverage + coverageAmount;
+        if (newReserved > insurancePoolBalance) {
+            revert InsufficientSolvency(_availableSurplus(), coverageAmount);
+        }
+        reservedCoverage = newReserved;
+
         // Create policy
         policies[missionId] = InsurancePolicy({
             missionId: missionId,
@@ -268,24 +296,34 @@ contract DeliveriesDAO is Ownable {
         uint256 payoutAmount
     ) external onlyOwner {
         InsuranceClaim storage claim = claims[claimId];
-        
+
         if (claim.processed) revert ClaimAlreadyProcessed();
-        
+
         claim.processed = true;
         claim.processedAt = block.timestamp;
         claim.approved = approved;
-        
+
+        InsurancePolicy storage policy = policies[claim.missionId];
+
         if (approved && payoutAmount > 0) {
+            // Audit M4: a payout may never exceed the coverage that was reserved for it.
+            if (payoutAmount > policy.coverageAmount) revert ExceedsCoverage();
             if (payoutAmount > insurancePoolBalance) revert InsufficientPoolBalance();
-            
+
             claim.paidAmount = payoutAmount;
             insurancePoolBalance -= payoutAmount;
             totalClaimsPaid += payoutAmount;
-            
-            // Transfer payout to claimant
-            usdc.safeTransfer(claim.claimant, payoutAmount);
         }
-        
+
+        // Audit M4: the policy is settled either way — release its reserve so the
+        // capital becomes available again for new policies or withdrawal.
+        _releasePolicy(claim.missionId);
+
+        if (claim.paidAmount > 0) {
+            // Transfer payout to claimant (interactions last)
+            usdc.safeTransfer(claim.claimant, claim.paidAmount);
+        }
+
         emit InsuranceClaimProcessed(claimId, approved, payoutAmount);
     }
 
@@ -319,15 +357,67 @@ contract DeliveriesDAO is Ownable {
     }
 
     /**
-     * @notice Withdraw excess funds from insurance pool
+     * @notice Capitalise the insurance pool.
+     * @dev Audit M4: policies are reserved 1:1 against the pool, so the DAO must fund it
+     *      with real capital before it can underwrite coverage that premiums alone
+     *      (1–2% of coverage) could never pay. Permissionless — anyone may donate.
+     * @param amount USDC to pull from the caller into the pool.
+     */
+    function fundPool(uint256 amount) external {
+        require(amount > 0, "Zero amount");
+        usdc.safeTransferFrom(msg.sender, address(this), amount);
+        insurancePoolBalance += amount;
+        emit PoolFunded(msg.sender, amount);
+    }
+
+    /**
+     * @notice Close an active policy that will never be claimed (delivery completed).
+     * @dev Frees the reserved coverage so it can back new policies or be withdrawn.
+     * @param missionId Mission whose policy should be closed.
+     */
+    function closePolicy(uint256 missionId) external onlyOwner {
+        InsurancePolicy storage policy = policies[missionId];
+        if (!policy.active) revert PolicyNotActive();
+        require(!policy.claimed, "Claim pending");
+        _releasePolicy(missionId);
+    }
+
+    /**
+     * @notice Withdraw surplus funds from insurance pool
+     * @dev Audit M4: capped at the genuine surplus (`balance − reservedCoverage`) so the
+     *      owner can no longer drain capital backing live policies.
      * @param amount Amount to withdraw
      * @param recipient Address to receive funds
      */
     function withdrawFunds(uint256 amount, address recipient) external onlyOwner {
-        require(amount <= insurancePoolBalance, "Insufficient balance");
+        require(amount <= _availableSurplus(), "Insufficient balance");
         insurancePoolBalance -= amount;
         usdc.safeTransfer(recipient, amount);
         emit FundsWithdrawn(recipient, amount);
+    }
+
+    // =============================================================================
+    // INTERNAL
+    // =============================================================================
+
+    /// @notice Pool capital not reserved against outstanding coverage.
+    function _availableSurplus() internal view returns (uint256) {
+        uint256 balance = insurancePoolBalance;
+        uint256 reserved = reservedCoverage;
+        return balance > reserved ? balance - reserved : 0;
+    }
+
+    /// @notice Deactivate a policy and release its reserved coverage (idempotent).
+    function _releasePolicy(uint256 missionId) internal {
+        InsurancePolicy storage policy = policies[missionId];
+        if (!policy.active) return;
+
+        policy.active = false;
+        uint256 coverage = policy.coverageAmount;
+        // Defensive: never underflow even if `sync()` or an upgrade skewed the tracker.
+        reservedCoverage = reservedCoverage > coverage ? reservedCoverage - coverage : 0;
+
+        emit PolicyClosed(missionId, coverage);
     }
 
     // =============================================================================
@@ -350,6 +440,15 @@ contract DeliveriesDAO is Ownable {
      */
     function getClaim(uint256 claimId) external view returns (InsuranceClaim memory) {
         return claims[claimId];
+    }
+
+    /**
+     * @notice Pool capital that is NOT reserved against outstanding coverage.
+     * @dev This is the maximum `withdrawFunds` will release, and the headroom available
+     *      for underwriting new policies.
+     */
+    function availableSurplus() external view returns (uint256) {
+        return _availableSurplus();
     }
 
     /**

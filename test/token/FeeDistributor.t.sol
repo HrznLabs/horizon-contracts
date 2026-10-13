@@ -165,6 +165,132 @@ contract FeeDistributorTest is Test {
     }
 
     // -------------------------------------------------------------------------
+    // Audit M3(a): removeGuild must also drop the guild's volume
+    // -------------------------------------------------------------------------
+
+    function _grantVolumeRole() internal {
+        bytes32 volumeRole = distributor.VOLUME_RECORDER_ROLE();
+        vm.prank(admin);
+        distributor.grantRole(volumeRole, admin);
+    }
+
+    function test_M3a_RemoveGuild_DropsVolumeFromDenominator() public {
+        _grantVolumeRole();
+        vm.prank(admin);
+        distributor.recordGuildVolume(guild1, 7000e6);
+        vm.prank(admin);
+        distributor.recordGuildVolume(guild2, 3000e6);
+        assertEq(distributor.totalGuildVolume(), 10_000e6);
+
+        vm.prank(admin);
+        distributor.removeGuild(guild2);
+
+        // FAILED BEFORE FIX: totalGuildVolume stayed at 10_000e6 and guildVolume[guild2]
+        // was never cleared.
+        assertEq(distributor.totalGuildVolume(), 7000e6);
+        assertEq(distributor.guildVolume(guild2), 0);
+
+        vm.prank(admin);
+        distributor.distribute(DISTRIBUTE_AMOUNT);
+
+        // guild1 is now the only volume holder and takes the whole 30% guild slice.
+        assertEq(usdc.balanceOf(guild1), 3000e6);
+        assertEq(usdc.balanceOf(guild2), 0);
+        // FAILED BEFORE FIX: 900 USDC (guild2's stale 30% share) was stranded here.
+        assertEq(usdc.balanceOf(address(distributor)), 0);
+    }
+
+    function test_M3a_ReRegisteredGuild_DoesNotInheritStaleVolume() public {
+        _grantVolumeRole();
+        vm.prank(admin);
+        distributor.recordGuildVolume(guild1, 5000e6);
+
+        vm.prank(admin);
+        distributor.removeGuild(guild1);
+        vm.prank(admin);
+        distributor.registerGuild(guild1);
+
+        // FAILED BEFORE FIX: guildVolume[guild1] was still 5000e6.
+        assertEq(distributor.guildVolume(guild1), 0);
+        assertEq(distributor.totalGuildVolume(), 0);
+    }
+
+    // -------------------------------------------------------------------------
+    // Audit M3(b): per-guild flooring dust must be forwarded, not stranded
+    // -------------------------------------------------------------------------
+
+    function test_M3b_GuildRoundingDust_GoesToTreasury() public {
+        address guild3 = makeAddr("guild3");
+        vm.prank(admin);
+        distributor.registerGuild(guild3);
+
+        _grantVolumeRole();
+        // Volumes 1 : 2 : 4 — the 30% guild slice does not divide evenly by 7.
+        vm.prank(admin);
+        distributor.recordGuildVolume(guild1, 1);
+        vm.prank(admin);
+        distributor.recordGuildVolume(guild2, 2);
+        vm.prank(admin);
+        distributor.recordGuildVolume(guild3, 4);
+
+        uint256 treasuryBefore = usdc.balanceOf(treasury);
+
+        vm.prank(admin);
+        distributor.distribute(DISTRIBUTE_AMOUNT);
+
+        uint256 guildTotal = 3000e6;
+        uint256 paid = usdc.balanceOf(guild1) + usdc.balanceOf(guild2) + usdc.balanceOf(guild3);
+        assertLt(paid, guildTotal, "precondition: flooring must leave dust");
+
+        // FAILED BEFORE FIX: the dust stayed in the distributor forever.
+        assertEq(usdc.balanceOf(address(distributor)), 0);
+        assertEq(
+            usdc.balanceOf(treasury),
+            treasuryBefore - DISTRIBUTE_AMOUNT + 2000e6 + (guildTotal - paid)
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Audit M3(c): distribution must not be blocked when the vault has no stakers
+    // -------------------------------------------------------------------------
+
+    function _freshDistributorWithEmptyVault() internal returns (FeeDistributor d, sHRZNVault v) {
+        v = new sHRZNVault(address(hrzn), address(usdc), admin);
+        d = new FeeDistributor(address(usdc), address(v), treasury, resolverPool, admin);
+        bytes32 distRole = v.DISTRIBUTOR_ROLE(); // resolve before pranking
+        vm.prank(admin);
+        v.grantRole(distRole, address(d));
+        vm.prank(treasury);
+        usdc.approve(address(d), type(uint256).max);
+    }
+
+    function test_M3c_Distribute_WithNoStakers_Succeeds() public {
+        (FeeDistributor d, sHRZNVault v) = _freshDistributorWithEmptyVault();
+        assertEq(v.totalSupply(), 0, "precondition: vault must be empty");
+
+        uint256 treasuryBefore = usdc.balanceOf(treasury);
+        uint256 resolverBefore = usdc.balanceOf(resolverPool);
+
+        // FAILED BEFORE FIX: reverted inside sHRZNVault.notifyRewardAmount (supply == 0),
+        // blocking ALL fee distribution until somebody staked.
+        vm.prank(admin);
+        d.distribute(DISTRIBUTE_AMOUNT);
+
+        // Staker slice (40%) + guild slice (30%, no volume) + treasury slice (20%) = 90%.
+        assertEq(usdc.balanceOf(address(v)), 0);
+        assertEq(usdc.balanceOf(treasury), treasuryBefore - DISTRIBUTE_AMOUNT + 9000e6);
+        assertEq(usdc.balanceOf(resolverPool), resolverBefore + 1000e6);
+        assertEq(usdc.balanceOf(address(d)), 0);
+    }
+
+    function test_M3c_Distribute_WithStakers_StillFundsVault() public {
+        // Regression guard: the fallback must not fire when the vault has supply.
+        vm.prank(admin);
+        distributor.distribute(DISTRIBUTE_AMOUNT);
+        assertEq(usdc.balanceOf(address(vault)), 4000e6);
+    }
+
+    // -------------------------------------------------------------------------
     // Fuzz
     // -------------------------------------------------------------------------
 

@@ -45,12 +45,22 @@ contract HorizonVesting is Ownable {
     /// @notice Whether the vesting schedule has been revoked by the owner.
     bool public revoked;
 
+    /// @notice Amount that had accrued to the beneficiary at the moment of revocation
+    ///         and is still claimable via `release()`.
+    /// @dev Audit M1: `vestedAmount()` returns 0 once `revoked == true`, so without this
+    ///      snapshot the already-accrued balance deliberately left in the contract by
+    ///      `revoke()` would be permanently unclaimable. Set once in `revoke()` and
+    ///      zeroed when the beneficiary claims it.
+    uint256 public revokedReleasable;
+
     // -------------------------------------------------------------------------
     // Events
     // -------------------------------------------------------------------------
 
     event TokensReleased(uint256 amount);
     event VestingRevoked(uint256 returnedToTreasury);
+    /// @notice Emitted alongside VestingRevoked with the amount left claimable by the beneficiary.
+    event RevokedReleasableRecorded(uint256 claimable);
 
     // -------------------------------------------------------------------------
     // Constructor
@@ -99,7 +109,10 @@ contract HorizonVesting is Ownable {
     }
 
     /// @notice Returns the amount currently claimable by the beneficiary.
+    /// @dev After revocation the schedule no longer accrues, so the claimable amount is
+    ///      frozen at the snapshot taken in `revoke()` (audit M1).
     function releasable() public view returns (uint256) {
+        if (revoked) return revokedReleasable;
         uint256 vested = vestedAmount(uint64(block.timestamp));
         return vested > released ? vested - released : 0;
     }
@@ -114,6 +127,8 @@ contract HorizonVesting is Ownable {
         require(msg.sender == beneficiary, "HorizonVesting: not beneficiary");
         uint256 amount = releasable();
         require(amount > 0, "HorizonVesting: nothing to release");
+        // Post-revocation the claim is one-shot: consume the frozen snapshot.
+        if (revoked) revokedReleasable = 0;
         released += amount;
         emit TokensReleased(amount);
         token.safeTransfer(beneficiary, amount);
@@ -138,8 +153,14 @@ contract HorizonVesting is Ownable {
 
         revoked = true;
 
+        // Audit M1: freeze the accrued-but-unclaimed amount so `releasable()` can still
+        // report it. Without this the tokens deliberately left behind below would be
+        // stranded forever, because `vestedAmount()` short-circuits to 0 once revoked.
+        revokedReleasable = releasableNow;
+
         uint256 unvested = token.balanceOf(address(this)) - releasableNow;
 
+        emit RevokedReleasableRecorded(releasableNow);
         emit VestingRevoked(unvested);
         if (unvested > 0) {
             token.safeTransfer(treasury, unvested);
