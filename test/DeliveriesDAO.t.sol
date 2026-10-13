@@ -16,6 +16,12 @@ contract DeliveriesDAOTest is Test {
 
     uint256 public constant INITIAL_BALANCE = 10000e6; // 10,000 USDC
 
+    /// @notice Capital seeded into the insurance pool by the DAO.
+    /// @dev Audit M4: policies are now reserved 1:1 against pool capital, so the pool must
+    ///      be genuinely funded before it can underwrite anything. Premiums (1–2% of
+    ///      coverage) can never back 100% payouts on their own.
+    uint256 public constant POOL_SEED = 1000e6; // 1,000 USDC
+
     function setUp() public {
         vm.startPrank(owner);
 
@@ -29,6 +35,19 @@ contract DeliveriesDAOTest is Test {
 
         // Mint USDC to poster
         usdc.mint(poster, INITIAL_BALANCE);
+
+        // Capitalise the insurance pool so policies can actually be underwritten.
+        usdc.mint(owner, POOL_SEED);
+        vm.startPrank(owner);
+        usdc.approve(address(dao), POOL_SEED);
+        dao.fundPool(POOL_SEED);
+        vm.stopPrank();
+    }
+
+    /// @notice A DAO whose insurance pool has NOT been capitalised.
+    function _uncapitalisedDao() internal returns (DeliveriesDAO fresh) {
+        vm.prank(owner);
+        fresh = new DeliveriesDAO(address(usdc));
     }
 
     // =============================================================================
@@ -145,8 +164,10 @@ contract DeliveriesDAOTest is Test {
 
         // Verify pool balance updated
         (uint256 poolBalance, , uint256 totalPremiums) = dao.getPoolStats();
-        assertEq(poolBalance, 2e6);
+        assertEq(poolBalance, POOL_SEED + 2e6);
         assertEq(totalPremiums, 2e6);
+        // Coverage is now reserved against the pool.
+        assertEq(dao.reservedCoverage(), coverageAmount);
     }
 
     function test_CreateInsurancePolicy_Curated() public {
@@ -257,8 +278,10 @@ contract DeliveriesDAOTest is Test {
 
         // Verify pool balance decreased
         (uint256 poolBalance, uint256 totalClaims, ) = dao.getPoolStats();
-        assertEq(poolBalance, 0.5e6); // 2 USDC premium - 1.5 USDC payout
+        assertEq(poolBalance, POOL_SEED + 2e6 - 1.5e6);
         assertEq(totalClaims, 1.5e6);
+        // Settling the claim releases the policy's reserve.
+        assertEq(dao.reservedCoverage(), 0);
     }
 
     function test_ProcessInsuranceClaim_Rejected() public {
@@ -309,21 +332,27 @@ contract DeliveriesDAOTest is Test {
         vm.stopPrank();
     }
 
-    function test_RevertWhen_InsufficientPoolBalance() public {
-        // Create policy with small premium
+    /// @dev Audit M4 replaced the old `test_RevertWhen_InsufficientPoolBalance`. That test
+    ///      asserted the pool could underwrite 100 USDC of coverage on a 2 USDC premium and
+    ///      only fail at payout time. Policies are now reserved 1:1, so an under-capitalised
+    ///      pool is rejected at creation (see test_M4_CreatePolicy_RejectedWhenInsolvent)
+    ///      and InsufficientPoolBalance is unreachable through the normal flow. The payout
+    ///      ceiling that IS reachable — payout > coverage — is asserted here instead.
+    function test_RevertWhen_PayoutExceedsCoverage() public {
         uint256 missionId = 1;
         uint256 coverageAmount = 100e6;
-        
+
         vm.startPrank(poster);
         usdc.approve(address(dao), 2e6);
         dao.createInsurancePolicy(missionId, coverageAmount, false);
         dao.submitInsuranceClaim(missionId, keccak256("evidence"), 100e6);
         vm.stopPrank();
 
-        // Try to approve claim for more than pool has
+        // The owner cannot pay out more than the policy covers, even though the
+        // (now capitalised) pool physically holds enough USDC.
         vm.prank(owner);
-        vm.expectRevert(DeliveriesDAO.InsufficientPoolBalance.selector);
-        dao.processInsuranceClaim(0, true, 100e6); // Pool only has 2 USDC
+        vm.expectRevert(DeliveriesDAO.ExceedsCoverage.selector);
+        dao.processInsuranceClaim(0, true, coverageAmount + 1);
     }
 
     // =============================================================================
@@ -350,13 +379,13 @@ contract DeliveriesDAOTest is Test {
         // Verify withdrawal
         assertEq(usdc.balanceOf(recipient), withdrawAmount);
         (uint256 poolBalance, , ) = dao.getPoolStats();
-        assertEq(poolBalance, 1e6); // 2 USDC - 1 USDC withdrawn
+        assertEq(poolBalance, POOL_SEED + 2e6 - withdrawAmount);
     }
 
     function test_RevertWhen_WithdrawExceedsBalance() public {
         vm.prank(owner);
         vm.expectRevert("Insufficient balance");
-        dao.withdrawFunds(1e6, address(5)); // Pool is empty
+        dao.withdrawFunds(POOL_SEED + 1, address(5)); // More than the pool holds
     }
 
     function test_GetPoolStats() public {
@@ -368,8 +397,197 @@ contract DeliveriesDAOTest is Test {
         vm.stopPrank();
 
         (uint256 poolBalance, uint256 totalClaims, uint256 totalPremiums) = dao.getPoolStats();
-        assertEq(poolBalance, 3e6);
+        assertEq(poolBalance, POOL_SEED + 3e6);
         assertEq(totalClaims, 0);
         assertEq(totalPremiums, 3e6);
+    }
+
+    // =============================================================================
+    // AUDIT M4: INSURANCE POOL SOLVENCY
+    // =============================================================================
+
+    /// @notice The owner must not be able to move capital that backs live policies.
+    function test_M4_WithdrawFunds_CannotDrainReservedCoverage() public {
+        uint256 coverage = 900e6;
+        uint256 premium = (coverage * 200) / 10_000; // 2% public rate = 18 USDC
+
+        vm.startPrank(poster);
+        usdc.approve(address(dao), premium);
+        dao.createInsurancePolicy(1, coverage, false);
+        vm.stopPrank();
+
+        uint256 poolBalance = dao.insurancePoolBalance();
+        assertEq(poolBalance, POOL_SEED + premium);
+        assertEq(dao.reservedCoverage(), coverage);
+        assertEq(dao.availableSurplus(), poolBalance - coverage);
+
+        // FAILED BEFORE FIX: the owner could withdraw the entire pool, including the
+        // capital backing the live policy.
+        vm.prank(owner);
+        vm.expectRevert("Insufficient balance");
+        dao.withdrawFunds(poolBalance, address(5));
+
+        // One wei above the surplus is still refused...
+        uint256 surplus = dao.availableSurplus(); // resolve before arming expectRevert
+        vm.prank(owner);
+        vm.expectRevert("Insufficient balance");
+        dao.withdrawFunds(surplus + 1, address(5));
+
+        // ...but the genuine surplus is withdrawable, leaving coverage fully backed.
+        vm.prank(owner);
+        dao.withdrawFunds(surplus, address(5));
+
+        assertEq(usdc.balanceOf(address(5)), surplus);
+        assertEq(dao.insurancePoolBalance(), coverage);
+        assertEq(dao.availableSurplus(), 0);
+        // The pool can still pay the policy in full.
+        assertGe(usdc.balanceOf(address(dao)), coverage);
+    }
+
+    /// @notice A pool holding only premiums cannot underwrite 100% coverage.
+    function test_M4_CreatePolicy_RejectedWhenInsolvent() public {
+        DeliveriesDAO fresh = _uncapitalisedDao();
+
+        vm.startPrank(poster);
+        usdc.approve(address(fresh), 2e6);
+        // FAILED BEFORE FIX: this succeeded, creating 100 USDC of coverage backed by a
+        // 2 USDC premium.
+        vm.expectRevert(
+            abi.encodeWithSelector(DeliveriesDAO.InsufficientSolvency.selector, 2e6, 100e6)
+        );
+        fresh.createInsurancePolicy(1, 100e6, false);
+        vm.stopPrank();
+    }
+
+    /// @notice Policies are rejected once cumulative coverage would exceed the pool.
+    function test_M4_CreatePolicy_RejectedWhenCumulativeCoverageExceedsPool() public {
+        // First policy: 900 USDC coverage against a 1000 USDC pool — fine.
+        vm.startPrank(poster);
+        usdc.approve(address(dao), type(uint256).max);
+        dao.createInsurancePolicy(1, 900e6, false);
+
+        // Second policy would push reserved coverage past the pool balance.
+        vm.expectRevert();
+        dao.createInsurancePolicy(2, 900e6, false);
+        vm.stopPrank();
+
+        assertEq(dao.reservedCoverage(), 900e6);
+    }
+
+    function test_M4_FundPool_RestoresSolvencyHeadroom() public {
+        DeliveriesDAO fresh = _uncapitalisedDao();
+        assertEq(fresh.availableSurplus(), 0);
+
+        usdc.mint(owner, 500e6);
+        vm.startPrank(owner);
+        usdc.approve(address(fresh), 500e6);
+        fresh.fundPool(500e6);
+        vm.stopPrank();
+
+        assertEq(fresh.insurancePoolBalance(), 500e6);
+        assertEq(fresh.availableSurplus(), 500e6);
+
+        vm.startPrank(poster);
+        usdc.approve(address(fresh), 2e6);
+        fresh.createInsurancePolicy(1, 100e6, false);
+        vm.stopPrank();
+
+        assertEq(fresh.reservedCoverage(), 100e6);
+        assertEq(fresh.availableSurplus(), 500e6 + 2e6 - 100e6);
+    }
+
+    /// @notice Settling a claim frees the reserve so the capital is reusable.
+    function test_M4_ProcessClaim_ReleasesReserve() public {
+        vm.startPrank(poster);
+        usdc.approve(address(dao), 2e6);
+        dao.createInsurancePolicy(1, 100e6, false);
+        dao.submitInsuranceClaim(1, keccak256("evidence"), 40e6);
+        vm.stopPrank();
+
+        assertEq(dao.reservedCoverage(), 100e6);
+
+        vm.prank(owner);
+        dao.processInsuranceClaim(0, true, 40e6);
+
+        assertEq(dao.reservedCoverage(), 0);
+        assertFalse(dao.getPolicy(1).active);
+        assertEq(dao.availableSurplus(), dao.insurancePoolBalance());
+    }
+
+    /// @notice A rejected claim also closes the policy and frees its reserve.
+    function test_M4_RejectedClaim_ReleasesReserve() public {
+        vm.startPrank(poster);
+        usdc.approve(address(dao), 2e6);
+        dao.createInsurancePolicy(1, 100e6, false);
+        dao.submitInsuranceClaim(1, keccak256("evidence"), 40e6);
+        vm.stopPrank();
+
+        vm.prank(owner);
+        dao.processInsuranceClaim(0, false, 0);
+
+        assertEq(dao.reservedCoverage(), 0);
+        assertFalse(dao.getPolicy(1).active);
+    }
+
+    /// @notice Completed deliveries can be closed out to recycle their reserve.
+    function test_M4_ClosePolicy_ReleasesReserve() public {
+        vm.startPrank(poster);
+        usdc.approve(address(dao), 2e6);
+        dao.createInsurancePolicy(1, 100e6, false);
+        vm.stopPrank();
+
+        assertEq(dao.reservedCoverage(), 100e6);
+
+        vm.prank(owner);
+        dao.closePolicy(1);
+
+        assertEq(dao.reservedCoverage(), 0);
+        assertFalse(dao.getPolicy(1).active);
+
+        // Closing twice is refused.
+        vm.prank(owner);
+        vm.expectRevert(DeliveriesDAO.PolicyNotActive.selector);
+        dao.closePolicy(1);
+    }
+
+    function test_M4_ClosePolicy_NonOwner_Reverts() public {
+        vm.startPrank(poster);
+        usdc.approve(address(dao), 2e6);
+        dao.createInsurancePolicy(1, 100e6, false);
+        vm.stopPrank();
+
+        vm.prank(poster);
+        vm.expectRevert();
+        dao.closePolicy(1);
+    }
+
+    /// @notice A pending claim blocks the shortcut close so reserves stay put.
+    function test_M4_ClosePolicy_WithPendingClaim_Reverts() public {
+        vm.startPrank(poster);
+        usdc.approve(address(dao), 2e6);
+        dao.createInsurancePolicy(1, 100e6, false);
+        dao.submitInsuranceClaim(1, keccak256("evidence"), 40e6);
+        vm.stopPrank();
+
+        vm.prank(owner);
+        vm.expectRevert("Claim pending");
+        dao.closePolicy(1);
+
+        assertEq(dao.reservedCoverage(), 100e6);
+    }
+
+    /// @notice Mission id 0 must not be a re-creatable policy slot.
+    function test_M4_PolicyZero_CannotBeOverwritten() public {
+        vm.startPrank(poster);
+        usdc.approve(address(dao), 4e6);
+        dao.createInsurancePolicy(0, 100e6, false);
+
+        // FAILED BEFORE FIX: the old `missionId == 0` sentinel let mission 0's policy be
+        // recreated indefinitely, double-counting premiums and (now) reserves.
+        vm.expectRevert("Policy already exists");
+        dao.createInsurancePolicy(0, 100e6, false);
+        vm.stopPrank();
+
+        assertEq(dao.reservedCoverage(), 100e6);
     }
 }

@@ -68,13 +68,26 @@ contract sHRZNVault is ERC4626, AccessControl, ReentrancyGuard {
     // HIGH-01: ERC-4626 inflation attack protection
     // -------------------------------------------------------------------------
 
-    /// @dev Returns a decimal offset of 3, which injects 1_000 virtual shares and
-    ///      1_000 virtual assets into the ERC-4626 share-price calculation.
-    ///      This makes the classic first-depositor inflation attack uneconomical:
-    ///      an attacker would need to donate ~1_000x the victim's deposit to move
-    ///      the share price enough to round their deposit to zero. See HIGH-01.
+    /// @dev Returns a decimal offset of 6, injecting 1e6 virtual shares/assets into
+    ///      the ERC-4626 share-price calculation. Combined with the `shares > 0`
+    ///      guard in the deposit path below, this defeats the first-depositor
+    ///      inflation/donation attack: an attacker would need to donate ~1e6x the
+    ///      victim's deposit to round it toward zero, and even then the guard reverts
+    ///      a zero-share mint rather than silently absorbing the victim's assets.
+    ///      See HIGH-01 / audit H1.
     function _decimalsOffset() internal pure override returns (uint8) {
-        return 3;
+        return 6;
+    }
+
+    /// @dev Guard every share-minting deposit against rounding to zero shares (which
+    ///      would take the depositor's assets while minting nothing). Covers both
+    ///      `deposit` and `mint` since ERC4626 routes both through `_deposit`.
+    function _deposit(address caller, address receiver, uint256 assets, uint256 shares)
+        internal
+        override
+    {
+        require(shares > 0, "sHRZNVault: zero shares");
+        super._deposit(caller, receiver, assets, shares);
     }
 
     // -------------------------------------------------------------------------
@@ -97,6 +110,10 @@ contract sHRZNVault is ERC4626, AccessControl, ReentrancyGuard {
     ///      The 1e30 scalar corrects for the 12-decimal mismatch between USDC (6)
     ///      and sHRZN shares (18 + 3 virtual). See HIGH-02.
     function earned(address account) public view returns (uint256) {
+        // Escrowed shares (held by this contract during a cooldown) do not earn — see
+        // notifyRewardAmount. Return 0 for the escrow address so no phantom rewards
+        // can ever be accounted against it.
+        if (account == address(this)) return 0;
         return (balanceOf(account) * (rewardPerTokenStored - userRewardPerTokenPaid[account])) / 1e30
             + rewards[account];
     }
@@ -108,7 +125,11 @@ contract sHRZNVault is ERC4626, AccessControl, ReentrancyGuard {
     ///      Without this correction, small USDC reward amounts would lose all
     ///      precision after integer division. See HIGH-02.
     function notifyRewardAmount(uint256 usdcAmount) external onlyRole(DISTRIBUTOR_ROLE) {
-        uint256 supply = totalSupply();
+        // MED-04/audit M2: escrowed shares (held by this contract during a cooldown)
+        // must NOT earn rewards — they belong to a user who has already committed to
+        // exiting. Exclude them from the distribution denominator so the full reward
+        // goes to circulating stakers and nothing is stranded on address(this).
+        uint256 supply = totalSupply() - balanceOf(address(this));
         require(supply > 0, "sHRZNVault: no stakers");
         rewardPerTokenStored += (usdcAmount * 1e30) / supply;
         emit RewardAdded(usdcAmount);
@@ -137,11 +158,13 @@ contract sHRZNVault is ERC4626, AccessControl, ReentrancyGuard {
         require(balanceOf(msg.sender) >= shares, "sHRZNVault: insufficient shares");
         require(unstakeRequests[msg.sender].shares == 0, "sHRZNVault: pending request");
 
-        unstakeRequests[msg.sender] = UnstakeRequest({shares: shares, requestedAt: block.timestamp});
-
-        // Transfer shares to escrow (this contract) so they cannot be transferred
-        // or used to claim rewards during the cooldown period. See MED-04.
+        // audit C1: escrow the shares FIRST (while the sender has no pending request),
+        // THEN record the request. The previous order set the request before the
+        // transfer, and the _update cooldown-lock then reverted the escrow transfer
+        // itself — bricking unstaking entirely and locking all deposits.
         _transfer(msg.sender, address(this), shares);
+
+        unstakeRequests[msg.sender] = UnstakeRequest({shares: shares, requestedAt: block.timestamp});
 
         emit UnstakeRequested(msg.sender, shares);
     }
@@ -157,9 +180,10 @@ contract sHRZNVault is ERC4626, AccessControl, ReentrancyGuard {
         emit UnstakeCompleted(msg.sender, assets);
 
         // Burn escrowed shares from this contract and release underlying HRZN to user.
-        // We call _withdraw with owner=address(this) since the escrowed shares belong
-        // to this contract's balance.
-        _withdraw(msg.sender, msg.sender, address(this), assets, req.shares);
+        // caller AND owner are address(this): the escrowed shares belong to the vault,
+        // so OZ's _withdraw must NOT try to spend a caller allowance (it would revert
+        // ERC20InsufficientAllowance). receiver is the user.
+        _withdraw(address(this), msg.sender, address(this), assets, req.shares);
     }
 
     // -------------------------------------------------------------------------
@@ -202,22 +226,20 @@ contract sHRZNVault is ERC4626, AccessControl, ReentrancyGuard {
     ///      Note: transfers FROM address(this) are allowed — that is the escrow
     ///      release path used by `completeUnstake` → `_withdraw`.
     function _update(address from, address to, uint256 value) internal override {
-        // MED-04: block outbound transfers from users with pending unstake requests.
-        // Exempt address(this) so that escrow-release in completeUnstake is not blocked.
+        // audit C1/M2: the previous MED-04 transfer-lock has been removed — it is
+        // redundant (escrowed shares live on address(this), which the user cannot
+        // transfer; and moving non-escrowed shares gains nothing since redeeming
+        // from any wallet still requires its own requestUnstake + 7-day cooldown),
+        // and it was what reverted the escrow transfer inside requestUnstake.
+        //
+        // Snapshot rewards before balances change. address(this) is skipped so
+        // escrowed shares never accrue (they are also excluded from the reward
+        // denominator in notifyRewardAmount) — no dilution, nothing stranded.
         if (from != address(0) && from != address(this)) {
-            require(
-                unstakeRequests[from].shares == 0,
-                "sHRZNVault: shares locked in cooldown"
-            );
-        }
-
-        // Snapshot sender rewards before their balance changes
-        if (from != address(0)) {
             rewards[from] = earned(from);
             userRewardPerTokenPaid[from] = rewardPerTokenStored;
         }
-        // Snapshot receiver rewards before their balance changes
-        if (to != address(0)) {
+        if (to != address(0) && to != address(this)) {
             rewards[to] = earned(to);
             userRewardPerTokenPaid[to] = rewardPerTokenStored;
         }
