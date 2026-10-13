@@ -1,15 +1,22 @@
 name: CI
 
+# Unit tests only. Static checks (build, sizes, fmt) run locally in the
+# monorepo (packages/contracts), which this repo mirrors read-only.
 on:
-  push:
-    branches: [main, staging]
   pull_request:
     branches: [main, staging]
+  push:
+    branches: [staging]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Forge build & test
+  test:
+    name: Forge test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -19,9 +26,31 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
 
-      - name: Build
-        run: forge build --sizes
+      - name: Restore solc and forge artifacts
+        id: forge-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            cache
+            out
+            ~/.svm
+          key: forge-${{ runner.os }}-${{ hashFiles('foundry.toml', 'foundry.lock', 'src/**/*.sol', 'lib/**/*.sol') }}
+          restore-keys: |
+            forge-${{ runner.os }}-
 
       - name: Run tests
-        run: forge test -v
+        run: forge test -vv
+
+      # Save even when tests fail, so a red run does not leave the next one cold.
+      - name: Save solc and forge artifacts
+        if: always() && steps.forge-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            cache
+            out
+            ~/.svm
+          key: ${{ steps.forge-cache.outputs.cache-primary-key }}
