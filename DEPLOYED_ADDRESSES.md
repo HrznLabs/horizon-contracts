@@ -38,7 +38,7 @@
 | [LisboaCafe (SubDAO)](./src/DeliveriesDAO.sol) | [`0xAA0096E1038449220dB872c19BDF9CD6d619b7BA`](https://sepolia.basescan.org/address/0xAA0096E1038449220dB872c19BDF9CD6d619b7BA#code) | [View](https://sepolia.basescan.org/address/0xAA0096E1038449220dB872c19BDF9CD6d619b7BA#code) |
 | [DeliveryMissionFactory](./src/DeliveryMissionFactory.sol) | [`0xf02Cdc9eD74E2fd63Cc98ED10e78A53512e25d53`](https://sepolia.basescan.org/address/0xf02Cdc9eD74E2fd63Cc98ED10e78A53512e25d53#code) | [View](https://sepolia.basescan.org/address/0xf02Cdc9eD74E2fd63Cc98ED10e78A53512e25d53#code) |
 | [DeliveryEscrow (Implementation)](./src/DeliveryEscrow.sol) | [`0x0A2F4Eeed28D630f0592068054e974991eBFe08B`](https://sepolia.basescan.org/address/0x0A2F4Eeed28D630f0592068054e974991eBFe08B#code) | [View](https://sepolia.basescan.org/address/0x0A2F4Eeed28D630f0592068054e974991eBFe08B#code) |
-| [DeliveriesDAO](./src/DeliveriesDAO.sol) | [`0xaB2F7787b72FcFfEA8E543375FE2db44D9C6ae53`](https://sepolia.basescan.org/address/0xaB2F7787b72FcFfEA8E543375FE2db44D9C6ae53#code) | [View](https://sepolia.basescan.org/address/0xaB2F7787b72FcFfEA8E543375FE2db44D9C6ae53#code) |
+| [DeliveriesDAO](./src/DeliveriesDAO.sol) | [`0x00C363a950CC39ab3c9623103cFB23bBB2303F0D`](https://sepolia.basescan.org/address/0x00C363a950CC39ab3c9623103cFB23bBB2303F0D#code) | [View](https://sepolia.basescan.org/address/0x00C363a950CC39ab3c9623103cFB23bBB2303F0D#code) |
 | [GuildFactory (iTake)](./src/GuildFactory.sol) | [`0xB3720D5f3Ff1A6385aC0C1f54f88536F68a967F3`](https://sepolia.basescan.org/address/0xB3720D5f3Ff1A6385aC0C1f54f88536F68a967F3#code) | [View](https://sepolia.basescan.org/address/0xB3720D5f3Ff1A6385aC0C1f54f88536F68a967F3#code) |
 | [GuildDAO (Implementation, iTake)](./src/GuildDAO.sol) | [`0x456D4c04F9001fDE8cdc306dd6b07a79655BB131`](https://sepolia.basescan.org/address/0x456D4c04F9001fDE8cdc306dd6b07a79655BB131#code) | [View](https://sepolia.basescan.org/address/0x456D4c04F9001fDE8cdc306dd6b07a79655BB131#code) |
 
@@ -68,6 +68,16 @@ Deployed and BaseScan-verified by `0x2b30efBA367D669c9cd7723587346a79b67A42DB`. 
 | PauseRegistry | `0x05Ec569d16Ac6b7B5dEB8B815976512CED645A87` | 48092227 | n/a (first deployment) |
 
 Wiring: `PaymentRouter.setMissionFactory(MissionFactory)`, `MissionFactory.setDisputeResolver(DisputeResolver)`, `MissionFactory.setPauseRegistry(PauseRegistry)`, and `DeliveryMissionFactory.setDisputeResolver(DisputeResolver)`. Full tx list: `script/README.md`.
+
+### 2026-10-14 DeliveriesDAO Redeploy (Base Sepolia)
+
+Deployed and BaseScan-verified by `0x2b30efBA367D669c9cd7723587346a79b67A42DB`. Built from the monorepo #974 source (insurance policies bound to their issuing factory, split withdraw/claim budgets, claim grace window) in the DAO-only deploy mode.
+
+| Contract | New address | Block | Replaces |
+|----------|-------------|-------|----------|
+| DeliveriesDAO | `0x00C363a950CC39ab3c9623103cFB23bBB2303F0D` | 48094904 | `0xaB2F7787b72FcFfEA8E543375FE2db44D9C6ae53` |
+
+Ownership warning: ownership of this DeliveriesDAO must be moved to a multisig before it is funded.
 
 ### Not Yet Deployed (pending governance bootstrap)
 

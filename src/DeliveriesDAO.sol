@@ -77,13 +77,44 @@ interface IInsuranceProvider {
  *        outflows: `closePolicy` only releases a reserve once the bound order is terminal
  *        (Completed/Cancelled) on the factory; a processed claim releases its reserve but the
  *        unpaid part is counted in `releasedThisPeriod`; immediate `withdrawFunds` is limited
- *        to surplus AND to the same per-period budget as claim payouts (minus what was
- *        released that period); anything larger goes through `queueWithdraw` →
+ *        to surplus AND to a per-period budget (minus what was released that period — since
+ *        #969 its own `maxWithdrawPerPeriod`); anything larger goes through `queueWithdraw` →
  *        `executeWithdraw` after `CONFIG_DELAY`, visible on-chain and cancellable.
  *      - They do NOT make a compromised owner key harmless: within those bounds the owner can
  *        still deny honest claims, move up to one period budget per `PAYOUT_PERIOD`, and
  *        withdraw the unreserved surplus after the delay. Full protection requires the owner
  *        to be a multisig / timelock — a pre-redeploy requirement (see script/README.md).
+ *
+ *      Factory binding, split budgets, claim window (issue #969, follow-up to #968):
+ *      - Every policy records the factory that issued it (`InsurancePolicy.factory`), and every
+ *        terminal-state read for that policy queries THAT factory, never the current
+ *        `deliveryFactory`. Re-pointing the factory therefore cannot make a live order look
+ *        Completed (the "queue hostile factory + queue full withdraw" drain), and after an
+ *        honest migration an unrelated terminal mission with the same id on the new factory
+ *        cannot close a live old policy. A colliding id can be re-insured on the new factory
+ *        once the old policy is no longer active.
+ *      - Claim payouts and immediate withdrawals have separate per-period budgets
+ *        (`maxPayoutPerPeriod` / `maxWithdrawPerPeriod`), so a withdrawal can never consume
+ *        the budget that approved claims need. Unpaid reserve releases (denials, closes) are
+ *        charged to the withdrawal budget via `releasedThisPeriod`.
+ *      - Windows are tumbling, anchored at the first outflow after the previous one expired.
+ *        Across a window boundary each budget can therefore be spent twice within seconds: the
+ *        hard bound is 2x `maxPayoutPerPeriod` of claim payouts plus 2x `maxWithdrawPerPeriod`
+ *        of withdrawals+releases in any `PAYOUT_PERIOD`-long interval.
+ *      - Claim grace window: a policy can only be closed `CLAIM_WINDOW` after its order was
+ *        first observed terminal (`recordPolicyTerminal`, permissionless), so the holder
+ *        always has that long to file. Close releases are charged to `releasedThisPeriod`.
+ *      - Any tightening (`setPayoutLimits` / `setMaxWithdrawPerPeriod`) cancels EVERY queued
+ *        loosening: limits, withdraw limit, delivery factory and queued withdrawal.
+ *
+ *      Remaining owner-trust boundary (honest statement): the owner can still deny any claim,
+ *      queue a hostile factory that — after `CONFIG_DELAY` — can mint fake policies for NEW
+ *      missions and have them paid within the per-period claim budget, and withdraw the
+ *      unreserved surplus after the delay. What the contract guarantees is visibility: every
+ *      such loosening sits on-chain for 2 days (`DeliveryFactoryQueued`, `PayoutLimitsQueued`,
+ *      `WithdrawLimitQueued`, `WithdrawQueued`) and is cancelled by any tightening. That only
+ *      protects users if someone watches those events and the owner is a multisig / timelock
+ *      whose honest signers can tighten in time — a deployment requirement, not a code one.
  */
 contract DeliveriesDAO is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -123,6 +154,11 @@ contract DeliveriesDAO is Ownable, ReentrancyGuard {
         bool active;
         bool claimed;
         uint256 createdAt;
+        /// @notice Delivery factory that issued the insured mission (issue #969). All
+        ///         terminal-state reads for this policy query this address.
+        address factory;
+        /// @notice When the order was first observed terminal (0 = not yet recorded).
+        uint256 terminalAt;
     }
     
     mapping(uint256 => InsurancePolicy) public policies;
@@ -151,6 +187,10 @@ contract DeliveriesDAO is Ownable, ReentrancyGuard {
     /// @notice Delay before a loosening config change (higher caps / new factory) applies.
     uint256 public constant CONFIG_DELAY = 2 days;
 
+    /// @notice Grace period after an order turns terminal during which the policy holder
+    ///         can still file a claim and the policy cannot be closed (issue #969).
+    uint256 public constant CLAIM_WINDOW = 3 days;
+
     /// @notice Delivery factory whose missions may be insured. Zero = no policies can be sold.
     address public deliveryFactory;
 
@@ -171,10 +211,22 @@ contract DeliveriesDAO is Ownable, ReentrancyGuard {
     address public pendingDeliveryFactory;
     uint256 public pendingDeliveryFactoryEta;
 
-    /// @notice Unpaid coverage released by processed claims in the current payout window.
-    /// @dev Counted against the immediate `withdrawFunds` budget so deny-then-withdraw stays
-    ///      bounded by `maxPayoutPerPeriod`. Not charged against claim payouts.
+    /// @notice Unpaid coverage released (claim denials / partial payouts / closed policies)
+    ///         in the current window.
+    /// @dev Counted against the immediate `withdrawFunds` budget so deny-or-close-then-withdraw
+    ///      stays bounded by `maxWithdrawPerPeriod`. Not charged against claim payouts.
     uint256 public releasedThisPeriod;
+
+    /// @notice Max immediate `withdrawFunds` (plus unpaid releases) per `PAYOUT_PERIOD`.
+    /// @dev Issue #969: separate from `maxPayoutPerPeriod` so withdrawals never starve claims.
+    uint256 public maxWithdrawPerPeriod = 5_000e6;
+
+    /// @notice Immediate withdrawals made in the current window.
+    uint256 public withdrawnThisPeriod;
+
+    /// @notice Queued (loosening) `maxWithdrawPerPeriod`; eta 0 = none queued.
+    uint256 public pendingMaxWithdrawPerPeriod;
+    uint256 public pendingMaxWithdrawEta;
 
     /// @notice Queued (delayed) surplus withdrawal; eta 0 = none queued.
     uint256 public pendingWithdrawAmount;
@@ -200,6 +252,11 @@ contract DeliveriesDAO is Ownable, ReentrancyGuard {
     event DeliveryFactoryQueued(address indexed factory, uint256 eta);
     event WithdrawQueued(address indexed recipient, uint256 amount, uint256 eta);
     event WithdrawCancelled();
+    event DeliveryFactoryCancelled();
+    event WithdrawLimitUpdated(uint256 maxWithdrawPerPeriod);
+    event WithdrawLimitQueued(uint256 maxWithdrawPerPeriod, uint256 eta);
+    /// @notice The policy's order was observed terminal; it is closable from `closableAt`.
+    event PolicyTerminalRecorded(uint256 indexed missionId, uint256 closableAt);
 
     // =============================================================================
     // ERRORS
@@ -232,6 +289,8 @@ contract DeliveriesDAO is Ownable, ReentrancyGuard {
     error ZeroAddress();
     /// @notice The bound order is not terminal yet, so the policy still covers it.
     error PolicyStillCovering();
+    /// @notice The post-terminal claim window has not elapsed (or was never started).
+    error ClaimWindowOpen(uint256 closableAt);
 
     // =============================================================================
     // CONSTRUCTOR
@@ -318,8 +377,14 @@ contract DeliveriesDAO is Ownable, ReentrancyGuard {
     ) external nonReentrant {
         // `createdAt` is non-zero for every real policy, so this also closes the
         // missionId == 0 hole left by the old `missionId == 0` sentinel check.
+        // Issue #969: after a factory migration the new factory may reuse an id of the old
+        // one; that id is insurable again once the old factory's policy is settled.
+        InsurancePolicy storage existing = policies[missionId];
         // slither-disable-next-line incorrect-equality
-        require(policies[missionId].createdAt == 0, "Policy already exists");
+        require(
+            existing.createdAt == 0 || (!existing.active && existing.factory != deliveryFactory),
+            "Policy already exists"
+        );
 
         // Audit M4 residual / L1: only a real, funded order can be insured, only by the
         // poster who funded it, and never for more than was actually escrowed.
@@ -350,7 +415,9 @@ contract DeliveriesDAO is Ownable, ReentrancyGuard {
             premium: premium,
             active: true,
             claimed: false,
-            createdAt: block.timestamp
+            createdAt: block.timestamp,
+            factory: deliveryFactory,
+            terminalAt: 0
         });
         
         emit InsurancePolicyCreated(missionId, msg.sender, premium, coverageAmount);
@@ -491,31 +558,56 @@ contract DeliveriesDAO is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Close an active policy whose order is over (delivered or cancelled).
+     * @notice Record that an active policy's order is over (Completed or Cancelled), which
+     *         starts its `CLAIM_WINDOW`. Permissionless: holder, keeper or owner may call it.
+     * @dev Issue #969: the state is read from the factory that ISSUED the policy, never from
+     *      the current `deliveryFactory`, so re-pointing the factory cannot fake a terminal
+     *      order. Idempotent once recorded.
+     * @param missionId Mission whose policy's order is terminal.
+     */
+    function recordPolicyTerminal(uint256 missionId) external {
+        InsurancePolicy storage policy = policies[missionId];
+        if (!policy.active) revert PolicyNotActive();
+        if (policy.terminalAt != 0) return;
+        IMissionEscrow.MissionState st =
+            IDeliveryMissionRegistry(policy.factory).getMissionRuntime(missionId).state;
+        if (st != IMissionEscrow.MissionState.Completed && st != IMissionEscrow.MissionState.Cancelled) {
+            revert PolicyStillCovering();
+        }
+        policy.terminalAt = block.timestamp;
+        emit PolicyTerminalRecorded(missionId, block.timestamp + CLAIM_WINDOW);
+    }
+
+    /**
+     * @notice Close an active, unclaimed policy whose order is over and whose claim window
+     *         has elapsed.
      * @dev Frees the reserved coverage so it can back new policies or be withdrawn. PR #963
-     *      review: only once the bound order is terminal on the delivery factory — while it
-     *      is Open/Accepted/Submitted/Disputed the holder is still covered, so closing it
-     *      would let the owner strip live cover and withdraw its reserve.
+     *      review: only once the bound order is terminal — while it is Open/Accepted/Submitted/
+     *      Disputed the holder is still covered. Issue #969: the order must have been recorded
+     *      terminal (`recordPolicyTerminal`, on the policy's own factory) at least
+     *      `CLAIM_WINDOW` ago, so the holder always has time to file; the released reserve is
+     *      charged to `releasedThisPeriod` (the immediate-withdraw budget).
      * @param missionId Mission whose policy should be closed.
      */
     function closePolicy(uint256 missionId) external onlyOwner {
         InsurancePolicy storage policy = policies[missionId];
         if (!policy.active) revert PolicyNotActive();
         require(!policy.claimed, "Claim pending");
-        IMissionEscrow.MissionState st =
-            IDeliveryMissionRegistry(deliveryFactory).getMissionRuntime(missionId).state;
-        if (st != IMissionEscrow.MissionState.Completed && st != IMissionEscrow.MissionState.Cancelled) {
-            revert PolicyStillCovering();
-        }
-        _releasePolicy(missionId);
+        uint256 terminalAt = policy.terminalAt;
+        if (terminalAt == 0) revert PolicyStillCovering();
+        uint256 closableAt = terminalAt + CLAIM_WINDOW;
+        if (block.timestamp < closableAt) revert ClaimWindowOpen(closableAt);
+        uint256 released = _releasePolicy(missionId);
+        _rollPeriod();
+        releasedThisPeriod += released;
     }
 
     /**
      * @notice Withdraw surplus funds from the insurance pool immediately (small amounts).
      * @dev Audit M4: capped at the genuine surplus (`balance − reservedCoverage`). PR #963
-     *      review: also charged against the per-period budget shared with claim payouts and
-     *      reduced by `releasedThisPeriod`, so an owner key can move at most
-     *      `maxPayoutPerPeriod` per `PAYOUT_PERIOD` without notice. Larger amounts: use
+     *      review: also rate-limited per `PAYOUT_PERIOD` and reduced by `releasedThisPeriod`.
+     *      Issue #969: the budget is `maxWithdrawPerPeriod`, separate from the claim-payout
+     *      budget, so a withdrawal never blocks an approved claim. Larger amounts: use
      *      `queueWithdraw`.
      * @param amount Amount to withdraw
      * @param recipient Address to receive funds
@@ -523,12 +615,12 @@ contract DeliveriesDAO is Ownable, ReentrancyGuard {
     function withdrawFunds(uint256 amount, address recipient) external onlyOwner nonReentrant {
         require(amount <= _availableSurplus(), "Insufficient balance");
         _rollPeriod();
-        uint256 used = payoutPeriodPaid + releasedThisPeriod;
-        uint256 cap = maxPayoutPerPeriod;
+        uint256 used = withdrawnThisPeriod + releasedThisPeriod;
+        uint256 cap = maxWithdrawPerPeriod;
         if (used + amount > cap) {
             revert PeriodPayoutCapExceeded(amount, used >= cap ? 0 : cap - used);
         }
-        payoutPeriodPaid += amount;
+        withdrawnThisPeriod += amount;
         _withdraw(amount, recipient);
     }
 
@@ -599,17 +691,17 @@ contract DeliveriesDAO is Ownable, ReentrancyGuard {
 
     /**
      * @notice Update the per-policy coverage cap and the per-period payout cap.
-     * @dev Tightening (both values ≤ current) applies immediately and cancels any queued
-     *      change, including a queued withdrawal. Loosening is queued for `CONFIG_DELAY`. `perPolicy ≤ perPeriod` so every
-     *      policy remains payable within one period.
+     * @dev Tightening (both values ≤ current) applies immediately and cancels every queued
+     *      loosening (limits, withdraw limit, delivery factory) and any queued withdrawal.
+     *      Loosening is queued for `CONFIG_DELAY`. `perPolicy ≤ perPeriod` so every policy
+     *      remains payable within one period.
      */
     function setPayoutLimits(uint256 perPolicy, uint256 perPeriod) external onlyOwner {
         if (perPolicy == 0 || perPolicy > perPeriod) revert InvalidLimits();
         if (perPolicy <= maxCoveragePerPolicy && perPeriod <= maxPayoutPerPeriod) {
             maxCoveragePerPolicy = perPolicy;
             maxPayoutPerPeriod = perPeriod;
-            pendingLimitsEta = 0;
-            if (pendingWithdrawEta != 0) _cancelWithdraw();
+            _cancelAllPending();
             emit PayoutLimitsUpdated(perPolicy, perPeriod);
             return;
         }
@@ -630,7 +722,42 @@ contract DeliveriesDAO is Ownable, ReentrancyGuard {
         emit PayoutLimitsUpdated(maxCoveragePerPolicy, maxPayoutPerPeriod);
     }
 
-    /// @notice Payout still available in the current period.
+    /**
+     * @notice Update the immediate-withdrawal budget per `PAYOUT_PERIOD` (issue #969).
+     * @dev Same rules as `setPayoutLimits`: tightening (≤ current, 0 allowed) applies
+     *      immediately and cancels every queued loosening and queued withdrawal; loosening is
+     *      queued for `CONFIG_DELAY`.
+     */
+    function setMaxWithdrawPerPeriod(uint256 cap) external onlyOwner {
+        if (cap <= maxWithdrawPerPeriod) {
+            maxWithdrawPerPeriod = cap;
+            _cancelAllPending();
+            emit WithdrawLimitUpdated(cap);
+            return;
+        }
+        pendingMaxWithdrawPerPeriod = cap;
+        pendingMaxWithdrawEta = block.timestamp + CONFIG_DELAY;
+        emit WithdrawLimitQueued(cap, pendingMaxWithdrawEta);
+    }
+
+    /// @notice Apply a queued (loosened) withdrawal budget once its delay has elapsed.
+    function applyMaxWithdrawPerPeriod() external onlyOwner {
+        uint256 eta = pendingMaxWithdrawEta;
+        if (eta == 0) revert NothingQueued();
+        if (block.timestamp < eta) revert TooEarly(eta);
+        maxWithdrawPerPeriod = pendingMaxWithdrawPerPeriod;
+        pendingMaxWithdrawEta = 0;
+        emit WithdrawLimitUpdated(maxWithdrawPerPeriod);
+    }
+
+    /// @notice Immediate withdrawal still available in the current period.
+    function remainingPeriodWithdraw() external view returns (uint256) {
+        if (block.timestamp >= payoutPeriodStart + PAYOUT_PERIOD) return maxWithdrawPerPeriod;
+        uint256 used = withdrawnThisPeriod + releasedThisPeriod;
+        return used >= maxWithdrawPerPeriod ? 0 : maxWithdrawPerPeriod - used;
+    }
+
+    /// @notice Claim payout still available in the current period.
     function remainingPeriodPayout() public view returns (uint256) {
         if (block.timestamp >= payoutPeriodStart + PAYOUT_PERIOD) return maxPayoutPerPeriod;
         uint256 paid = payoutPeriodPaid;
@@ -664,12 +791,13 @@ contract DeliveriesDAO is Ownable, ReentrancyGuard {
         }
     }
 
-    /// @dev Start a new payout window (resetting both counters) if the current one expired.
+    /// @dev Start a new window (resetting all counters) if the current one expired.
     function _rollPeriod() internal {
         if (block.timestamp >= payoutPeriodStart + PAYOUT_PERIOD) {
             payoutPeriodStart = block.timestamp;
             payoutPeriodPaid = 0;
             releasedThisPeriod = 0;
+            withdrawnThisPeriod = 0;
         }
     }
 
@@ -705,6 +833,18 @@ contract DeliveriesDAO is Ownable, ReentrancyGuard {
     function _cancelWithdraw() internal {
         _clearWithdraw();
         emit WithdrawCancelled();
+    }
+
+    /// @dev Any tightening cancels every queued loosening (issue #969).
+    function _cancelAllPending() internal {
+        pendingLimitsEta = 0;
+        pendingMaxWithdrawEta = 0;
+        if (pendingDeliveryFactoryEta != 0) {
+            pendingDeliveryFactory = address(0);
+            pendingDeliveryFactoryEta = 0;
+            emit DeliveryFactoryCancelled();
+        }
+        if (pendingWithdrawEta != 0) _cancelWithdraw();
     }
 
     /// @notice Deactivate a policy and release its reserved coverage (idempotent).
