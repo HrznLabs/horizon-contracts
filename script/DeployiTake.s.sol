@@ -6,6 +6,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 import {GuildFactory} from "../src/GuildFactory.sol";
 import {GuildDAO} from "../src/GuildDAO.sol";
 import {PaymentRouter} from "../src/PaymentRouter.sol";
+import {DeliveryRouterWiring} from "./lib/DeliveryRouterWiring.sol";
 import {ReputationOracle} from "../src/ReputationOracle.sol";
 import {DeliveryMissionFactory} from "../src/DeliveryMissionFactory.sol";
 import {DeliveriesDAO} from "../src/DeliveriesDAO.sol";
@@ -113,6 +114,8 @@ contract DeployiTake is Script {
         // ------------------------------------------------------------------
         console.log("5. Deploying DeliveriesDAO...");
         DeliveriesDAO deliveriesDAO = new DeliveriesDAO(USDC_BASE_SEPOLIA);
+        // Audit M4 residual: bind insurance policies to this factory's real missions.
+        deliveriesDAO.setDeliveryFactory(address(deliveryMissionFactory));
         console.log("   DeliveriesDAO:", address(deliveriesDAO));
 
         // ------------------------------------------------------------------
@@ -173,10 +176,13 @@ contract DeployiTake is Script {
         paymentRouter.setAcceptedToken(EURC_BASE_SEPOLIA, true);
         console.log("   EURC whitelisted as accepted token");
 
-        // Grant SETTLER_ROLE to DeliveryMissionFactory so it can settle payments
-        bytes32 SETTLER_ROLE = paymentRouter.SETTLER_ROLE();
-        paymentRouter.grantRole(SETTLER_ROLE, address(deliveryMissionFactory));
-        console.log("   SETTLER_ROLE granted to DeliveryMissionFactory");
+        // Authorise the DeliveryEscrow clones (not the factory) to settle. The clones call
+        // settleRestaurantOrder themselves; the router accepts them via
+        // missionFactory.getMissionByEscrow. Granting SETTLER_ROLE to the factory (the old
+        // code) authorised nobody and left every delivery settlement reverting (#950 review).
+        paymentRouter.setMissionFactory(address(deliveryMissionFactory));
+        DeliveryRouterWiring.assertSettlementReady(paymentRouter, address(deliveryMissionFactory));
+        console.log("   PaymentRouter.missionFactory -> DeliveryMissionFactory");
 
         // ------------------------------------------------------------------
         // 10. Seed menu items — 3 per restaurant (logged; stored off-chain)
