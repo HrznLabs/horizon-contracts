@@ -66,8 +66,14 @@ abstract contract GuildXPVotes is Governor {
         if (_quorumNumerator > 100) revert InvalidQuorum();
         if (_xpContract == address(0)) revert InvalidXPContract();
         guildDAO = _guildDAO;
-        _xpContractHistory.push(clock(), uint160(_xpContract));
-        _quorumNumeratorHistory.push(clock(), SafeCast.toUint208(_quorumNumerator));
+        // Initial settings are keyed at timepoint 0, not clock() (issue #969): OZ `propose`
+        // reads the proposer's votes at `clock() - 1`, so a governor deployed by a factory in
+        // block D would look up the XP source at D - 1, find no checkpoint (address(0)) and
+        // revert — no proposal could be made in the deployment block. Keying at 0 makes the
+        // constructor values the baseline for every past timepoint; later setter changes are
+        // still keyed at `clock() + 1` and never move an existing snapshot.
+        _xpContractHistory.push(0, uint160(_xpContract));
+        _quorumNumeratorHistory.push(0, SafeCast.toUint208(_quorumNumerator));
     }
 
     // =========================================================================

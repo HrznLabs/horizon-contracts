@@ -563,6 +563,9 @@ contract DeliveriesDAOTest is Test {
         vm.expectRevert(DeliveriesDAO.PolicyStillCovering.selector);
         dao.closePolicy(1);
         registry.setState(1, IMissionEscrow.MissionState.Completed);
+        // Issue #969: record terminal, then wait out the holder's claim window.
+        dao.recordPolicyTerminal(1);
+        vm.warp(block.timestamp + dao.CLAIM_WINDOW());
 
         vm.prank(owner);
         dao.closePolicy(1);

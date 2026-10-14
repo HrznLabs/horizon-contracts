@@ -104,15 +104,57 @@ Optional flags:
   redeployed with this flag before insurance is used. Changing the factory later is delayed 2 days.
   **Pre-redeploy requirement — `DeliveriesDAO` owner must be a multisig / timelock.** The delays in
   `DeliveriesDAO` only bound the permissionless drain and rate-limit owner outflows (`closePolicy` only
-  for Completed/Cancelled orders; immediate `withdrawFunds` ≤ surplus and ≤ the per-period payout
-  budget; larger withdrawals via `queueWithdraw` → `executeWithdraw` after 2 days). A single-key owner
-  can still deny every claim and move one period budget per day, then the whole unreserved surplus
-  after the delay. Do not fund the pool beyond test amounts until `transferOwnership(<Safe/timelock>)`
+  for Completed/Cancelled orders — read from the factory that issued the policy — and only
+  `CLAIM_WINDOW` (3 days) after `recordPolicyTerminal`; immediate `withdrawFunds` ≤ surplus and ≤
+  `maxWithdrawPerPeriod`, a budget separate from claim payouts; larger withdrawals via `queueWithdraw` →
+  `executeWithdraw` after 2 days). A single-key owner can still deny every claim, move one withdraw
+  budget per day, queue a hostile factory that after 2 days can underwrite fake NEW policies paid within
+  the claim budget, and withdraw the whole unreserved surplus after the delay. Do not fund the pool beyond test amounts until `transferOwnership(<Safe/timelock>)`
   has been executed on the new `DeliveriesDAO` (PR #963 review). Watch `WithdrawQueued` events and
-  `cancelWithdraw()` (or tighten `setPayoutLimits`) to stop a queued withdrawal.
+  `cancelWithdraw()` (or tighten `setPayoutLimits` / `setMaxWithdrawPerPeriod`) to stop a queued withdrawal.
+  Any tightening also cancels a queued factory change and every queued limit loosening. Route
+  `DeliveryFactoryQueued`, `PayoutLimitsQueued`, `WithdrawLimitQueued` and `WithdrawQueued` to an alert
+  — the 2-day delay only helps if someone sees it.
+- `DELIVERY_MISSION_FACTORY=0x…` (with `DEPLOY_DELIVERIES_DAO=true`): **DAO-only mode**, see below.
 - `USDC=0x…` overrides the Base Sepolia USDC default; the script reverts if the router does not accept it.
 - Hardware wallet / keystore: leave `DEPLOYER_PRIVATE_KEY` unset and pass `--account <name> --sender $ADMIN`
   (the script then calls `vm.startBroadcast()` with no key).
+
+### DeliveriesDAO-only redeploy (issue #969)
+
+Ships a new `DeliveriesDAO` against the **already-live** factory without redeploying it or touching the
+router (`PAYMENT_ROUTER` / `DISPUTE_RESOLVER` are not needed). The script deploys
+`DeliveriesDAO(USDC)`, calls `setDeliveryFactory(DELIVERY_MISSION_FACTORY)` (first wiring is immediate),
+checks it, and prints a JSON block plus the `transferOwnership` command.
+
+**Prerequisite — ownership → multisig.** The new DAO is owned by the broadcaster. Before anyone funds
+the pool beyond test amounts, transfer ownership to a Safe / timelock (`cast send <DAO>
+'transferOwnership(address)' <Safe>`) and confirm `owner()`. The contract's delays only make owner
+actions visible for 2 days; they do not make a single compromised key harmless.
+
+```bash
+unset PAYMENT_ROUTER DISPUTE_RESOLVER
+export DEPLOY_DELIVERIES_DAO=true
+export DELIVERY_MISSION_FACTORY=0xf02Cdc9eD74E2fd63Cc98ED10e78A53512e25d53   # live factory (2026-10-13)
+export DELIVERIES_DAO=0xaB2F7787b72FcFfEA8E543375FE2db44D9C6ae53            # previous DAO, echoed only
+
+# 1. dry run - expect "=== DEPLOYMENT JSON ===" and "SIMULATION COMPLETE"
+forge script script/DeployDeliveryContracts.s.sol --rpc-url $BASE_SEPOLIA_RPC_URL --sender $ADMIN -vvvv
+
+# 2. broadcast
+forge script script/DeployDeliveryContracts.s.sol --rpc-url $BASE_SEPOLIA_RPC_URL \
+  --broadcast --verify --etherscan-api-key $BASESCAN_API_KEY --slow -vvvv
+
+# 3. checks, then hand over ownership
+cast call <DAO> 'deliveryFactory()(address)' --rpc-url $BASE_SEPOLIA_RPC_URL   # == $DELIVERY_MISSION_FACTORY
+cast send <DAO> 'transferOwnership(address)' <Safe/timelock> --rpc-url $BASE_SEPOLIA_RPC_URL --account <deployer>
+cast call <DAO> 'owner()(address)' --rpc-url $BASE_SEPOLIA_RPC_URL             # == Safe/timelock
+```
+
+`DELIVERY_MISSION_FACTORY` without `DEPLOY_DELIVERIES_DAO=true` reverts `DaoOnlyModeRequiresDeployFlag`;
+an address without code reverts `NoCodeAtAddress`, and a contract that is not a `DeliveryMissionFactory`
+(no `deliveryEscrowImplementation()`) reverts before anything is broadcast. Then update the
+`DeliveriesDAO` address in the consumers listed in section 4.
 
 If `--verify` fails (foundry.toml still points at the Basescan v1 API URL, which Etherscan has
 deprecated), verify afterwards:

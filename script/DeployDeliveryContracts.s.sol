@@ -38,6 +38,14 @@ import { DeliveryRouterWiring } from "./lib/DeliveryRouterWiring.sol";
  *                         (re-pointing orphans every escrow of the current factory: they can no
  *                         longer settle). Set true only when that is intended.
  *
+ * DAO-only mode (issue #969): DEPLOY_DELIVERIES_DAO=true + DELIVERY_MISSION_FACTORY=<existing>
+ * deploys ONLY a new DeliveriesDAO(USDC) and calls setDeliveryFactory(existing). No factory is
+ * deployed and the router is not touched, so PAYMENT_ROUTER / DISPUTE_RESOLVER are not needed.
+ * The new DAO is owned by the broadcaster: transfer it to a multisig/timelock before funding.
+ *   DEPLOY_DELIVERIES_DAO=true DELIVERY_MISSION_FACTORY=0x... \
+ *   forge script script/DeployDeliveryContracts.s.sol --rpc-url https://sepolia.base.org \
+ *     --sender <deployer> -vvvv
+ *
  * Dry run (no broadcast):
  *   PAYMENT_ROUTER=0x... DISPUTE_RESOLVER=0x... \
  *   forge script script/DeployDeliveryContracts.s.sol --rpc-url https://sepolia.base.org \
@@ -51,6 +59,8 @@ contract DeployDeliveryContracts is Script {
     error TokenNotAccepted(address router, address token);
     /// @notice router.missionFactory() already points at a (different) factory; see ALLOW_ROUTER_REPOINT.
     error RouterAlreadyWired(address current);
+    /// @notice DELIVERY_MISSION_FACTORY was set without DEPLOY_DELIVERIES_DAO=true.
+    error DaoOnlyModeRequiresDeployFlag();
 
     struct Config {
         address paymentRouter;
@@ -61,6 +71,8 @@ contract DeployDeliveryContracts is Script {
         uint256 deployerPrivateKey;
         bool allowUnwiredRouter;
         bool allowRouterRepoint;
+        /// @dev Non-zero selects DAO-only mode: wire a new DeliveriesDAO to this factory.
+        address existingDeliveryFactory;
     }
 
     struct Deployed {
@@ -73,15 +85,21 @@ contract DeployDeliveryContracts is Script {
     }
 
     function run() external returns (Deployed memory) {
+        address existingFactory = vm.envOr("DELIVERY_MISSION_FACTORY", address(0));
+        bool daoOnly = existingFactory != address(0);
         Config memory cfg = Config({
-            paymentRouter: vm.envAddress("PAYMENT_ROUTER"),
-            disputeResolver: vm.envAddress("DISPUTE_RESOLVER"),
+            // Not used in DAO-only mode, so only required when deploying a factory.
+            paymentRouter: daoOnly ? vm.envOr("PAYMENT_ROUTER", address(0)) : vm.envAddress("PAYMENT_ROUTER"),
+            disputeResolver: daoOnly
+                ? vm.envOr("DISPUTE_RESOLVER", address(0))
+                : vm.envAddress("DISPUTE_RESOLVER"),
             usdc: vm.envOr("USDC", USDC_BASE_SEPOLIA),
             deployDeliveriesDAO: vm.envOr("DEPLOY_DELIVERIES_DAO", false),
             existingDeliveriesDAO: vm.envOr("DELIVERIES_DAO", address(0)),
             deployerPrivateKey: vm.envOr("DEPLOYER_PRIVATE_KEY", uint256(0)),
             allowUnwiredRouter: vm.envOr("ALLOW_UNWIRED_ROUTER", false),
-            allowRouterRepoint: vm.envOr("ALLOW_ROUTER_REPOINT", false)
+            allowRouterRepoint: vm.envOr("ALLOW_ROUTER_REPOINT", false),
+            existingDeliveryFactory: existingFactory
         });
         Deployed memory out = deploy(cfg);
         if (
@@ -98,6 +116,11 @@ contract DeployDeliveryContracts is Script {
     function deploy(Config memory cfg) public returns (Deployed memory out) {
         address broadcaster =
             cfg.deployerPrivateKey != 0 ? vm.addr(cfg.deployerPrivateKey) : msg.sender;
+
+        if (cfg.existingDeliveryFactory != address(0)) {
+            if (!cfg.deployDeliveriesDAO) revert DaoOnlyModeRequiresDeployFlag();
+            return _deployDaoOnly(cfg, broadcaster);
+        }
 
         console.log("===========================================");
         console.log("  Delivery vertical (re)deployment");
@@ -224,5 +247,66 @@ contract DeployDeliveryContracts is Script {
         if (previousFactory != address(0) && previousFactory != address(factory)) {
             console.log("NOTE: escrows of the previous factory can no longer settle:", previousFactory);
         }
+    }
+
+    /**
+     * @notice DAO-only mode (issue #969): deploy a DeliveriesDAO bound to an EXISTING
+     *         DeliveryMissionFactory. No factory deploy, no router changes.
+     */
+    function _deployDaoOnly(Config memory cfg, address broadcaster) internal returns (Deployed memory out) {
+        address factory = cfg.existingDeliveryFactory;
+        console.log("===========================================");
+        console.log("  DeliveriesDAO-only deployment");
+        console.log("===========================================");
+        console.log("Chain id:               ", block.chainid);
+        console.log("Broadcaster:            ", broadcaster);
+        console.log("DeliveryMissionFactory: ", factory, "(existing)");
+        console.log("USDC:                   ", cfg.usdc);
+
+        // Pre-flight - fail before spending gas.
+        if (factory.code.length == 0) revert NoCodeAtAddress("DELIVERY_MISSION_FACTORY", factory);
+        if (cfg.usdc.code.length == 0) revert NoCodeAtAddress("USDC", cfg.usdc);
+        // A post-audit factory exposes its escrow implementation; a non-factory address reverts.
+        out.deliveryEscrowImpl = DeliveryMissionFactory(factory).deliveryEscrowImplementation();
+        if (out.deliveryEscrowImpl == address(0)) revert NoCodeAtAddress("DeliveryEscrow impl", factory);
+
+        if (cfg.deployerPrivateKey != 0) {
+            vm.startBroadcast(cfg.deployerPrivateKey);
+        } else {
+            vm.startBroadcast();
+        }
+        DeliveriesDAO dao = new DeliveriesDAO(cfg.usdc);
+        // First configuration applies immediately (no policy can exist yet).
+        dao.setDeliveryFactory(factory);
+        vm.stopBroadcast();
+
+        require(dao.deliveryFactory() == factory, "deliveryFactory not set");
+        require(dao.owner() == broadcaster, "DAO owner != broadcaster");
+
+        out.deliveryMissionFactory = factory;
+        out.deliveriesDAO = address(dao);
+        out.deliveriesDAOIsNew = true;
+        console.log("1. DeliveriesDAO:", out.deliveriesDAO, "(deliveryFactory wired)");
+
+        console.log("");
+        console.log("=== DEPLOYMENT JSON ===");
+        console.log("{");
+        console.log('  "chainId": %s,', vm.toString(block.chainid));
+        console.log('  "USDC": "%s",', vm.toString(cfg.usdc));
+        console.log('  "DeliveryMissionFactory": "%s",', vm.toString(factory));
+        console.log('  "DeliveriesDAO": "%s",', vm.toString(out.deliveriesDAO));
+        console.log('  "DeliveriesDAOOwner": "%s",', vm.toString(broadcaster));
+        console.log('  "previousDeliveriesDAO": "%s"', vm.toString(cfg.existingDeliveriesDAO));
+        console.log("}");
+        console.log("=== END DEPLOYMENT JSON ===");
+        console.log("");
+        console.log("ACTION REQUIRED before funding the pool: transfer ownership to a multisig/timelock:");
+        console.log(
+            string.concat(
+                "  cast send ",
+                vm.toString(out.deliveriesDAO),
+                " 'transferOwnership(address)' <Safe/timelock> --rpc-url $BASE_SEPOLIA_RPC_URL --account <deployer>"
+            )
+        );
     }
 }
