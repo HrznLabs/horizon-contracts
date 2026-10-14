@@ -375,9 +375,12 @@ contract MissionEscrow is Initializable, ReentrancyGuard, IMissionEscrow {
      * @dev Called by DisputeResolver after finalization
      * @param outcome 0=None, 1=PosterWins, 2=PerformerWins, 3=Split, 4=Cancelled
      * @param splitPercentage For Split outcome, performer's share in basis points (0-10000)
+     * @dev `virtual` so DeliveryEscrow can route the restaurant's food cost separately
+     *      (issue #950). The body below is the plain-mission behaviour and is unchanged.
      */
     function settleDispute(uint8 outcome, uint256 splitPercentage)
         external
+        virtual
         onlyDisputeResolver
         nonReentrant
     {

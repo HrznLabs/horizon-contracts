@@ -6,6 +6,7 @@ import {DeliveryEscrow} from "../src/DeliveryEscrow.sol";
 import {DeliveryMissionFactory} from "../src/DeliveryMissionFactory.sol";
 import {PaymentRouter} from "../src/PaymentRouter.sol";
 import {IMissionEscrow} from "../src/interfaces/IMissionEscrow.sol";
+import {IPaymentRouter} from "../src/interfaces/IPaymentRouter.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
 contract DeliveryEscrowTest is Test {
@@ -624,6 +625,54 @@ contract DeliveryEscrowTest is Test {
             REWARD_AMOUNT,
             abi.encodeWithSelector(DeliveryEscrow.MissingMetaDAO.selector)
         );
+    }
+
+    // -------------------------------------------------------------------------
+    // Payment-token whitelist: reject tokens the router would refuse at settlement
+    // -------------------------------------------------------------------------
+
+    /// @notice A mission funded with a token the PaymentRouter does not accept could never
+    /// settle (approveCompletion / dispute settlement revert TokenNotAccepted), freezing the
+    /// escrow. Creation must fail up front instead, and no funds may move.
+    function test_RevertWhen_PaymentTokenNotAccepted() public {
+        MockERC20 fakeUsdc = new MockERC20("Fake USD Coin", "fUSDC", 6);
+        fakeUsdc.mint(poster, REWARD_AMOUNT);
+        assertFalse(router.acceptedTokens(address(fakeUsdc)));
+
+        vm.startPrank(poster);
+        fakeUsdc.approve(address(factory), REWARD_AMOUNT);
+        vm.expectRevert(
+            abi.encodeWithSelector(IPaymentRouter.TokenNotAccepted.selector, address(fakeUsdc))
+        );
+        factory.createDeliveryMission(
+            address(fakeUsdc), REWARD_AMOUNT, block.timestamp + 1 days,
+            address(0), METADATA_HASH, LOCATION_HASH,
+            _defaultParams(), _defaultSettlement(), _oneWaypoint()
+        );
+        vm.stopPrank();
+
+        assertEq(factory.missionCount(), 0);
+        assertEq(fakeUsdc.balanceOf(poster), REWARD_AMOUNT);
+    }
+
+    /// @notice Once governance whitelists the token, creation succeeds with it.
+    function test_CreateSucceedsAfterTokenWhitelisted() public {
+        MockERC20 eurc = new MockERC20("Euro Coin", "EURC", 6);
+        eurc.mint(poster, REWARD_AMOUNT);
+
+        vm.prank(owner);
+        router.setAcceptedToken(address(eurc), true);
+
+        vm.startPrank(poster);
+        eurc.approve(address(factory), REWARD_AMOUNT);
+        uint256 missionId = factory.createDeliveryMission(
+            address(eurc), REWARD_AMOUNT, block.timestamp + 1 days,
+            address(0), METADATA_HASH, LOCATION_HASH,
+            _defaultParams(), _defaultSettlement(), _oneWaypoint()
+        );
+        vm.stopPrank();
+
+        assertEq(eurc.balanceOf(factory.missions(missionId)), REWARD_AMOUNT);
     }
 
     // -------------------------------------------------------------------------

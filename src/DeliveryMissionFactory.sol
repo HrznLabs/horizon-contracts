@@ -9,6 +9,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {DeliveryEscrow} from "./DeliveryEscrow.sol";
 import {IMissionEscrow} from "./interfaces/IMissionEscrow.sol";
 import {PaymentRouter} from "./PaymentRouter.sol";
+import {IPaymentRouter} from "./interfaces/IPaymentRouter.sol";
 
 /**
  * @title DeliveryMissionFactory
@@ -135,6 +136,16 @@ contract DeliveryMissionFactory is Ownable, ReentrancyGuard {
         if (expiresAt < block.timestamp + MIN_DURATION) revert InvalidDuration();
         // audit C2: never create an escrow that can't be settled in a dispute.
         if (disputeResolver == address(0)) revert DisputeResolverNotSet();
+
+        // Fail fast on a payment token the router would reject at settlement time
+        // (settleRestaurantOrder / settlePayment revert TokenNotAccepted). Without this,
+        // a mission funded with a non-whitelisted token can be created and accepted, but
+        // approveCompletion and dispute settlement always revert, and once proof is
+        // Submitted/Disputed claimExpired is blocked too, freezing the escrowed funds.
+        // Reuses IPaymentRouter.TokenNotAccepted so the selector matches the router's.
+        if (!PaymentRouter(paymentRouter).acceptedTokens(paymentToken)) {
+            revert IPaymentRouter.TokenNotAccepted(paymentToken);
+        }
 
         // audit H5: fail fast on a fee config the router would reject at settlement time.
         _validateSettlementFees(settlement.subDAOFeeBps, settlement.metaDAOFeeBps);

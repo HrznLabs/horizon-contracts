@@ -250,16 +250,14 @@ contract GuildXPTest is Test {
         xp.batchUpdateXP(guildA, users, amounts);
         uint256 batchGasUsed = gasBefore - gasleft();
 
-        // Measure single-call loop gas (reset state first by zeroing XP)
-        for (uint256 i = 0; i < 5; i++) {
-            vm.prank(globalRelayer);
-            xp.updateXP(guildA, users[i], 0);
-        }
-
+        // Measure single-call loop gas on a disjoint set of fresh users so both paths pay
+        // the same cold-storage cost. (Audit H6: each write now also appends a per-block
+        // checkpoint; re-writing the batch's own users in the same block would only update
+        // those checkpoints in place and make the single-call path look artificially cheap.)
         uint256 singleGasBefore = gasleft();
         for (uint256 i = 0; i < 5; i++) {
             vm.prank(globalRelayer);
-            xp.updateXP(guildA, users[i], amounts[i]);
+            xp.updateXP(guildA, address(uint160(300 + i)), amounts[i]);
         }
         uint256 singleGasUsed = singleGasBefore - gasleft();
 

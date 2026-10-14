@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {Checkpoints} from "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title GuildXP
@@ -17,8 +19,18 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
  * - ADMIN_ROLE: Can manage global relayers, pause, and set guild admins
  * - RELAYER_ROLE: Can update XP for ANY guild (global relayer)
  * - Guild admins can update XP for their specific guild only
+ *
+ * Snapshot safety (audit H6):
+ * - Every guild XP write is also checkpointed per block (OZ `Checkpoints.Trace208`),
+ *   both per (guild, user) and for the guild total.
+ * - `getPastGuildXP` / `getPastTotalGuildXP` return the value as of the end of a past
+ *   block. GuildGovernor reads voting power and quorum through these at the proposal's
+ *   snapshot timepoint, so XP written after a proposal snapshot (by a relayer, a guild
+ *   admin or a compromised key) cannot change the weight or the quorum of an open vote.
+ * - Clock is `block.number`, matching GuildGovernor's IERC6372 clock.
  */
 contract GuildXP is AccessControl {
+    using Checkpoints for Checkpoints.Trace208;
     // =============================================================================
     // ROLES
     // =============================================================================
@@ -51,6 +63,12 @@ contract GuildXP is AccessControl {
     /// @notice Pause state for emergency
     bool public paused;
 
+    /// @dev Audit H6: per-block history of guild XP: guild => user => checkpoints
+    mapping(address => mapping(address => Checkpoints.Trace208)) private _guildXPCheckpoints;
+
+    /// @dev Audit H6: per-block history of total guild XP: guild => checkpoints
+    mapping(address => Checkpoints.Trace208) private _totalGuildXPCheckpoints;
+
     // =============================================================================
     // EVENTS
     // =============================================================================
@@ -81,6 +99,8 @@ contract GuildXP is AccessControl {
     error NotAuthorized();
     error ArrayLengthMismatch();
     error ZeroAddress();
+    /// @notice Historical lookups must target a block that has already ended.
+    error FutureLookup(uint256 timepoint, uint48 currentClock);
 
     // =============================================================================
     // MODIFIERS
@@ -172,11 +192,18 @@ contract GuildXP is AccessControl {
         guildXP[guild][user] = newXP;
 
         // Update total guild XP
+        uint256 newTotal;
         if (newXP > oldXP) {
-            totalGuildXP[guild] += (newXP - oldXP);
+            newTotal = totalGuildXP[guild] + (newXP - oldXP);
         } else {
-            totalGuildXP[guild] -= (oldXP - newXP);
+            newTotal = totalGuildXP[guild] - (oldXP - newXP);
         }
+        totalGuildXP[guild] = newTotal;
+
+        // Audit H6: record history so governance can read XP as of a past block.
+        uint48 key = clock();
+        _guildXPCheckpoints[guild][user].push(key, SafeCast.toUint208(newXP));
+        _totalGuildXPCheckpoints[guild].push(key, SafeCast.toUint208(newTotal));
 
         emit XPUpdated(guild, user, oldXP, newXP);
     }
@@ -247,6 +274,42 @@ contract GuildXP is AccessControl {
      */
     function getTotalGuildXP(address guild) external view returns (uint256) {
         return totalGuildXP[guild];
+    }
+
+    /**
+     * @notice A user's guild XP as of the end of block `timepoint` (audit H6).
+     * @dev Reverts for the current or a future block, like OZ `Votes.getPastVotes`, so a
+     *      value cannot be read before it is final.
+     */
+    function getPastGuildXP(
+        address guild,
+        address account,
+        uint256 timepoint
+    ) external view returns (uint256) {
+        return _guildXPCheckpoints[guild][account].upperLookupRecent(_validateTimepoint(timepoint));
+    }
+
+    /**
+     * @notice Total guild XP as of the end of block `timepoint` (audit H6).
+     */
+    function getPastTotalGuildXP(address guild, uint256 timepoint) external view returns (uint256) {
+        return _totalGuildXPCheckpoints[guild].upperLookupRecent(_validateTimepoint(timepoint));
+    }
+
+    /// @notice IERC6372-style clock: block number (matches GuildGovernor).
+    function clock() public view returns (uint48) {
+        return SafeCast.toUint48(block.number);
+    }
+
+    // solhint-disable-next-line func-name-mixedcase
+    function CLOCK_MODE() external pure returns (string memory) {
+        return "mode=blocknumber&from=default";
+    }
+
+    function _validateTimepoint(uint256 timepoint) internal view returns (uint48) {
+        uint48 currentClock = clock();
+        if (timepoint >= currentClock) revert FutureLookup(timepoint, currentClock);
+        return SafeCast.toUint48(timepoint);
     }
 
     /**
