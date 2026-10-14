@@ -117,11 +117,13 @@ contract DeliveriesDAOOwnerOutflowsTest is Test {
         vm.startPrank(owner);
         dao.withdrawFunds(3_000e6, thief);
         dao.withdrawFunds(2_000e6, thief);
-        assertEq(dao.payoutPeriodPaid(), 5_000e6);
+        assertEq(dao.withdrawnThisPeriod(), 5_000e6);
         vm.expectRevert(abi.encodeWithSelector(DeliveriesDAO.PeriodPayoutCapExceeded.selector, 1, 0));
         dao.withdrawFunds(1, thief);
-        // Withdrawals share the budget with claim payouts: the window is spent for both.
-        assertEq(dao.remainingPeriodPayout(), 0);
+        // Issue #969: withdrawals have their own budget; the claim-payout budget is untouched.
+        assertEq(dao.remainingPeriodWithdraw(), 0);
+        assertEq(dao.payoutPeriodPaid(), 0);
+        assertEq(dao.remainingPeriodPayout(), dao.maxPayoutPerPeriod());
         vm.warp(block.timestamp + dao.PAYOUT_PERIOD());
         dao.withdrawFunds(5_000e6, thief);
         vm.stopPrank();
@@ -149,14 +151,16 @@ contract DeliveriesDAOOwnerOutflowsTest is Test {
         assertEq(dao.reservedCoverage(), 0);
         assertEq(dao.releasedThisPeriod(), 1_000e6);
         uint256 left = usdc.balanceOf(address(dao));
-        // ...so nothing can be withdrawn immediately this period.
-        vm.expectRevert(abi.encodeWithSelector(DeliveriesDAO.PeriodPayoutCapExceeded.selector, left, 0));
+        // ...so deny + withdraw together stay within ONE withdraw budget this period (issue
+        // #969: the withdraw budget is separate from the claim payouts already made).
+        vm.expectRevert(abi.encodeWithSelector(DeliveriesDAO.PeriodPayoutCapExceeded.selector, left, 4_000e6));
         dao.withdrawFunds(left, thief);
+        dao.withdrawFunds(4_000e6, thief);
         vm.expectRevert(abi.encodeWithSelector(DeliveriesDAO.PeriodPayoutCapExceeded.selector, 1, 0));
         dao.withdrawFunds(1, thief);
-        // Next period the budget (not the whole pool) is available again.
+        // Next period the budget is available again (only 1,120 of surplus is left).
         vm.warp(block.timestamp + dao.PAYOUT_PERIOD());
-        dao.withdrawFunds(5_000e6, thief);
+        dao.withdrawFunds(1_000e6, thief);
         assertEq(dao.releasedThisPeriod(), 0);
         vm.stopPrank();
         assertEq(usdc.balanceOf(thief), 5_000e6);
@@ -176,8 +180,9 @@ contract DeliveriesDAOOwnerOutflowsTest is Test {
         dao.withdrawFunds(4_000e6 + 1, thief);
         dao.withdrawFunds(4_000e6, thief);
         vm.stopPrank();
-        // Denials do not consume the claim-payout budget.
-        assertEq(dao.remainingPeriodPayout(), 1_000e6);
+        // Neither denials nor withdrawals consume the claim-payout budget (issue #969).
+        assertEq(dao.remainingPeriodPayout(), dao.maxPayoutPerPeriod());
+        assertEq(dao.remainingPeriodWithdraw(), 0);
     }
 
     /// @notice Approving a token payout releases the unpaid rest into the same counter.
@@ -204,17 +209,23 @@ contract DeliveriesDAOOwnerOutflowsTest is Test {
         ];
         for (uint256 i = 0; i < live.length; i++) {
             registry.setState(1, live[i]);
+            vm.expectRevert(DeliveriesDAO.PolicyStillCovering.selector);
+            dao.recordPolicyTerminal(1);
             vm.prank(owner);
             vm.expectRevert(DeliveriesDAO.PolicyStillCovering.selector);
             dao.closePolicy(1);
         }
         registry.setState(1, IMissionEscrow.MissionState.Cancelled);
+        dao.recordPolicyTerminal(1);
+        vm.warp(block.timestamp + dao.CLAIM_WINDOW()); // issue #969 grace window
         vm.prank(owner);
         dao.closePolicy(1);
         assertEq(dao.reservedCoverage(), 0);
 
         _insure(2, poster, 500e6);
         registry.setState(2, IMissionEscrow.MissionState.Completed);
+        dao.recordPolicyTerminal(2);
+        vm.warp(block.timestamp + dao.CLAIM_WINDOW());
         vm.prank(owner);
         dao.closePolicy(2);
         assertEq(dao.reservedCoverage(), 0);
@@ -405,6 +416,8 @@ contract DeliveriesDAOOwnerOutflowsTest is Test {
         address escA = f.missions(a);
         vm.prank(performer);
         DeliveryEscrow(payable(escA)).acceptMission();
+        vm.expectRevert(DeliveriesDAO.PolicyStillCovering.selector);
+        real.recordPolicyTerminal(a);
         vm.prank(owner);
         vm.expectRevert(DeliveriesDAO.PolicyStillCovering.selector);
         real.closePolicy(a);
@@ -417,6 +430,9 @@ contract DeliveriesDAOOwnerOutflowsTest is Test {
         vm.prank(poster);
         DeliveryEscrow(payable(escB)).cancelMission();
         assertEq(uint8(f.getMissionRuntime(b).state), uint8(IMissionEscrow.MissionState.Cancelled));
+        real.recordPolicyTerminal(b); // reads the real escrow through the issuing factory
+        assertEq(real.getPolicy(b).factory, address(f));
+        vm.warp(block.timestamp + real.CLAIM_WINDOW());
         vm.prank(owner);
         real.closePolicy(b);
         assertEq(real.reservedCoverage(), 400e6);

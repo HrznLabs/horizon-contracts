@@ -12,6 +12,7 @@ import { IPaymentRouter } from "../src/interfaces/IPaymentRouter.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
 import { DeployDeliveryContracts } from "../script/DeployDeliveryContracts.s.sol";
 import { DeliveryRouterWiring } from "../script/lib/DeliveryRouterWiring.sol";
+import { DeliveriesDAO } from "../src/DeliveriesDAO.sol";
 
 /// @dev Exposes the library's internal functions so expectRevert can observe them.
 contract WiringHarness {
@@ -83,7 +84,8 @@ contract DeliveryRouterWiringTest is Test {
             existingDeliveriesDAO: address(0),
             deployerPrivateKey: pk,
             allowUnwiredRouter: allowUnwired,
-            allowRouterRepoint: false
+            allowRouterRepoint: false,
+            existingDeliveryFactory: address(0)
         });
     }
 
@@ -287,5 +289,63 @@ contract DeliveryRouterWiringTest is Test {
             )
         );
         harness.assertSettlementReady(router, address(factory));
+    }
+
+    // -------------------------------------------------------------------------
+    // Issue #969: DAO-only mode - new DeliveriesDAO bound to an EXISTING factory
+    // -------------------------------------------------------------------------
+
+    function _daoOnlyCfg(address existingFactory) internal view returns (DeployDeliveryContracts.Config memory cfg) {
+        cfg = _cfg(ADMIN_PK, false);
+        cfg.paymentRouter = address(0); // not needed in DAO-only mode
+        cfg.disputeResolver = address(0);
+        cfg.deployDeliveriesDAO = true;
+        cfg.existingDeliveriesDAO = address(0xAB2F);
+        cfg.existingDeliveryFactory = existingFactory;
+    }
+
+    function test_DeployScript_DaoOnly_WiresNewDaoToExistingFactory_NoFactoryDeploy() public {
+        DeployDeliveryContracts.Deployed memory live = script.deploy(_cfg(ADMIN_PK, false));
+        uint64 nonceBefore = vm.getNonce(admin);
+
+        DeployDeliveryContracts.Deployed memory out = script.deploy(_daoOnlyCfg(live.deliveryMissionFactory));
+
+        assertTrue(out.deliveriesDAOIsNew, "dao new");
+        assertEq(out.deliveryMissionFactory, live.deliveryMissionFactory, "existing factory reused");
+        assertEq(out.deliveryEscrowImpl, live.deliveryEscrowImpl, "escrow impl echoed");
+        assertFalse(out.routerWired, "router untouched");
+        assertEq(router.missionFactory(), live.deliveryMissionFactory, "router still on the live factory");
+        // Exactly two txs: DeliveriesDAO creation + setDeliveryFactory.
+        assertEq(vm.getNonce(admin), nonceBefore + 2, "only DAO deploy + wiring broadcast");
+
+        DeliveriesDAO dao = DeliveriesDAO(out.deliveriesDAO);
+        assertEq(dao.deliveryFactory(), live.deliveryMissionFactory, "dao.deliveryFactory");
+        assertEq(dao.owner(), admin, "dao owner = broadcaster (transfer to multisig next)");
+        assertEq(address(dao.usdc()), address(usdc), "dao usdc");
+        assertEq(dao.pendingDeliveryFactoryEta(), 0, "first wiring is immediate");
+    }
+
+    function test_DeployScript_DaoOnly_RequiresDeployFlag() public {
+        DeployDeliveryContracts.Deployed memory live = script.deploy(_cfg(ADMIN_PK, false));
+        DeployDeliveryContracts.Config memory cfg = _daoOnlyCfg(live.deliveryMissionFactory);
+        cfg.deployDeliveriesDAO = false;
+        vm.expectRevert(DeployDeliveryContracts.DaoOnlyModeRequiresDeployFlag.selector);
+        script.deploy(cfg);
+    }
+
+    function test_DeployScript_DaoOnly_RevertsOnFactoryWithoutCode() public {
+        address noCode = address(0xF02C);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DeployDeliveryContracts.NoCodeAtAddress.selector, "DELIVERY_MISSION_FACTORY", noCode
+            )
+        );
+        script.deploy(_daoOnlyCfg(noCode));
+    }
+
+    function test_DeployScript_DaoOnly_RevertsOnNonFactoryContract() public {
+        // A contract that is not a DeliveryMissionFactory (no deliveryEscrowImplementation()).
+        vm.expectRevert();
+        script.deploy(_daoOnlyCfg(address(router)));
     }
 }
