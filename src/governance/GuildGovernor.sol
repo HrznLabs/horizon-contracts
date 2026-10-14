@@ -6,7 +6,7 @@ import {GovernorSettings} from "@openzeppelin/contracts/governance/extensions/Go
 import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
 import {GovernorTimelockControl} from "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
-import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {GuildXPVotes, IGuildXPCheckpointed} from "./GuildXPVotes.sol";
 
 /**
  * @title GuildGovernor
@@ -14,12 +14,18 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
  * @dev Uses Guild XP as voting power instead of ERC20Votes tokens
  *
  * Features:
- * - XP-based voting power (via external IGuildXP contract)
+ * - XP-based voting power, read as of the proposal snapshot (GuildXPVotes, audit H6)
+ * - Quorum from total guild XP and the quorum percentage as of the proposal snapshot
  * - Configurable voting delay, period, and proposal threshold
  * - Timelock for execution delay
  * - Support for Zone, Governance, Feature, and Treasury proposals
  */
-contract GuildGovernor is Governor, GovernorSettings, GovernorCountingSimple, GovernorTimelockControl {
+contract GuildGovernor is
+    GuildXPVotes,
+    GovernorSettings,
+    GovernorCountingSimple,
+    GovernorTimelockControl
+{
     // =============================================================================
     // TYPES
     // =============================================================================
@@ -35,45 +41,18 @@ contract GuildGovernor is Governor, GovernorSettings, GovernorCountingSimple, Go
     // STATE
     // =============================================================================
 
-    /// @notice The Guild DAO this governor is attached to
-    address public immutable guildDAO;
-
-    /// @notice Contract that tracks Guild XP for voting power
-    IGuildXP public xpContract;
-
-    /// @notice Quorum as percentage of total XP (0-100)
-    uint256 public quorumNumerator;
-
     /// @notice Proposal type metadata
     mapping(uint256 => ProposalType) public proposalTypes;
-
-    /**
-     * @notice Snapshot of totalGuildXP recorded at proposal creation time.
-     * @dev Security (MED-06): Reading live totalGuildXP in quorum() allows an attacker
-     *      to manipulate the quorum threshold between proposal creation and vote tallying
-     *      by temporarily inflating or deflating XP. Snapshotting at propose time locks
-     *      the quorum denominator for the lifetime of that proposal.
-     */
-    mapping(uint256 => uint256) public proposalQuorumSnapshot;
 
     // =============================================================================
     // EVENTS
     // =============================================================================
 
-    event QuorumUpdated(uint256 oldQuorum, uint256 newQuorum);
-    event XPContractUpdated(address oldContract, address newContract);
     event ProposalCreatedWithType(
         uint256 indexed proposalId,
         ProposalType proposalType,
         address proposer
     );
-
-    // =============================================================================
-    // ERRORS
-    // =============================================================================
-
-    error InvalidQuorum();
-    error InvalidXPContract();
 
     // =============================================================================
     // CONSTRUCTOR
@@ -83,7 +62,7 @@ contract GuildGovernor is Governor, GovernorSettings, GovernorCountingSimple, Go
      * @notice Deploy a new GuildGovernor
      * @param _guildDAO Address of the GuildDAO contract
      * @param _timelock Address of the TimelockController
-     * @param _xpContract Address of the XP tracking contract
+     * @param _xpContract Address of the (checkpointed) XP tracking contract
      * @param _votingDelay Delay before voting starts (in blocks)
      * @param _votingPeriod Duration of voting (in blocks)
      * @param _proposalThreshold Minimum XP to create a proposal
@@ -99,41 +78,10 @@ contract GuildGovernor is Governor, GovernorSettings, GovernorCountingSimple, Go
         uint256 _quorumNumerator
     )
         Governor("GuildGovernor")
+        GuildXPVotes(_guildDAO, _xpContract, _quorumNumerator)
         GovernorSettings(_votingDelay, _votingPeriod, _proposalThreshold)
         GovernorTimelockControl(_timelock)
-    {
-        if (_quorumNumerator > 100) revert InvalidQuorum();
-
-        guildDAO = _guildDAO;
-        xpContract = IGuildXP(_xpContract);
-        quorumNumerator = _quorumNumerator;
-    }
-
-    // =============================================================================
-    // GOVERNANCE SETTINGS
-    // =============================================================================
-
-    /**
-     * @notice Update quorum percentage
-     * @param newQuorum New quorum (0-100)
-     */
-    function setQuorum(uint256 newQuorum) external onlyGovernance {
-        if (newQuorum > 100) revert InvalidQuorum();
-        uint256 oldQuorum = quorumNumerator;
-        quorumNumerator = newQuorum;
-        emit QuorumUpdated(oldQuorum, newQuorum);
-    }
-
-    /**
-     * @notice Update XP contract address
-     * @param newXPContract New XP contract address
-     */
-    function setXPContract(address newXPContract) external onlyGovernance {
-        if (newXPContract == address(0)) revert InvalidXPContract();
-        address oldContract = address(xpContract);
-        xpContract = IGuildXP(newXPContract);
-        emit XPContractUpdated(oldContract, newXPContract);
-    }
+    {}
 
     // =============================================================================
     // PROPOSAL CREATION
@@ -158,79 +106,6 @@ contract GuildGovernor is Governor, GovernorSettings, GovernorCountingSimple, Go
         proposalTypes[proposalId] = proposalType;
         emit ProposalCreatedWithType(proposalId, proposalType, msg.sender);
         return proposalId;
-    }
-
-    /**
-     * @notice Internal propose hook — records total XP snapshot at proposal creation.
-     * @dev Security (MED-06): Overrides Governor._propose to capture totalGuildXP before
-     *      any votes are cast. This snapshot is used by quorum() so that XP changes after
-     *      proposal creation cannot retroactively manipulate the quorum threshold.
-     */
-    function _propose(
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        string memory description,
-        address proposer
-    ) internal override returns (uint256 proposalId) {
-        proposalId = super._propose(targets, values, calldatas, description, proposer);
-        proposalQuorumSnapshot[proposalId] = xpContract.getTotalGuildXP(guildDAO);
-    }
-
-    // =============================================================================
-    // VOTING POWER (XP-based)
-    // =============================================================================
-
-    /**
-     * @notice Get voting power for an account at a specific timepoint
-     * @dev Uses Guild XP as voting power
-     */
-    function _getVotes(
-        address account,
-        uint256 /* timepoint */,
-        bytes memory /* params */
-    ) internal view override returns (uint256) {
-        // Get user's XP from the XP contract
-        return xpContract.getGuildXP(guildDAO, account);
-    }
-
-    // =============================================================================
-    // QUORUM
-    // =============================================================================
-
-    /**
-     * @notice Calculate quorum for a given proposal.
-     * @param proposalId The proposal ID whose snapshot to use.
-     * @dev Security (MED-06): Reads from proposalQuorumSnapshot[proposalId] instead of live
-     *      totalGuildXP to prevent quorum manipulation between proposal creation and vote tallying.
-     *      Falls back to live XP only when the proposalId is zero (e.g., compatibility calls
-     *      that pass a timepoint rather than a proposalId — should not occur in normal operation).
-     */
-    function quorum(uint256 proposalId) public view override returns (uint256) {
-        uint256 snapshotXP = proposalQuorumSnapshot[proposalId];
-        // If snapshot is non-zero the proposal is known; use it. Otherwise fall back to live XP
-        // (handles edge cases such as direct timepoint queries from tooling).
-        uint256 totalXP = snapshotXP > 0 ? snapshotXP : xpContract.getTotalGuildXP(guildDAO);
-        return (totalXP * quorumNumerator) / 100;
-    }
-
-    // =============================================================================
-    // CLOCK (IERC6372)
-    // =============================================================================
-
-    /**
-     * @notice Returns the current block number as the clock
-     */
-    function clock() public view override returns (uint48) {
-        return uint48(block.number);
-    }
-
-    /**
-     * @notice Returns the clock mode description
-     */
-    // solhint-disable-next-line func-name-mixedcase
-    function CLOCK_MODE() public pure override returns (string memory) {
-        return "mode=blocknumber&from=default";
     }
 
     // =============================================================================
@@ -301,21 +176,7 @@ contract GuildGovernor is Governor, GovernorSettings, GovernorCountingSimple, Go
 
 /**
  * @title IGuildXP
- * @notice Interface for Guild XP tracking contract
+ * @notice Interface for the Guild XP tracking contract (kept for compatibility; the
+ *         governor requires the checkpointed reads, see IGuildXPCheckpointed).
  */
-interface IGuildXP {
-    /**
-     * @notice Get a user's XP for a specific guild
-     * @param guild Guild address
-     * @param account User address
-     * @return XP amount
-     */
-    function getGuildXP(address guild, address account) external view returns (uint256);
-
-    /**
-     * @notice Get total XP for a guild
-     * @param guild Guild address
-     * @return Total XP
-     */
-    function getTotalGuildXP(address guild) external view returns (uint256);
-}
+interface IGuildXP is IGuildXPCheckpointed {}

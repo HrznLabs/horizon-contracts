@@ -11,6 +11,7 @@ import {PaymentRouter} from "../src/PaymentRouter.sol";
 import {ReputationOracle} from "../src/ReputationOracle.sol";
 import {DeliveryMissionFactory} from "../src/DeliveryMissionFactory.sol";
 import {DeliveriesDAO} from "../src/DeliveriesDAO.sol";
+import {MockDeliveryRegistry} from "./mocks/MockDeliveryRegistry.sol";
 import {DeliveryEscrow} from "../src/DeliveryEscrow.sol";
 import {IMissionEscrow} from "../src/interfaces/IMissionEscrow.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
@@ -427,6 +428,11 @@ contract SmokeTest is Test {
 
         uint256 missionId = 42;
         uint256 coverage  = 10e6; // €10
+
+        // Audit M4 residual: policies must reference a real order of the delivery factory.
+        MockDeliveryRegistry registry = new MockDeliveryRegistry();
+        registry.setMission(missionId, poster, coverage);
+        deliveriesDAO.setDeliveryFactory(address(registry));
 
         // Curate a performer
         deliveriesDAO.curatePerformer(performer, 90);

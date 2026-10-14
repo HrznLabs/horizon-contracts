@@ -819,6 +819,11 @@ contract EthskillsAuditTest is Test {
     // =========================================================================
     // MED-06 — GuildGovernorSimple: quorum snapshotted at proposal time
     // =========================================================================
+    // Audit H6: the original MED-06 tests called `quorum(proposalId)` directly, but OZ v5
+    // calls `quorum(proposalSnapshot(proposalId))` — a block number — so the per-proposalId
+    // snapshot they asserted was never used by the governor (false assurance). These tests
+    // now go through the timepoint OZ actually passes. Full adversarial coverage lives in
+    // test/governance/GuildGovernorSnapshot.t.sol.
 
     function test_MED06_QuorumSnapshotted_AtProposalTime() public {
         GuildXPMock xpMock = new GuildXPMock();
@@ -833,40 +838,28 @@ contract EthskillsAuditTest is Test {
             20   // quorumNumerator = 20%
         );
 
-        // Give alice enough XP to propose
+        // Give alice XP; total = 1000
         xpMock.setGuildXP(guildDAO, alice, 1000);
-        // Total XP at proposal time = 1000
+        vm.roll(block.number + 1);
 
-        // Create proposal
         address[] memory targets   = new address[](1);
         uint256[] memory values    = new uint256[](1);
         bytes[]   memory calldatas = new bytes[](1);
         targets[0] = guildDAO;
-        string memory description  = "Test proposal";
 
         vm.prank(alice);
-        uint256 proposalId = governor.propose(targets, values, calldatas, description);
+        uint256 proposalId = governor.propose(targets, values, calldatas, "Test proposal");
+        uint256 snapshot = governor.proposalSnapshot(proposalId);
+        vm.roll(snapshot + 1);
 
-        // Snapshot quorum is based on XP at proposal creation = 1000 * 20% = 200
-        uint256 snapshotXP = governor.proposalQuorumSnapshot(proposalId);
-        assertEq(snapshotXP, 1000, "MED-06: Snapshot must equal XP at proposal time");
+        assertEq(governor.quorum(snapshot), 200, "MED-06: Quorum = 20% of snapshot XP");
 
-        uint256 quorumAtProposal = governor.quorum(proposalId);
-        assertEq(quorumAtProposal, 200, "MED-06: Quorum = 20% of snapshot XP");
-
-        // Now double the total XP (simulating a post-proposal XP inflation attack)
+        // Post-snapshot XP inflation attack
         xpMock.setGuildXP(guildDAO, bob, 9000);
-        // totalGuildXP is now 10_000
 
-        // Quorum for this proposal must STILL be 200 (snapshotted)
-        uint256 quorumAfterInflation = governor.quorum(proposalId);
-        assertEq(
-            quorumAfterInflation,
-            200,
-            "MED-06: Quorum must not change after proposal creation"
-        );
+        assertEq(governor.quorum(snapshot), 200, "MED-06: Quorum must not change after snapshot");
         assertNotEq(
-            quorumAfterInflation,
+            governor.quorum(snapshot),
             (xpMock.getTotalGuildXP(guildDAO) * 20) / 100,
             "MED-06: Live quorum would be 2000, snapshot quorum must be 200"
         );
@@ -885,26 +878,27 @@ contract EthskillsAuditTest is Test {
         );
 
         xpMock.setGuildXP(guildDAO, alice, 1000);
+        vm.roll(block.number + 1);
 
         address[] memory targets   = new address[](1);
         uint256[] memory values    = new uint256[](1);
         bytes[]   memory calldatas = new bytes[](1);
         targets[0] = guildDAO;
 
-        // Proposal 1 — snapshot = 1000
         vm.prank(alice);
         uint256 proposalId1 = governor.propose(targets, values, calldatas, "proposal 1");
+        vm.roll(governor.proposalSnapshot(proposalId1) + 1);
 
-        // Inflate XP
+        // Inflate XP after proposal 1's snapshot
         xpMock.setGuildXP(guildDAO, bob, 9000);
 
-        // Proposal 2 — snapshot = 10_000
-        vm.roll(block.number + 2); // advance past voting delay of proposal1
+        vm.roll(block.number + 1);
         vm.prank(alice);
         uint256 proposalId2 = governor.propose(targets, values, calldatas, "proposal 2");
+        vm.roll(governor.proposalSnapshot(proposalId2) + 1);
 
-        assertEq(governor.proposalQuorumSnapshot(proposalId1), 1000);
-        assertEq(governor.proposalQuorumSnapshot(proposalId2), 10_000);
+        assertEq(governor.quorum(governor.proposalSnapshot(proposalId1)), 200);
+        assertEq(governor.quorum(governor.proposalSnapshot(proposalId2)), 2000);
     }
 }
 

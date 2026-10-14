@@ -4,6 +4,25 @@ pragma solidity ^0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IMissionEscrow} from "./interfaces/IMissionEscrow.sol";
+
+/**
+ * @title IDeliveryMissionRegistry
+ * @notice The subset of DeliveryMissionFactory that DeliveriesDAO trusts to bind an
+ *         insurance policy to a real, funded delivery order (audit M4 residual / L1).
+ */
+interface IDeliveryMissionRegistry {
+    function missions(uint256 missionId) external view returns (address escrow);
+    function getMissionParams(uint256 missionId)
+        external
+        view
+        returns (IMissionEscrow.MissionParams memory);
+    function getMissionRuntime(uint256 missionId)
+        external
+        view
+        returns (IMissionEscrow.MissionRuntime memory);
+}
 
 /**
  * @title IInsuranceProvider
@@ -39,8 +58,34 @@ interface IInsuranceProvider {
  *      OPS NOTE (audit M4): the privileged role here is a single `Ownable` owner that can
  *      process claims and withdraw pool surplus. Transferring ownership to a multisig /
  *      the DAO timelock is an operational task and is deliberately NOT encoded here.
+ *
+ *      Drain bounds (audit M4 residual, issue #820). #828 added 1:1 reserve accounting, but
+ *      the pool could still be emptied through the policy/claim path itself:
+ *      `createInsurancePolicy` was permissionless with arbitrary `missionId` and
+ *      `coverageAmount`, so anyone could insure orders that do not exist (or that they
+ *      never paid for) for up to the whole pool surplus at a 1–2% premium, then claim it,
+ *      and an owner-approved payout had no ceiling beyond that coverage. Now:
+ *      - a policy must reference a real mission of the configured DeliveryMissionFactory,
+ *        be bought by that mission's poster, while the order is Open/Accepted;
+ *      - coverage ≤ the reward actually escrowed for the order, and ≤ `maxCoveragePerPolicy`;
+ *      - payouts across all claims are capped per `PAYOUT_PERIOD` (`maxPayoutPerPeriod`);
+ *      - the limits and the factory can be tightened instantly but only loosened after
+ *        `CONFIG_DELAY`.
+ *
+ *      Owner outflows (PR #963 review follow-up). What the delays DO and do NOT protect:
+ *      - They bound the permissionless drain (fake/over-sized policies) and rate-limit owner
+ *        outflows: `closePolicy` only releases a reserve once the bound order is terminal
+ *        (Completed/Cancelled) on the factory; a processed claim releases its reserve but the
+ *        unpaid part is counted in `releasedThisPeriod`; immediate `withdrawFunds` is limited
+ *        to surplus AND to the same per-period budget as claim payouts (minus what was
+ *        released that period); anything larger goes through `queueWithdraw` →
+ *        `executeWithdraw` after `CONFIG_DELAY`, visible on-chain and cancellable.
+ *      - They do NOT make a compromised owner key harmless: within those bounds the owner can
+ *        still deny honest claims, move up to one period budget per `PAYOUT_PERIOD`, and
+ *        withdraw the unreserved surplus after the delay. Full protection requires the owner
+ *        to be a multisig / timelock — a pre-redeploy requirement (see script/README.md).
  */
-contract DeliveriesDAO is Ownable {
+contract DeliveriesDAO is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // =============================================================================
@@ -98,6 +143,44 @@ contract DeliveriesDAO is Ownable {
     mapping(uint256 => InsuranceClaim) public claims;
     uint256 public claimCounter;
 
+    // ---- Drain bounds (audit M4 residual) ----------------------------------------
+
+    /// @notice Length of the rolling window for `maxPayoutPerPeriod`.
+    uint256 public constant PAYOUT_PERIOD = 1 days;
+
+    /// @notice Delay before a loosening config change (higher caps / new factory) applies.
+    uint256 public constant CONFIG_DELAY = 2 days;
+
+    /// @notice Delivery factory whose missions may be insured. Zero = no policies can be sold.
+    address public deliveryFactory;
+
+    /// @notice Max coverage a single policy may carry (USDC, 6 decimals).
+    uint256 public maxCoveragePerPolicy = 1_000e6;
+
+    /// @notice Max aggregate claim payouts per `PAYOUT_PERIOD` (USDC, 6 decimals).
+    uint256 public maxPayoutPerPeriod = 5_000e6;
+
+    /// @notice Start of the current payout window and the amount paid in it.
+    uint256 public payoutPeriodStart;
+    uint256 public payoutPeriodPaid;
+
+    /// @notice Queued loosening changes and when they may be applied (0 = none queued).
+    uint256 public pendingMaxCoveragePerPolicy;
+    uint256 public pendingMaxPayoutPerPeriod;
+    uint256 public pendingLimitsEta;
+    address public pendingDeliveryFactory;
+    uint256 public pendingDeliveryFactoryEta;
+
+    /// @notice Unpaid coverage released by processed claims in the current payout window.
+    /// @dev Counted against the immediate `withdrawFunds` budget so deny-then-withdraw stays
+    ///      bounded by `maxPayoutPerPeriod`. Not charged against claim payouts.
+    uint256 public releasedThisPeriod;
+
+    /// @notice Queued (delayed) surplus withdrawal; eta 0 = none queued.
+    uint256 public pendingWithdrawAmount;
+    address public pendingWithdrawRecipient;
+    uint256 public pendingWithdrawEta;
+
     // =============================================================================
     // EVENTS
     // =============================================================================
@@ -111,6 +194,12 @@ contract DeliveriesDAO is Ownable {
     event FundsWithdrawn(address indexed recipient, uint256 amount);
     event PoolFunded(address indexed from, uint256 amount);
     event PolicyClosed(uint256 indexed missionId, uint256 coverageReleased);
+    event PayoutLimitsUpdated(uint256 maxCoveragePerPolicy, uint256 maxPayoutPerPeriod);
+    event PayoutLimitsQueued(uint256 maxCoveragePerPolicy, uint256 maxPayoutPerPeriod, uint256 eta);
+    event DeliveryFactoryUpdated(address indexed factory);
+    event DeliveryFactoryQueued(address indexed factory, uint256 eta);
+    event WithdrawQueued(address indexed recipient, uint256 amount, uint256 eta);
+    event WithdrawCancelled();
 
     // =============================================================================
     // ERRORS
@@ -125,6 +214,24 @@ contract DeliveriesDAO is Ownable {
     error InsufficientSolvency(uint256 available, uint256 required);
     /// @notice Payout would exceed the policy's coverage.
     error ExceedsCoverage();
+    /// @notice No delivery factory configured, so no order can be verified.
+    error DeliveryFactoryNotSet();
+    /// @notice `missionId` is not a mission of the configured delivery factory.
+    error UnknownMission(uint256 missionId);
+    /// @notice Only the mission's poster may insure it.
+    error NotMissionPoster();
+    /// @notice The order is no longer insurable (completed, cancelled or disputed).
+    error MissionNotInsurable();
+    /// @notice Coverage is zero, above the order's escrowed reward, or above the per-policy cap.
+    error InvalidCoverage(uint256 coverage, uint256 maxAllowed);
+    /// @notice Payout would breach the per-period cap.
+    error PeriodPayoutCapExceeded(uint256 requested, uint256 remaining);
+    error InvalidLimits();
+    error NothingQueued();
+    error TooEarly(uint256 eta);
+    error ZeroAddress();
+    /// @notice The bound order is not terminal yet, so the policy still covers it.
+    error PolicyStillCovering();
 
     // =============================================================================
     // CONSTRUCTOR
@@ -208,29 +315,31 @@ contract DeliveriesDAO is Ownable {
         uint256 missionId,
         uint256 coverageAmount,
         bool curated
-    ) external {
+    ) external nonReentrant {
         // `createdAt` is non-zero for every real policy, so this also closes the
         // missionId == 0 hole left by the old `missionId == 0` sentinel check.
         // slither-disable-next-line incorrect-equality
         require(policies[missionId].createdAt == 0, "Policy already exists");
 
+        // Audit M4 residual / L1: only a real, funded order can be insured, only by the
+        // poster who funded it, and never for more than was actually escrowed.
+        _checkInsurable(missionId, coverageAmount);
+
         uint256 feeRate = curated ? curatedInsuranceFee : publicInsuranceFee;
         uint256 premium = (coverageAmount * feeRate) / 10000;
 
-        // Transfer premium from poster
-        usdc.safeTransferFrom(msg.sender, address(this), premium);
-
-        // Update pool balance
-        insurancePoolBalance += premium;
-        totalPremiumsCollected += premium;
-
         // Audit M4: refuse to underwrite coverage the pool cannot actually pay.
         // Reserving 1:1 means the DAO must capitalise the pool (see fundPool) rather
-        // than pretend 1–2% premiums back 100% payouts.
-        uint256 newReserved = reservedCoverage + coverageAmount;
-        if (newReserved > insurancePoolBalance) {
-            revert InsufficientSolvency(_availableSurplus(), coverageAmount);
+        // than pretend 1–2% premiums back 100% payouts. The premium counts towards the
+        // pool; all state is written before the premium is pulled (CEI).
+        uint256 newBalance = insurancePoolBalance + premium;
+        uint256 reserved = reservedCoverage;
+        uint256 newReserved = reserved + coverageAmount;
+        if (newReserved > newBalance) {
+            revert InsufficientSolvency(newBalance > reserved ? newBalance - reserved : 0, coverageAmount);
         }
+        insurancePoolBalance = newBalance;
+        totalPremiumsCollected += premium;
         reservedCoverage = newReserved;
 
         // Create policy
@@ -245,6 +354,9 @@ contract DeliveriesDAO is Ownable {
         });
         
         emit InsurancePolicyCreated(missionId, msg.sender, premium, coverageAmount);
+
+        // Interaction last.
+        usdc.safeTransferFrom(msg.sender, address(this), premium);
     }
 
     /**
@@ -294,7 +406,7 @@ contract DeliveriesDAO is Ownable {
         uint256 claimId,
         bool approved,
         uint256 payoutAmount
-    ) external onlyOwner {
+    ) external onlyOwner nonReentrant {
         InsuranceClaim storage claim = claims[claimId];
 
         if (claim.processed) revert ClaimAlreadyProcessed();
@@ -309,6 +421,8 @@ contract DeliveriesDAO is Ownable {
             // Audit M4: a payout may never exceed the coverage that was reserved for it.
             if (payoutAmount > policy.coverageAmount) revert ExceedsCoverage();
             if (payoutAmount > insurancePoolBalance) revert InsufficientPoolBalance();
+            // Audit M4 residual: bound aggregate outflow per period.
+            _consumePeriodPayout(payoutAmount);
 
             claim.paidAmount = payoutAmount;
             insurancePoolBalance -= payoutAmount;
@@ -316,8 +430,14 @@ contract DeliveriesDAO is Ownable {
         }
 
         // Audit M4: the policy is settled either way — release its reserve so the
-        // capital becomes available again for new policies or withdrawal.
-        _releasePolicy(claim.missionId);
+        // capital becomes available again for new policies or withdrawal. The unpaid part
+        // (all of it on a denial) is charged to `releasedThisPeriod`, so an owner cannot
+        // deny-then-withdraw past the per-period budget (PR #963 review).
+        uint256 released = _releasePolicy(claim.missionId);
+        if (released > claim.paidAmount) {
+            _rollPeriod();
+            releasedThisPeriod += released - claim.paidAmount;
+        }
 
         if (claim.paidAmount > 0) {
             // Transfer payout to claimant (interactions last)
@@ -371,34 +491,197 @@ contract DeliveriesDAO is Ownable {
     }
 
     /**
-     * @notice Close an active policy that will never be claimed (delivery completed).
-     * @dev Frees the reserved coverage so it can back new policies or be withdrawn.
+     * @notice Close an active policy whose order is over (delivered or cancelled).
+     * @dev Frees the reserved coverage so it can back new policies or be withdrawn. PR #963
+     *      review: only once the bound order is terminal on the delivery factory — while it
+     *      is Open/Accepted/Submitted/Disputed the holder is still covered, so closing it
+     *      would let the owner strip live cover and withdraw its reserve.
      * @param missionId Mission whose policy should be closed.
      */
     function closePolicy(uint256 missionId) external onlyOwner {
         InsurancePolicy storage policy = policies[missionId];
         if (!policy.active) revert PolicyNotActive();
         require(!policy.claimed, "Claim pending");
+        IMissionEscrow.MissionState st =
+            IDeliveryMissionRegistry(deliveryFactory).getMissionRuntime(missionId).state;
+        if (st != IMissionEscrow.MissionState.Completed && st != IMissionEscrow.MissionState.Cancelled) {
+            revert PolicyStillCovering();
+        }
         _releasePolicy(missionId);
     }
 
     /**
-     * @notice Withdraw surplus funds from insurance pool
-     * @dev Audit M4: capped at the genuine surplus (`balance − reservedCoverage`) so the
-     *      owner can no longer drain capital backing live policies.
+     * @notice Withdraw surplus funds from the insurance pool immediately (small amounts).
+     * @dev Audit M4: capped at the genuine surplus (`balance − reservedCoverage`). PR #963
+     *      review: also charged against the per-period budget shared with claim payouts and
+     *      reduced by `releasedThisPeriod`, so an owner key can move at most
+     *      `maxPayoutPerPeriod` per `PAYOUT_PERIOD` without notice. Larger amounts: use
+     *      `queueWithdraw`.
      * @param amount Amount to withdraw
      * @param recipient Address to receive funds
      */
-    function withdrawFunds(uint256 amount, address recipient) external onlyOwner {
+    function withdrawFunds(uint256 amount, address recipient) external onlyOwner nonReentrant {
         require(amount <= _availableSurplus(), "Insufficient balance");
-        insurancePoolBalance -= amount;
-        usdc.safeTransfer(recipient, amount);
-        emit FundsWithdrawn(recipient, amount);
+        _rollPeriod();
+        uint256 used = payoutPeriodPaid + releasedThisPeriod;
+        uint256 cap = maxPayoutPerPeriod;
+        if (used + amount > cap) {
+            revert PeriodPayoutCapExceeded(amount, used >= cap ? 0 : cap - used);
+        }
+        payoutPeriodPaid += amount;
+        _withdraw(amount, recipient);
+    }
+
+    /**
+     * @notice Queue a surplus withdrawal of any size, executable after `CONFIG_DELAY`.
+     * @dev Replaces any queued withdrawal. Cancelled by `cancelWithdraw` or by any tightening
+     *      of the payout limits. The surplus is re-checked at execution time.
+     */
+    function queueWithdraw(uint256 amount, address recipient) external onlyOwner {
+        if (recipient == address(0)) revert ZeroAddress();
+        require(amount > 0, "Zero amount");
+        pendingWithdrawAmount = amount;
+        pendingWithdrawRecipient = recipient;
+        pendingWithdrawEta = block.timestamp + CONFIG_DELAY;
+        emit WithdrawQueued(recipient, amount, pendingWithdrawEta);
+    }
+
+    /// @notice Execute the queued withdrawal once its delay has elapsed.
+    function executeWithdraw() external onlyOwner nonReentrant {
+        uint256 eta = pendingWithdrawEta;
+        if (eta == 0) revert NothingQueued();
+        if (block.timestamp < eta) revert TooEarly(eta);
+        uint256 amount = pendingWithdrawAmount;
+        require(amount <= _availableSurplus(), "Insufficient balance");
+        address recipient = pendingWithdrawRecipient;
+        _clearWithdraw();
+        _withdraw(amount, recipient);
+    }
+
+    /// @notice Cancel the queued withdrawal.
+    function cancelWithdraw() external onlyOwner {
+        if (pendingWithdrawEta == 0) revert NothingQueued();
+        _cancelWithdraw();
+    }
+
+    // =============================================================================
+    // DRAIN BOUNDS CONFIG (audit M4 residual)
+    // =============================================================================
+
+    /**
+     * @notice Set the delivery factory whose missions may be insured.
+     * @dev First configuration applies immediately (no policy can exist before it). Any
+     *      later change is queued for `CONFIG_DELAY`, because a hostile factory could report
+     *      arbitrary posters and rewards.
+     */
+    function setDeliveryFactory(address factory) external onlyOwner {
+        if (factory == address(0)) revert ZeroAddress();
+        if (deliveryFactory == address(0)) {
+            deliveryFactory = factory;
+            emit DeliveryFactoryUpdated(factory);
+            return;
+        }
+        pendingDeliveryFactory = factory;
+        pendingDeliveryFactoryEta = block.timestamp + CONFIG_DELAY;
+        emit DeliveryFactoryQueued(factory, pendingDeliveryFactoryEta);
+    }
+
+    /// @notice Apply a queued delivery-factory change once its delay has elapsed.
+    function applyDeliveryFactory() external onlyOwner {
+        uint256 eta = pendingDeliveryFactoryEta;
+        if (eta == 0) revert NothingQueued();
+        if (block.timestamp < eta) revert TooEarly(eta);
+        deliveryFactory = pendingDeliveryFactory;
+        pendingDeliveryFactory = address(0);
+        pendingDeliveryFactoryEta = 0;
+        emit DeliveryFactoryUpdated(deliveryFactory);
+    }
+
+    /**
+     * @notice Update the per-policy coverage cap and the per-period payout cap.
+     * @dev Tightening (both values ≤ current) applies immediately and cancels any queued
+     *      change, including a queued withdrawal. Loosening is queued for `CONFIG_DELAY`. `perPolicy ≤ perPeriod` so every
+     *      policy remains payable within one period.
+     */
+    function setPayoutLimits(uint256 perPolicy, uint256 perPeriod) external onlyOwner {
+        if (perPolicy == 0 || perPolicy > perPeriod) revert InvalidLimits();
+        if (perPolicy <= maxCoveragePerPolicy && perPeriod <= maxPayoutPerPeriod) {
+            maxCoveragePerPolicy = perPolicy;
+            maxPayoutPerPeriod = perPeriod;
+            pendingLimitsEta = 0;
+            if (pendingWithdrawEta != 0) _cancelWithdraw();
+            emit PayoutLimitsUpdated(perPolicy, perPeriod);
+            return;
+        }
+        pendingMaxCoveragePerPolicy = perPolicy;
+        pendingMaxPayoutPerPeriod = perPeriod;
+        pendingLimitsEta = block.timestamp + CONFIG_DELAY;
+        emit PayoutLimitsQueued(perPolicy, perPeriod, pendingLimitsEta);
+    }
+
+    /// @notice Apply queued (loosened) payout limits once their delay has elapsed.
+    function applyPayoutLimits() external onlyOwner {
+        uint256 eta = pendingLimitsEta;
+        if (eta == 0) revert NothingQueued();
+        if (block.timestamp < eta) revert TooEarly(eta);
+        maxCoveragePerPolicy = pendingMaxCoveragePerPolicy;
+        maxPayoutPerPeriod = pendingMaxPayoutPerPeriod;
+        pendingLimitsEta = 0;
+        emit PayoutLimitsUpdated(maxCoveragePerPolicy, maxPayoutPerPeriod);
+    }
+
+    /// @notice Payout still available in the current period.
+    function remainingPeriodPayout() public view returns (uint256) {
+        if (block.timestamp >= payoutPeriodStart + PAYOUT_PERIOD) return maxPayoutPerPeriod;
+        uint256 paid = payoutPeriodPaid;
+        return paid >= maxPayoutPerPeriod ? 0 : maxPayoutPerPeriod - paid;
     }
 
     // =============================================================================
     // INTERNAL
     // =============================================================================
+
+    /// @dev Bind a new policy to a real, funded, still-live order of the delivery factory.
+    function _checkInsurable(uint256 missionId, uint256 coverageAmount) internal view {
+        address factory = deliveryFactory;
+        if (factory == address(0)) revert DeliveryFactoryNotSet();
+        IDeliveryMissionRegistry registry = IDeliveryMissionRegistry(factory);
+        if (registry.missions(missionId) == address(0)) revert UnknownMission(missionId);
+
+        IMissionEscrow.MissionParams memory params = registry.getMissionParams(missionId);
+        if (params.poster != msg.sender) revert NotMissionPoster();
+
+        IMissionEscrow.MissionState st = registry.getMissionRuntime(missionId).state;
+        if (st != IMissionEscrow.MissionState.Open && st != IMissionEscrow.MissionState.Accepted) {
+            revert MissionNotInsurable();
+        }
+
+        uint256 maxAllowed = params.rewardAmount < maxCoveragePerPolicy
+            ? params.rewardAmount
+            : maxCoveragePerPolicy;
+        if (coverageAmount == 0 || coverageAmount > maxAllowed) {
+            revert InvalidCoverage(coverageAmount, maxAllowed);
+        }
+    }
+
+    /// @dev Start a new payout window (resetting both counters) if the current one expired.
+    function _rollPeriod() internal {
+        if (block.timestamp >= payoutPeriodStart + PAYOUT_PERIOD) {
+            payoutPeriodStart = block.timestamp;
+            payoutPeriodPaid = 0;
+            releasedThisPeriod = 0;
+        }
+    }
+
+    /// @dev Roll the payout window if it expired, then charge `amount` against it.
+    function _consumePeriodPayout(uint256 amount) internal {
+        _rollPeriod();
+        uint256 paid = payoutPeriodPaid + amount;
+        if (paid > maxPayoutPerPeriod) {
+            revert PeriodPayoutCapExceeded(amount, remainingPeriodPayout());
+        }
+        payoutPeriodPaid = paid;
+    }
 
     /// @notice Pool capital not reserved against outstanding coverage.
     function _availableSurplus() internal view returns (uint256) {
@@ -407,13 +690,31 @@ contract DeliveriesDAO is Ownable {
         return balance > reserved ? balance - reserved : 0;
     }
 
+    function _withdraw(uint256 amount, address recipient) internal {
+        insurancePoolBalance -= amount;
+        usdc.safeTransfer(recipient, amount);
+        emit FundsWithdrawn(recipient, amount);
+    }
+
+    function _clearWithdraw() internal {
+        pendingWithdrawAmount = 0;
+        pendingWithdrawRecipient = address(0);
+        pendingWithdrawEta = 0;
+    }
+
+    function _cancelWithdraw() internal {
+        _clearWithdraw();
+        emit WithdrawCancelled();
+    }
+
     /// @notice Deactivate a policy and release its reserved coverage (idempotent).
-    function _releasePolicy(uint256 missionId) internal {
+    /// @return coverage The coverage released (0 if the policy was already inactive).
+    function _releasePolicy(uint256 missionId) internal returns (uint256 coverage) {
         InsurancePolicy storage policy = policies[missionId];
-        if (!policy.active) return;
+        if (!policy.active) return 0;
 
         policy.active = false;
-        uint256 coverage = policy.coverageAmount;
+        coverage = policy.coverageAmount;
         // Defensive: never underflow even if `sync()` or an upgrade skewed the tracker.
         reservedCoverage = reservedCoverage > coverage ? reservedCoverage - coverage : 0;
 

@@ -4,10 +4,16 @@ pragma solidity ^0.8.24;
 import {Test, console} from "forge-std/Test.sol";
 import {DeliveriesDAO} from "../src/DeliveriesDAO.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
+import {MockDeliveryRegistry} from "./mocks/MockDeliveryRegistry.sol";
+import {IMissionEscrow} from "../src/interfaces/IMissionEscrow.sol";
 
 contract DeliveriesDAOTest is Test {
     DeliveriesDAO public dao;
     MockERC20 public usdc;
+    MockDeliveryRegistry public registry;
+
+    /// @notice Reward escrowed for each registered test mission.
+    uint256 public constant ESCROWED_REWARD = 1000e6;
 
     address public owner = address(1);
     address public performer1 = address(2);
@@ -33,6 +39,14 @@ contract DeliveriesDAOTest is Test {
 
         vm.stopPrank();
 
+        // Audit M4 residual: policies must reference real orders of the delivery factory.
+        registry = new MockDeliveryRegistry();
+        for (uint256 id = 1; id <= 3; id++) {
+            registry.setMission(id, poster, ESCROWED_REWARD);
+        }
+        registry.setMission(42, poster, ESCROWED_REWARD);
+        _wire(dao);
+
         // Mint USDC to poster
         usdc.mint(poster, INITIAL_BALANCE);
 
@@ -48,6 +62,12 @@ contract DeliveriesDAOTest is Test {
     function _uncapitalisedDao() internal returns (DeliveriesDAO fresh) {
         vm.prank(owner);
         fresh = new DeliveriesDAO(address(usdc));
+        _wire(fresh);
+    }
+
+    function _wire(DeliveriesDAO d) internal {
+        vm.prank(owner);
+        d.setDeliveryFactory(address(registry));
     }
 
     // =============================================================================
@@ -538,6 +558,12 @@ contract DeliveriesDAOTest is Test {
 
         assertEq(dao.reservedCoverage(), 100e6);
 
+        // PR #963 review: only a terminal order can be closed out.
+        vm.prank(owner);
+        vm.expectRevert(DeliveriesDAO.PolicyStillCovering.selector);
+        dao.closePolicy(1);
+        registry.setState(1, IMissionEscrow.MissionState.Completed);
+
         vm.prank(owner);
         dao.closePolicy(1);
 
@@ -577,17 +603,239 @@ contract DeliveriesDAOTest is Test {
     }
 
     /// @notice Mission id 0 must not be a re-creatable policy slot.
+    /// @dev The delivery factory numbers missions from 1, so mission 0 is now not insurable
+    ///      at all (L1); a registered mission still cannot be insured twice.
     function test_M4_PolicyZero_CannotBeOverwritten() public {
         vm.startPrank(poster);
         usdc.approve(address(dao), 4e6);
+        vm.expectRevert(abi.encodeWithSelector(DeliveriesDAO.UnknownMission.selector, 0));
         dao.createInsurancePolicy(0, 100e6, false);
 
-        // FAILED BEFORE FIX: the old `missionId == 0` sentinel let mission 0's policy be
-        // recreated indefinitely, double-counting premiums and (now) reserves.
+        dao.createInsurancePolicy(1, 100e6, false);
         vm.expectRevert("Policy already exists");
-        dao.createInsurancePolicy(0, 100e6, false);
+        dao.createInsurancePolicy(1, 100e6, false);
         vm.stopPrank();
 
         assertEq(dao.reservedCoverage(), 100e6);
+    }
+
+    // =============================================================================
+    // AUDIT M4 RESIDUAL — policy/claim-path drain (issue #820)
+    // =============================================================================
+
+    address internal attacker = address(0xBAD);
+
+    function _fundAttacker(uint256 amount) internal {
+        usdc.mint(attacker, amount);
+        vm.prank(attacker);
+        usdc.approve(address(dao), type(uint256).max);
+    }
+
+    /// @notice The drain as it stood after #828: an outsider insures orders that do not
+    ///         exist for the whole surplus at a 2% premium. Now refused.
+    function test_M4Drain_FakeMission_Reverts() public {
+        _fundAttacker(100e6);
+        // FAILED BEFORE FIX: mission 7777 does not exist, yet a 1,000 USDC policy was sold
+        // for 20 USDC and could be claimed against the pool.
+        vm.prank(attacker);
+        vm.expectRevert(abi.encodeWithSelector(DeliveriesDAO.UnknownMission.selector, 7777));
+        dao.createInsurancePolicy(7777, 1000e6, false);
+        assertEq(dao.reservedCoverage(), 0);
+    }
+
+    /// @notice Someone else's real order cannot be insured by a third party (also L1 grief).
+    function test_M4Drain_NotPoster_Reverts() public {
+        _fundAttacker(100e6);
+        vm.prank(attacker);
+        vm.expectRevert(DeliveriesDAO.NotMissionPoster.selector);
+        dao.createInsurancePolicy(1, 100e6, false);
+    }
+
+    /// @notice Coverage is bounded by what the poster actually escrowed.
+    function test_M4Drain_CoverageAboveEscrowedReward_Reverts() public {
+        registry.setMission(5, attacker, 10e6); // a 10 USDC order
+        _fundAttacker(100e6);
+        // FAILED BEFORE FIX: a 10 USDC order could carry 900 USDC of coverage.
+        vm.prank(attacker);
+        vm.expectRevert(abi.encodeWithSelector(DeliveriesDAO.InvalidCoverage.selector, 900e6, 10e6));
+        dao.createInsurancePolicy(5, 900e6, false);
+
+        vm.prank(attacker);
+        dao.createInsurancePolicy(5, 10e6, false); // exactly the escrowed reward is fine
+        assertEq(dao.reservedCoverage(), 10e6);
+    }
+
+    function test_M4Drain_CoverageAbovePerPolicyCap_Reverts() public {
+        registry.setMission(6, attacker, 50_000e6);
+        _fundAttacker(10_000e6);
+        uint256 cap = dao.maxCoveragePerPolicy();
+        vm.prank(attacker);
+        vm.expectRevert(abi.encodeWithSelector(DeliveriesDAO.InvalidCoverage.selector, cap + 1, cap));
+        dao.createInsurancePolicy(6, cap + 1, false);
+    }
+
+    function test_M4Drain_ZeroCoverage_Reverts() public {
+        vm.prank(poster);
+        vm.expectRevert(abi.encodeWithSelector(DeliveriesDAO.InvalidCoverage.selector, 0, 1000e6));
+        dao.createInsurancePolicy(1, 0, false);
+    }
+
+    /// @notice Completed / cancelled / disputed orders can no longer be insured after the fact.
+    function test_M4Drain_SettledMission_NotInsurable() public {
+        IMissionEscrow.MissionState[3] memory dead = [
+            IMissionEscrow.MissionState.Completed,
+            IMissionEscrow.MissionState.Cancelled,
+            IMissionEscrow.MissionState.Disputed
+        ];
+        vm.startPrank(poster);
+        usdc.approve(address(dao), type(uint256).max);
+        vm.stopPrank();
+        for (uint256 i = 0; i < dead.length; i++) {
+            registry.setState(1, dead[i]);
+            vm.prank(poster);
+            vm.expectRevert(DeliveriesDAO.MissionNotInsurable.selector);
+            dao.createInsurancePolicy(1, 100e6, false);
+        }
+        registry.setState(1, IMissionEscrow.MissionState.Accepted);
+        vm.prank(poster);
+        dao.createInsurancePolicy(1, 100e6, false);
+    }
+
+    function test_M4Drain_NoFactory_NoPolicies() public {
+        vm.prank(owner);
+        DeliveriesDAO bare = new DeliveriesDAO(address(usdc));
+        vm.prank(poster);
+        vm.expectRevert(DeliveriesDAO.DeliveryFactoryNotSet.selector);
+        bare.createInsurancePolicy(1, 100e6, false);
+    }
+
+    /// @notice Even with owner-approved claims, aggregate payouts are capped per period.
+    function test_M4Drain_PeriodPayoutCap() public {
+        // Tighten caps: 400/policy, 1,000/period. Pool: 1,000 seed + 10,000 extra.
+        vm.prank(owner);
+        dao.setPayoutLimits(400e6, 1000e6);
+        usdc.mint(owner, 10_000e6);
+        vm.startPrank(owner);
+        usdc.approve(address(dao), 10_000e6);
+        dao.fundPool(10_000e6);
+        vm.stopPrank();
+
+        vm.startPrank(poster);
+        usdc.approve(address(dao), type(uint256).max);
+        for (uint256 id = 1; id <= 3; id++) {
+            dao.createInsurancePolicy(id, 400e6, false);
+            dao.submitInsuranceClaim(id, keccak256("evidence"), 400e6);
+        }
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        dao.processInsuranceClaim(0, true, 400e6);
+        dao.processInsuranceClaim(1, true, 400e6);
+        assertEq(dao.remainingPeriodPayout(), 200e6);
+        // FAILED BEFORE FIX: nothing bounded the aggregate outflow of approved claims.
+        vm.expectRevert(
+            abi.encodeWithSelector(DeliveriesDAO.PeriodPayoutCapExceeded.selector, 400e6, 200e6)
+        );
+        dao.processInsuranceClaim(2, true, 400e6);
+        vm.stopPrank();
+
+        // Next period the claim is payable.
+        vm.warp(block.timestamp + dao.PAYOUT_PERIOD());
+        vm.prank(owner);
+        dao.processInsuranceClaim(2, true, 400e6);
+        assertEq(dao.totalClaimsPaid(), 1200e6);
+    }
+
+    /// @notice A compromised owner cannot lift the caps instantly; loosening waits CONFIG_DELAY.
+    function test_M4Drain_LooseningLimits_IsDelayed() public {
+        uint256 perPolicy = dao.maxCoveragePerPolicy();
+        uint256 perPeriod = dao.maxPayoutPerPeriod();
+
+        vm.prank(owner);
+        dao.setPayoutLimits(1_000_000e6, 1_000_000e6);
+        assertEq(dao.maxCoveragePerPolicy(), perPolicy, "not applied yet");
+        assertEq(dao.maxPayoutPerPeriod(), perPeriod, "not applied yet");
+
+        uint256 eta = dao.pendingLimitsEta();
+        assertEq(eta, block.timestamp + dao.CONFIG_DELAY());
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(DeliveriesDAO.TooEarly.selector, eta));
+        dao.applyPayoutLimits();
+
+        vm.warp(eta);
+        vm.prank(owner);
+        dao.applyPayoutLimits();
+        assertEq(dao.maxPayoutPerPeriod(), 1_000_000e6);
+    }
+
+    function test_M4Drain_TighteningLimits_IsImmediate_AndCancelsQueue() public {
+        vm.startPrank(owner);
+        dao.setPayoutLimits(1_000_000e6, 1_000_000e6); // queued
+        dao.setPayoutLimits(100e6, 500e6); // tighten → immediate
+        vm.stopPrank();
+        assertEq(dao.maxCoveragePerPolicy(), 100e6);
+        assertEq(dao.maxPayoutPerPeriod(), 500e6);
+        vm.prank(owner);
+        vm.expectRevert(DeliveriesDAO.NothingQueued.selector);
+        dao.applyPayoutLimits();
+    }
+
+    function test_M4Drain_InvalidLimits_Revert() public {
+        vm.startPrank(owner);
+        vm.expectRevert(DeliveriesDAO.InvalidLimits.selector);
+        dao.setPayoutLimits(0, 100e6);
+        vm.expectRevert(DeliveriesDAO.InvalidLimits.selector);
+        dao.setPayoutLimits(200e6, 100e6);
+        vm.stopPrank();
+    }
+
+    /// @notice Swapping in a hostile factory (that vouches for fake orders) is delayed too.
+    function test_M4Drain_FactorySwap_IsDelayed() public {
+        MockDeliveryRegistry hostile = new MockDeliveryRegistry();
+        hostile.setMission(7777, attacker, 1000e6);
+
+        vm.prank(owner);
+        dao.setDeliveryFactory(address(hostile));
+        assertEq(dao.deliveryFactory(), address(registry), "swap queued, not applied");
+
+        _fundAttacker(100e6);
+        vm.prank(attacker);
+        vm.expectRevert(abi.encodeWithSelector(DeliveriesDAO.UnknownMission.selector, 7777));
+        dao.createInsurancePolicy(7777, 100e6, false);
+
+        vm.warp(block.timestamp + dao.CONFIG_DELAY());
+        vm.prank(owner);
+        dao.applyDeliveryFactory();
+        assertEq(dao.deliveryFactory(), address(hostile));
+    }
+
+    function test_M4Drain_ConfigFunctions_OnlyOwner() public {
+        vm.startPrank(attacker);
+        vm.expectRevert();
+        dao.setDeliveryFactory(attacker);
+        vm.expectRevert();
+        dao.setPayoutLimits(1, 1);
+        vm.expectRevert();
+        dao.applyPayoutLimits();
+        vm.expectRevert();
+        dao.applyDeliveryFactory();
+        vm.stopPrank();
+    }
+
+    /// @notice Happy path end-to-end: real order → policy → claim → payout within caps.
+    function test_M4_HappyPath_RealOrderClaimPaid() public {
+        uint256 before = usdc.balanceOf(poster);
+        vm.startPrank(poster);
+        usdc.approve(address(dao), type(uint256).max);
+        dao.createInsurancePolicy(42, 250e6, true); // 1% curated premium = 2.5 USDC
+        dao.submitInsuranceClaim(42, keccak256("lost parcel"), 250e6);
+        vm.stopPrank();
+
+        vm.prank(owner);
+        dao.processInsuranceClaim(0, true, 250e6);
+
+        assertEq(usdc.balanceOf(poster), before - 2.5e6 + 250e6);
+        assertEq(dao.reservedCoverage(), 0);
+        assertEq(dao.payoutPeriodPaid(), 250e6);
     }
 }

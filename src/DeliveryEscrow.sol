@@ -25,6 +25,10 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * Before this change the inherited `MissionEscrow.approveCompletion()` routed the whole
  * balance through `settlePayment()` as courier reward, so the courier received ~90% of the
  * food cost and the restaurant received nothing.
+ *
+ * Issue #950: `settleDispute()` is overridden too, so PerformerWins / Split dispute
+ * outcomes use the same restaurant-aware payout (shared `_settleOrder`) instead of the
+ * inherited `settlePayment()` path.
  */
 contract DeliveryEscrow is MissionEscrow {
     using SafeERC20 for IERC20;
@@ -112,7 +116,7 @@ contract DeliveryEscrow is MissionEscrow {
     DeliveryWaypoint[] private _waypoints;
     TrackingCheckpoint[] private _trackingCheckpoints;
 
-    /// @notice audit H5: food/delivery breakdown used by approveCompletion().
+    /// @notice audit H5: food/delivery breakdown used by approveCompletion() and settleDispute().
     DeliverySettlement private _settlement;
 
     /// @notice HIGH-05: Address of the factory that deployed this clone.
@@ -134,7 +138,9 @@ contract DeliveryEscrow is MissionEscrow {
     event TipAdded(uint256 indexed missionId, uint256 tipAmount, uint256 totalTip);
     event DeliveryLocationVerified(uint256 indexed missionId, uint8 locationType, bool verified);
 
-    /// @notice audit H5: emitted on the happy path with the exact amounts the escrow moved.
+    /// @notice audit H5: emitted whenever the order is settled through the restaurant path
+    ///         (approveCompletion, and settleDispute PerformerWins/Split — issue #950) with the
+    ///         exact amounts the escrow moved. For a Split these are the performer-side shares.
     /// @param foodCostToRestaurant Amount routed to the restaurant treasury (no fees taken)
     /// @param deliveryFeeRouted Amount handed to PaymentRouter for the hierarchy split
     /// @param tipToPerformer Tip paid straight to the courier (no fees taken)
@@ -166,6 +172,8 @@ contract DeliveryEscrow is MissionEscrow {
     error MissingRestaurantDAO();
     /// @notice audit H5: a MetaDAO fee was configured with no MetaDAO to pay
     error MissingMetaDAO();
+    /// @notice issue #950: a Split dispute outcome with a performer share above 100%
+    error InvalidSplitPercentage(uint256 splitPercentage);
 
     // =============================================================================
     // INITIALIZATION
@@ -448,34 +456,143 @@ contract DeliveryEscrow is MissionEscrow {
         inState(MissionState.Submitted)
         nonReentrant
     {
-        DeliverySettlement memory settlement = _settlement;
         uint256 tip = _deliveryParams.tipAmount;
-        uint256 total = _params.rewardAmount;
+        uint256 foodCost = _settlement.foodCost;
+        uint256 deliveryFee = _settlement.deliveryFee;
 
         // Defense in depth: the invariant is established at creation and preserved by
         // addTip(), so a mismatch here means storage was corrupted — refuse to pay out.
-        uint256 breakdown = settlement.foodCost + settlement.deliveryFee + tip;
-        if (breakdown != total) revert SettlementBreakdownMismatch(total, breakdown);
+        _checkBreakdown(foodCost, deliveryFee, tip);
 
         // CEI: finalize state before any external call.
         _runtime.state = MissionState.Completed;
 
-        address courier = _runtime.performer;
+        _settleOrder(_runtime.performer, foodCost, deliveryFee, tip);
 
-        // Tips belong entirely to the courier — the protocol takes no cut.
+        emit MissionCompleted(_missionId);
+    }
+
+    /**
+     * @notice Settle a disputed delivery according to the DisputeResolver's outcome.
+     * @dev Issue #950. The inherited `MissionEscrow.settleDispute()` routed the WHOLE
+     *      `rewardAmount` through `PaymentRouter.settlePayment()` as courier reward for
+     *      PerformerWins and Split, so the restaurant's food cost was paid to the courier
+     *      (the same bug class as audit H5 / #819, which only fixed `approveCompletion`).
+     *
+     *      Outcomes (every path moves exactly `rewardAmount` out of the escrow):
+     *        1 PosterWins / 4 Cancelled
+     *            Full `rewardAmount` refund to the poster, no fees (same as the base).
+     *            The restaurant is NOT paid on-chain; if the food was already prepared,
+     *            compensating the restaurant is an off-chain operations matter.
+     *        2 PerformerWins
+     *            Identical to `approveCompletion()`: tip -> courier directly; foodCost ->
+     *            restaurant in full and deliveryFee -> hierarchy split, both via
+     *            `settleRestaurantOrder`.
+     *        3 Split (splitPercentage = performer share in bps, 0..10000)
+     *            The restaurant is not a party to the dispute and the food was handed over,
+     *            so foodCost -> restaurant in full. Only the courier-attributable pool
+     *            (deliveryFee + tip) is split, pro rata:
+     *              feeShare = deliveryFee * split / 10000  -> hierarchy split (router)
+     *              tipShare = tip * split / 10000          -> courier directly
+     *              poster   = rewardAmount - foodCost - feeShare - tipShare (absorbs rounding)
+     *        other
+     *            Reverts `InvalidState` (same as the base).
+     *
+     *      `DisputeSettled.performerAmount` is everything not refunded to the poster
+     *      (foodCost + feeShare + tipShare), so existing indexer handlers keep working.
+     *      Safety properties match the base: onlyDisputeResolver, nonReentrant, Disputed
+     *      state required, and CEI — the state is set to Completed before any transfer.
+     * @param outcome 0=None, 1=PosterWins, 2=PerformerWins, 3=Split, 4=Cancelled
+     * @param splitPercentage For Split, the performer's share in basis points (0-10000)
+     */
+    function settleDispute(uint8 outcome, uint256 splitPercentage)
+        external
+        override
+        onlyDisputeResolver
+        nonReentrant
+    {
+        if (_runtime.state != MissionState.Disputed) revert InvalidState();
+
+        uint256 total = _params.rewardAmount;
+        uint256 foodCost;
+        uint256 feeShare;
+        uint256 tipShare;
+
+        if (outcome == 1 || outcome == 4) {
+            // Full refund to the poster — nothing is routed (foodCost/feeShare/tipShare = 0).
+        } else if (outcome == 2 || outcome == 3) {
+            uint256 tip = _deliveryParams.tipAmount;
+            uint256 deliveryFee = _settlement.deliveryFee;
+            foodCost = _settlement.foodCost;
+            _checkBreakdown(foodCost, deliveryFee, tip);
+
+            if (outcome == 2) {
+                feeShare = deliveryFee;
+                tipShare = tip;
+            } else {
+                if (splitPercentage > 10000) revert InvalidSplitPercentage(splitPercentage);
+                feeShare = (deliveryFee * splitPercentage) / 10000;
+                tipShare = (tip * splitPercentage) / 10000;
+            }
+        } else {
+            revert InvalidState();
+        }
+
+        uint256 performerAmount = foodCost + feeShare + tipShare;
+        uint256 posterAmount = total - performerAmount;
+
+        // CEI: finalize state before any external call.
+        _runtime.state = MissionState.Completed;
+
+        if (posterAmount > 0) {
+            _token.safeTransfer(_params.poster, posterAmount);
+        }
+        if (performerAmount > 0) {
+            _settleOrder(_runtime.performer, foodCost, feeShare, tipShare);
+        }
+
+        emit DisputeSettled(_missionId, outcome, posterAmount, performerAmount);
+    }
+
+    /**
+     * @dev Revert unless foodCost + deliveryFee + tip accounts for every escrowed wei.
+     */
+    function _checkBreakdown(uint256 foodCost, uint256 deliveryFee, uint256 tip) private view {
+        uint256 total = _params.rewardAmount;
+        uint256 breakdown = foodCost + deliveryFee + tip;
+        if (breakdown != total) revert SettlementBreakdownMismatch(total, breakdown);
+    }
+
+    /**
+     * @dev Shared payout used by BOTH approveCompletion() and settleDispute() so the two
+     *      paths cannot drift again (issue #950). Caller must already have set the state
+     *      to Completed (CEI) and validated the amounts.
+     *        tip                  -> courier directly (no protocol fee)
+     *        foodCost+deliveryFee -> pushed to the router, then settleRestaurantOrder pays
+     *                                foodCost to the restaurant in full and splits
+     *                                deliveryFee through the fee hierarchy.
+     * @param courier Performer receiving the tip and the courier share of the fee
+     * @param foodCost Amount paid to the restaurant treasury in full
+     * @param deliveryFee Amount split through the PaymentRouter hierarchy
+     * @param tip Amount paid to the courier directly
+     */
+    function _settleOrder(address courier, uint256 foodCost, uint256 deliveryFee, uint256 tip)
+        private
+    {
         if (tip > 0) {
             _token.safeTransfer(courier, tip);
         }
 
-        uint256 routed = total - tip; // == foodCost + deliveryFee
+        uint256 routed = foodCost + deliveryFee;
         if (routed > 0) {
+            DeliverySettlement memory settlement = _settlement;
             _token.safeTransfer(address(_paymentRouter), routed);
             _paymentRouter.settleRestaurantOrder(
                 _missionId,
                 courier,
                 address(_token),
-                settlement.foodCost,
-                settlement.deliveryFee,
+                foodCost,
+                deliveryFee,
                 settlement.restaurantDAO,
                 settlement.metaDAO,
                 settlement.subDAOFeeBps,
@@ -483,14 +600,7 @@ contract DeliveryEscrow is MissionEscrow {
             );
         }
 
-        emit DeliveryOrderSettled(
-            _missionId,
-            courier,
-            settlement.foodCost,
-            settlement.deliveryFee,
-            tip
-        );
-        emit MissionCompleted(_missionId);
+        emit DeliveryOrderSettled(_missionId, courier, foodCost, deliveryFee, tip);
     }
 
     // =============================================================================

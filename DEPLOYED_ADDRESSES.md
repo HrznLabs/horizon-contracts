@@ -5,16 +5,16 @@
 
 ## Base Sepolia Testnet (Chain ID: 84532)
 
-### Core Contracts (Phase 13 redeploy, 2026-03-10)
+### Core Contracts (2026-10-14 redeploy; GuildFactory and HorizonAchievements from Phase 13, 2026-03-10)
 
 | Contract | Address | BaseScan |
 |----------|---------|----------|
-| [MissionFactory](./src/MissionFactory.sol) | [`0x6d97964E9BE016A8AABA2f99F0bA419464Fb88D9`](https://sepolia.basescan.org/address/0x6d97964E9BE016A8AABA2f99F0bA419464Fb88D9#code) | [View](https://sepolia.basescan.org/address/0x6d97964E9BE016A8AABA2f99F0bA419464Fb88D9#code) |
-| [PaymentRouter](./src/PaymentRouter.sol) | [`0x3013db6C92EF956f86EBC0aDFECe70b80FA73600`](https://sepolia.basescan.org/address/0x3013db6C92EF956f86EBC0aDFECe70b80FA73600#code) | [View](https://sepolia.basescan.org/address/0x3013db6C92EF956f86EBC0aDFECe70b80FA73600#code) |
+| [MissionFactory](./src/MissionFactory.sol) | [`0x8D780F03206E6433c2e5F7E0aB40244Ee051a271`](https://sepolia.basescan.org/address/0x8D780F03206E6433c2e5F7E0aB40244Ee051a271#code) | [View](https://sepolia.basescan.org/address/0x8D780F03206E6433c2e5F7E0aB40244Ee051a271#code) |
+| [PaymentRouter](./src/PaymentRouter.sol) | [`0x3a84718A90E03621526748A1721f10D32BEaf903`](https://sepolia.basescan.org/address/0x3a84718A90E03621526748A1721f10D32BEaf903#code) | [View](https://sepolia.basescan.org/address/0x3a84718A90E03621526748A1721f10D32BEaf903#code) |
 | [GuildFactory](./src/GuildFactory.sol) | [`0x7349Cd1A4f7C1a74Db730743d873de98A2f3a32F`](https://sepolia.basescan.org/address/0x7349Cd1A4f7C1a74Db730743d873de98A2f3a32F#code) | [View](https://sepolia.basescan.org/address/0x7349Cd1A4f7C1a74Db730743d873de98A2f3a32F#code) |
-| [DisputeResolver](./src/DisputeResolver.sol) | [`0xdE37Ff10A487c852941DC842987dd8d5d8b9E855`](https://sepolia.basescan.org/address/0xdE37Ff10A487c852941DC842987dd8d5d8b9E855#code) | [View](https://sepolia.basescan.org/address/0xdE37Ff10A487c852941DC842987dd8d5d8b9E855#code) |
+| [DisputeResolver](./src/DisputeResolver.sol) | [`0x073A3674FB09177fcD6615bD920Ca1Fc52Fbd156`](https://sepolia.basescan.org/address/0x073A3674FB09177fcD6615bD920Ca1Fc52Fbd156#code) | [View](https://sepolia.basescan.org/address/0x073A3674FB09177fcD6615bD920Ca1Fc52Fbd156#code) |
 | [HorizonAchievements](./src/HorizonAchievements.sol) | [`0xfCC5971C3704C7a1F1c9E4acFdC7eEd60D4e4949`](https://sepolia.basescan.org/address/0xfCC5971C3704C7a1F1c9E4acFdC7eEd60D4e4949#code) | [View](https://sepolia.basescan.org/address/0xfCC5971C3704C7a1F1c9E4acFdC7eEd60D4e4949#code) |
-| [MissionEscrow (Implementation)](./src/MissionEscrow.sol) | [`0x3b02a7eac30Bc4a800Eebd69Fed75c818dB92099`](https://sepolia.basescan.org/address/0x3b02a7eac30Bc4a800Eebd69Fed75c818dB92099#code) | [View](https://sepolia.basescan.org/address/0x3b02a7eac30Bc4a800Eebd69Fed75c818dB92099#code) |
+| [MissionEscrow (Implementation)](./src/MissionEscrow.sol) | [`0x9aBe058635D961191571140948774cD829847406`](https://sepolia.basescan.org/address/0x9aBe058635D961191571140948774cD829847406#code) | [View](https://sepolia.basescan.org/address/0x9aBe058635D961191571140948774cD829847406#code) |
 
 ### M5 Token Stack (2026-02-21)
 
@@ -36,15 +36,43 @@
 | [iTakeMetaDAO](./src/DeliveriesDAO.sol) | [`0x883B7D8CA234912B82AC9718664c2dF224c98a67`](https://sepolia.basescan.org/address/0x883B7D8CA234912B82AC9718664c2dF224c98a67#code) | [View](https://sepolia.basescan.org/address/0x883B7D8CA234912B82AC9718664c2dF224c98a67#code) |
 | [AtobaDAO (SubDAO)](./src/DeliveriesDAO.sol) | [`0x85fB5f85FeC3c18a47e21f22AB69A9bBB09d913f`](https://sepolia.basescan.org/address/0x85fB5f85FeC3c18a47e21f22AB69A9bBB09d913f#code) | [View](https://sepolia.basescan.org/address/0x85fB5f85FeC3c18a47e21f22AB69A9bBB09d913f#code) |
 | [LisboaCafe (SubDAO)](./src/DeliveriesDAO.sol) | [`0xAA0096E1038449220dB872c19BDF9CD6d619b7BA`](https://sepolia.basescan.org/address/0xAA0096E1038449220dB872c19BDF9CD6d619b7BA#code) | [View](https://sepolia.basescan.org/address/0xAA0096E1038449220dB872c19BDF9CD6d619b7BA#code) |
-| [DeliveryMissionFactory](./src/DeliveryMissionFactory.sol) | [`0x77DD51c63A3fEE0442f4383B5a9D91d470BD04F5`](https://sepolia.basescan.org/address/0x77DD51c63A3fEE0442f4383B5a9D91d470BD04F5#code) | [View](https://sepolia.basescan.org/address/0x77DD51c63A3fEE0442f4383B5a9D91d470BD04F5#code) |
-| [DeliveryEscrow (Implementation)](./src/DeliveryEscrow.sol) | [`0x21Fd1D6f66BFf3B084FdA428C75b659A46446f4b`](https://sepolia.basescan.org/address/0x21Fd1D6f66BFf3B084FdA428C75b659A46446f4b#code) | [View](https://sepolia.basescan.org/address/0x21Fd1D6f66BFf3B084FdA428C75b659A46446f4b#code) |
+| [DeliveryMissionFactory](./src/DeliveryMissionFactory.sol) | [`0xf02Cdc9eD74E2fd63Cc98ED10e78A53512e25d53`](https://sepolia.basescan.org/address/0xf02Cdc9eD74E2fd63Cc98ED10e78A53512e25d53#code) | [View](https://sepolia.basescan.org/address/0xf02Cdc9eD74E2fd63Cc98ED10e78A53512e25d53#code) |
+| [DeliveryEscrow (Implementation)](./src/DeliveryEscrow.sol) | [`0x0A2F4Eeed28D630f0592068054e974991eBFe08B`](https://sepolia.basescan.org/address/0x0A2F4Eeed28D630f0592068054e974991eBFe08B#code) | [View](https://sepolia.basescan.org/address/0x0A2F4Eeed28D630f0592068054e974991eBFe08B#code) |
 | [DeliveriesDAO](./src/DeliveriesDAO.sol) | [`0xaB2F7787b72FcFfEA8E543375FE2db44D9C6ae53`](https://sepolia.basescan.org/address/0xaB2F7787b72FcFfEA8E543375FE2db44D9C6ae53#code) | [View](https://sepolia.basescan.org/address/0xaB2F7787b72FcFfEA8E543375FE2db44D9C6ae53#code) |
+| [GuildFactory (iTake)](./src/GuildFactory.sol) | [`0xB3720D5f3Ff1A6385aC0C1f54f88536F68a967F3`](https://sepolia.basescan.org/address/0xB3720D5f3Ff1A6385aC0C1f54f88536F68a967F3#code) | [View](https://sepolia.basescan.org/address/0xB3720D5f3Ff1A6385aC0C1f54f88536F68a967F3#code) |
+| [GuildDAO (Implementation, iTake)](./src/GuildDAO.sol) | [`0x456D4c04F9001fDE8cdc306dd6b07a79655BB131`](https://sepolia.basescan.org/address/0x456D4c04F9001fDE8cdc306dd6b07a79655BB131#code) | [View](https://sepolia.basescan.org/address/0x456D4c04F9001fDE8cdc306dd6b07a79655BB131#code) |
+
+### 2026-10-13 Redeploy (Base Sepolia)
+
+Deployed and BaseScan-verified by `0x2b30efBA367D669c9cd7723587346a79b67A42DB`.
+
+| Contract | New address | Block | Replaces |
+|----------|-------------|-------|----------|
+| DeliveryMissionFactory | `0xf02Cdc9eD74E2fd63Cc98ED10e78A53512e25d53` | 48074534 | `0x77DD51c63A3fEE0442f4383B5a9D91d470BD04F5` |
+| DeliveryEscrow (Implementation) | `0x0A2F4Eeed28D630f0592068054e974991eBFe08B` | - | `0x21Fd1D6f66BFf3B084FdA428C75b659A46446f4b` |
+| GuildFactory (iTake) | `0xB3720D5f3Ff1A6385aC0C1f54f88536F68a967F3` | 48074577 | `0xB54795f8049De1acf729160bcD9184e50E4f267E` |
+| GuildDAO (Implementation, iTake) | `0x456D4c04F9001fDE8cdc306dd6b07a79655BB131` | - | n/a |
+
+Reason: GuildDAO fix (#949) and DeliveryEscrow.settleDispute fix plus router wiring (#954). The core GuildFactory (`0x7349...`, Phase 13 redeploy) is unchanged by this redeploy.
+
+### 2026-10-14 Core Redeploy (Base Sepolia)
+
+Deployed and BaseScan-verified by `0x2b30efBA367D669c9cd7723587346a79b67A42DB`. A fresh, coherently wired core set (DisputeResolver, then PaymentRouter + MissionFactory + PauseRegistry). The old core router/factory are orphaned and untouched.
+
+| Contract | New address | Block | Replaces |
+|----------|-------------|-------|----------|
+| DisputeResolver | `0x073A3674FB09177fcD6615bD920Ca1Fc52Fbd156` | 48092206 | `0xdE37Ff10A487c852941DC842987dd8d5d8b9E855` |
+| PaymentRouter | `0x3a84718A90E03621526748A1721f10D32BEaf903` | 48092222 | `0x3013db6C92EF956f86EBC0aDFECe70b80FA73600` |
+| MissionFactory | `0x8D780F03206E6433c2e5F7E0aB40244Ee051a271` | 48092224 | `0x6d97964E9BE016A8AABA2f99F0bA419464Fb88D9` |
+| MissionEscrow (Implementation) | `0x9aBe058635D961191571140948774cD829847406` | 48092224 | `0x3b02a7eac30Bc4a800Eebd69Fed75c818dB92099` |
+| PauseRegistry | `0x05Ec569d16Ac6b7B5dEB8B815976512CED645A87` | 48092227 | n/a (first deployment) |
+
+Wiring: `PaymentRouter.setMissionFactory(MissionFactory)`, `MissionFactory.setDisputeResolver(DisputeResolver)`, `MissionFactory.setPauseRegistry(PauseRegistry)`, and `DeliveryMissionFactory.setDisputeResolver(DisputeResolver)`. Full tx list: `script/README.md`.
 
 ### Not Yet Deployed (pending governance bootstrap)
 
 | Contract | Status |
 |----------|--------|
-| PauseRegistry | Awaiting deploy |
 | GuildXP | Awaiting deploy |
 | GuildGovernorFactory | Awaiting deploy |
 | SeasonsRegistry | Awaiting deploy |
@@ -97,11 +125,11 @@
 For application integration, use these environment variables:
 
 ```env
-# Base Sepolia Testnet (Phase 13 addresses)
-NEXT_PUBLIC_MISSION_FACTORY_ADDRESS=0x6d97964E9BE016A8AABA2f99F0bA419464Fb88D9
-NEXT_PUBLIC_PAYMENT_ROUTER_ADDRESS=0x3013db6C92EF956f86EBC0aDFECe70b80FA73600
+# Base Sepolia Testnet (2026-10-14 core redeploy)
+NEXT_PUBLIC_MISSION_FACTORY_ADDRESS=0x8D780F03206E6433c2e5F7E0aB40244Ee051a271
+NEXT_PUBLIC_PAYMENT_ROUTER_ADDRESS=0x3a84718A90E03621526748A1721f10D32BEaf903
 NEXT_PUBLIC_GUILD_FACTORY_ADDRESS=0x7349Cd1A4f7C1a74Db730743d873de98A2f3a32F
-NEXT_PUBLIC_DISPUTE_RESOLVER_ADDRESS=0xdE37Ff10A487c852941DC842987dd8d5d8b9E855
+NEXT_PUBLIC_DISPUTE_RESOLVER_ADDRESS=0x073A3674FB09177fcD6615bD920Ca1Fc52Fbd156
 NEXT_PUBLIC_ACHIEVEMENTS_ADDRESS=0xfCC5971C3704C7a1F1c9E4acFdC7eEd60D4e4949
 NEXT_PUBLIC_USDC_ADDRESS=0x036CbD53842c5426634e7929541eC2318f3dCF7e
 NEXT_PUBLIC_EURC_ADDRESS=0x808456652fdb597867f38412077A9182bf77359F
@@ -110,4 +138,4 @@ NEXT_PUBLIC_RPC_URL=https://sepolia.base.org
 
 ---
 
-*Last updated: 2026-06-11 (auto-synced from monorepo)*
+*Last updated: 2026-10-14 (hand-synced from monorepo staging)*
