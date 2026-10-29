@@ -3,8 +3,10 @@ name: CI
 # Unit tests only. Static checks (build, sizes, fmt) run locally in the
 # monorepo (packages/contracts), which this repo mirrors read-only.
 on:
+  # Not on PRs into main: the automated staging-to-main promotion PR is opened by the bot and merged at once,
+  # so its run would only wait for approval and expire. The promotion workflow has its own build gate.
   pull_request:
-    branches: [main, staging]
+    branches: [staging]
   push:
     branches: [staging]
 
